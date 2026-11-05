@@ -1,7 +1,12 @@
 # Rocky — Autonomous Commerce Intelligence Platform
 
-A governed multi-agent system that **discovers → analyses → validates → transforms → prices → (with approval) launches**
+A governed multi-agent system that **discovers → analyses → validates → transforms → brands → prices → (with approval) launches**
 commercial opportunities, initially for the Swedish / EU market.
+
+**Rocky Flare** is its creative intelligence layer: editable agent personalities, genre intelligence and hybrid fusion,
+the Product Mutation Engine, Think Sideways, creative competitions, review panels, councils and discussions, a brand
+portfolio, a versioned asset library, campaign testing and learning from real results — plus the **Field Operations**
+division for survival, tactical, outdoor and e-mobility products. See [ROCKY_FLARE.md](ROCKY_FLARE.md).
 
 > Status: **Phase 1 (foundation) complete, Phase 3 (opportunity engine) largely complete, Phases 2/4/5 partially
 > implemented.** See [ROADMAP.md](ROADMAP.md) for the exact list of completed, partial, blocked and planned features.
@@ -18,7 +23,9 @@ commercial opportunities, initially for the Swedish / EU market.
 | Approval center (LEVEL 4–5 actions), audit trail, live WebSocket event bus | ✅ tested |
 | Connectors on official APIs: YouTube Data v3, Reddit, eBay Browse, Etsy v3, Shopify Admin (draft products) | ✅ implemented, tested with mocked HTTP; **not exercised against live APIs** (no credentials in this environment) |
 | 23 further platforms (TikTok, Instagram, Amazon, Google Trends, AliExpress, Stripe, …) | ⏳ registered as *planned* with access requirements documented |
-| Next.js command center (10 sections) | ✅ builds, type-checks, verified in a real browser against the live API |
+| Rocky Flare: 60 editable personas, 45-genre taxonomy, fusion, originality gate, mutation engine, think-sideways, competitions/panels/councils/discussions, brand portfolio, assets, campaigns & Style DNA learning | ✅ tested (engine + end-to-end API tests) |
+| Field Operations: pillars, segments, ecosystems, Nordic-first sourcing, compatibility matrix, mobility/survival compliance | ✅ tested |
+| Next.js command center (10 core sections + 8 Rocky Flare sections + Field Operations with 14 subsections) | ✅ builds, type-checks, verified in a real browser against the live API |
 
 ## Quick start (local, no Docker)
 
@@ -29,7 +36,7 @@ pip install -r requirements-dev.txt
 cp ../.env.example ../.env            # optional; defaults work for local use
 alembic upgrade head                   # or let the app create tables on first start
 uvicorn app.main:app --reload --port 8000
-python -m pytest -q                    # 38 tests
+python -m pytest -q                    # 73 tests
 
 # frontend (separate shell)
 cd frontend
@@ -39,7 +46,8 @@ NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
 
 Open http://localhost:3000. The first visit asks you to create the admin account.
 To explore before any connector is configured: **Systems & Integrations → Load demo data**
-(synthetic, badged `DEMO` everywhere, removable with one click), then **Product Laboratory → Evaluate pipeline**.
+(synthetic, badged `DEMO` everywhere, removable with one click), then **Product Laboratory → Evaluate pipeline**,
+then try **Rocky Flare → Brand Laboratory → Creative competition** or **Field Operations → Creative Council**.
 
 ## Docker
 
@@ -64,6 +72,7 @@ Deterministic agents (scoring, economics, compliance, trends, business models, e
 - [AGENTS.md](AGENTS.md) — every agent, its task types, permission level and outputs
 - [SECURITY.md](SECURITY.md) — permission levels, approvals, kill switch, secrets, data protection
 - [INTEGRATIONS.md](INTEGRATIONS.md) — every connector, its state and the credentials it needs
+- [ROCKY_FLARE.md](ROCKY_FLARE.md) — creative intelligence layer & Field Operations: modules, workflows, acceptance map
 - [ROADMAP.md](ROADMAP.md) — completed / partial / blocked / planned
 
 ## Repository layout

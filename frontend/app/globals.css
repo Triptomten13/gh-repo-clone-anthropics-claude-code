@@ -41,3 +41,21 @@ input, select, textarea {
   padding: 6px 10px; color: var(--color-ink); font-size: 13px;
 }
 input:focus, select:focus, textarea:focus { outline: 2px solid var(--color-ember-dim); outline-offset: 0; }
+
+/* ---------------------------------------------------------------- Rocky Flare & Field Operations */
+@theme {
+  --color-gold: #c9a227;
+  --color-bronze: #a0703c;
+  --color-olive: #6b6a4c;
+  --color-parchment: #e8dcc0;
+  --color-char: #1c1c1a;
+}
+.field-bg {
+  background-image:
+    linear-gradient(rgba(201, 162, 39, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201, 162, 39, 0.045) 1px, transparent 1px),
+    radial-gradient(circle at 85% 12%, rgba(160, 112, 60, 0.10), transparent 42%);
+  background-size: 32px 32px, 32px 32px, auto;
+}
+.parchment-rule { height: 1px; background: linear-gradient(90deg, transparent, var(--color-gold), transparent); opacity: .55; }
+.compass-mark { border: 1px solid var(--color-bronze); border-radius: 9999px; }

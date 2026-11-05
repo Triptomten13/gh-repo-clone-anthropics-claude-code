@@ -232,3 +232,15 @@ def test_personalization_privacy_guard():
     bad = personalization.validate_fields([{"name": "inferred_religion", "source": "social_media", "purpose": "target"},
                                            {"name": "price_by_profile", "source": "customer_input", "purpose": "x"}])
     assert not bad["valid"] and len(bad["errors"]) >= 3
+
+
+def test_support_bar_depends_on_risk_tolerance():
+    ctx = {"concept": {"id": 1, "evaluation": {"audience_relevance": 75, "production_cost": 70, "brand_scalability": 80, "marketing_potential": 75,
+                                              "visual_recognition": 85}},
+           "originality": {"score": 80, "components": {"creative_coherence": 85}, "flags": []},
+           "product": {"net_margin": 0.2, "purchase_signal": 60, "score_confidence": 0.8, "compliance_status": "needs_review"}}
+    same = {**PS.SEED_BY_ID["devils_advocate"], "evaluation_lens": PS.LENSES["executive"]}
+    bold = {**same, "risk_tolerance": 0.7, "novelty_appetite": 0.2}
+    da, vis = PS.evaluate(same, ctx), PS.evaluate(bold, ctx)
+    assert abs(da["weighted_score"] - vis["weighted_score"]) < 5  # nearly the same score…
+    assert da["stance"] != "support" and vis["stance"] == "support"  # …but the sceptic holds a higher bar

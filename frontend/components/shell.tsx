@@ -1,12 +1,14 @@
 "use client";
-import { Activity, Archive, Beaker, Bot, Briefcase, FlaskConical, Gauge, Landmark, Power, Radar, Settings, ShieldCheck } from "lucide-react";
+import { Activity, Archive, Beaker, Bot, Briefcase, Compass, Dna, FlaskConical, Gauge, GitFork, Landmark, Lightbulb, Megaphone, MessagesSquare, Palette, Power, Radar, Settings, ShieldCheck, Sparkles, UserCog } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, getToken, setToken } from "@/lib/api";
 import { useApi, useLiveEvents } from "@/lib/hooks";
 
-const NAV = [
+type NavItem = { href: string; label: string; icon: typeof Gauge };
+const GROUPS: { title: string; tone: string; items: NavItem[] }[] = [];
+const NAV: NavItem[] = [
   { href: "/", label: "Executive Overview", icon: Gauge },
   { href: "/radar", label: "Market Radar", icon: Radar },
   { href: "/lab", label: "Product Laboratory", icon: FlaskConical },
@@ -18,6 +20,19 @@ const NAV = [
   { href: "/archive", label: "Intelligence Archive", icon: Archive },
   { href: "/settings", label: "Systems & Integrations", icon: Settings },
 ];
+const FLARE: NavItem[] = [
+  { href: "/flare", label: "Creative Intelligence", icon: Sparkles },
+  { href: "/flare/brands", label: "Brand Laboratory", icon: Palette },
+  { href: "/flare/mutations", label: "Mutation Lab", icon: Dna },
+  { href: "/flare/campaigns", label: "Campaign Studio", icon: Megaphone },
+  { href: "/flare/portfolio", label: "Brand Portfolio", icon: GitFork },
+  { href: "/flare/sideways", label: "Think Sideways", icon: Lightbulb },
+  { href: "/flare/personas", label: "Personalities", icon: UserCog },
+  { href: "/flare/collab", label: "Collaboration Log", icon: MessagesSquare },
+];
+const FIELD: NavItem[] = [{ href: "/field", label: "Field Operations", icon: Compass }];
+GROUPS.push({ title: "Command", tone: "text-ink-3", items: NAV }, { title: "Rocky Flare", tone: "text-ember", items: FLARE },
+  { title: "Field Ops", tone: "text-gold", items: FIELD });
 
 export function RockyMark({ size = 28 }: { size?: number }) {
   // Original mark: a faceted granite peak with an ember summit line.
@@ -53,7 +68,7 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-[#121211]/90 md:flex">
-        <div className="flex items-center gap-2.5 px-5 pb-4 pt-5">
+        <div className="flex items-center gap-2.5 px-5 pb-3 pt-5">
           <RockyMark />
           <div>
             <div className="font-mono text-[15px] font-bold tracking-[0.32em]">ROCKY</div>
@@ -61,12 +76,15 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <div className="scan-line mx-5 mb-3 opacity-50" />
-        <nav className="flex-1 space-y-0.5 px-2">
-          {NAV.map(({ href, label, icon: Icon }) => {
-            const active = href === "/" ? path === "/" : path.startsWith(href);
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
+          {GROUPS.map((g) => (
+          <div key={g.title} className="mb-2">
+          <div className={`px-3 pb-1 pt-2 font-mono text-[9.5px] uppercase tracking-[0.22em] ${g.tone}`}>{g.title}</div>
+          {g.items.map(({ href, label, icon: Icon }) => {
+            const active = href === "/" ? path === "/" : href === "/flare" ? path === "/flare" : path.startsWith(href);
             return (
               <Link key={href} href={href}
-                className={`flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] transition ${active ? "bg-surface-2 text-ink" : "text-ink-3 hover:bg-surface hover:text-ink-2"}`}>
+                className={`flex items-center gap-2.5 rounded-md px-3 py-1.5 text-[13px] transition ${active ? "bg-surface-2 text-ink" : "text-ink-3 hover:bg-surface hover:text-ink-2"}`}>
                 <Icon size={15} className={active ? "text-ember" : ""} />
                 <span className="flex-1">{label}</span>
                 {href === "/approvals" && (approvals.data?.length ?? 0) > 0 && (
@@ -75,6 +93,8 @@ export function Shell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+          </div>
+          ))}
         </nav>
         <div className="border-t border-line px-4 py-3 text-[11px] text-ink-3">
           <div className="flex items-center gap-1.5">

@@ -307,7 +307,9 @@ def evaluate(persona: dict[str, Any], ctx: dict[str, Any]) -> dict[str, Any]:
     generic = [f["detail"] for f in flags if f.get("code") in ("generic_name", "ai_phrases", "overused_slogan", "predictable_palette",
                                                                  "buzzwords", "empty_description", "no_target_customer", "template_suffix")]
     improvements = [IMPROVE[k] for k in sorted(lens, key=lambda k: crit[k]) if crit[k] < 55][:3]
-    stance = "support" if score >= 65 else "caution" if score >= 50 else "oppose"
+    # Sceptics need more before they support: the bar rises as risk tolerance falls (DA ≈ 77, Visionary ≈ 59).
+    support_bar = 65 + (0.5 - risk) * 30
+    stance = "support" if score >= support_bar else "caution" if score >= support_bar - 15 else "oppose"
     if risk < 0.3 and any(f.get("severity") == "block" for f in flags):
         stance = "oppose"
     known = sum(1 for v in ((ctx.get("product") or {}).get("net_margin"), (ctx.get("product") or {}).get("purchase_signal"), ctx.get("concept")) if v is not None)

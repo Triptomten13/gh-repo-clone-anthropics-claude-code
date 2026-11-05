@@ -90,6 +90,16 @@ product.score (30) → opportunity.generate (40)`. To scale out, run `drain()` i
   feeds the self-improvement agent.
 - **Forecast** — OLS on daily totals with an ≈80% band; refuses with < 14 days of data.
 
+## Rocky Flare layer
+
+`backend/app/flare/` holds pure creative engines (taxonomy, genres, originality, mutation, sideways, field, campaigns,
+learning, portfolio, assets, commercial, personalization) and `service.py` (DB helpers). `agents/flare_agents.py` exposes
+them as orchestrated agents. Multi-agent workflows use `Task.depends_on`: `next_queued()` only returns a task whose
+dependencies are in a terminal state, so a synthesis step always runs after its members — also with several workers in future.
+New tables: `personas`, `persona_versions`, `persona_memory`, `custom_genres`, `brands`, `brand_concepts`,
+`creative_assets`, `campaigns`, `campaign_performance`, `collaboration_sessions`, `collaboration_turns`, `graph_nodes`,
+`graph_edges`, `compatibility_records` (migration `0002`). Details: [ROCKY_FLARE.md](ROCKY_FLARE.md).
+
 ## Frontend
 
 Next.js App Router, all pages client-rendered against the API with a bearer token. `lib/hooks.ts` provides `useApi`

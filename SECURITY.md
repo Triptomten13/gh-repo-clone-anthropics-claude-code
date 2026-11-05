@@ -18,6 +18,15 @@ Every one of these changes is written to `audit_log`.
 **Agents cannot change their own permissions, security policies or financial limits.** There is no code path from an
 agent to `PATCH /api/agents/*`; `sync_agents()` never overwrites a level set by an admin.
 
+## Rocky Flare controls
+
+- Personas shape judgement only; they have no permission, budget or limit fields, and only admins can edit them (versioned + audited).
+- Concept approval is admin-only and requires the anti-generic gate to pass. Brands need an admin-recorded trademark search
+  (with evidence) and a LEVEL 4 approval to go live. Campaign launches are LEVEL 5. Acquisitions are research-only (offers LEVEL 5).
+- Generated SVG assets are rendered through `<img>` data URLs so markup can never execute; user text inside SVGs is XML-escaped.
+- Real agency names/seals are blocked in brand assets; conspiracy aesthetics must read as fiction.
+- Personalisation accepts only customer-entered data with a stated purpose; inferred or scraped attributes and sensitive-category profiling are rejected.
+
 ## Emergency controls
 
 - **Kill switch** (`POST /api/system/kill-switch`, red button in the header): rejects new tasks, cancels queued tasks,

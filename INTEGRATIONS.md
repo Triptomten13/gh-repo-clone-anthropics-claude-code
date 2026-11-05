@@ -19,6 +19,13 @@ States: `configured` (implemented + credentials present) · `missing_credentials
 To verify a connector after adding credentials: put a keyword on the Market Radar watchlist and press
 **Run market scan**; the research task result (Agent Control Room) shows the signal count or the API error.
 
+## Creative asset providers
+
+| Provider | State | Notes |
+|---|---|---|
+| `procedural_svg` | ✅ implemented, tested | Offline generator: palette boards, wordmarks, sigils, packaging fronts from the brand system |
+| OpenAI Images (`OPENAI_API_KEY`), Stability AI (`STABILITY_API_KEY`), Replicate (`REPLICATE_API_TOKEN`) | ⏳ planned | Same `ImageProvider` interface in `backend/app/flare/assets.py`; selecting one today blocks the task with a clear reason |
+
 ## Planned (registered, not implemented)
 
 TikTok Research / Shop Partner API · Instagram Graph API · Amazon PA-API 5 / SP-API · Google Trends API (alpha) ·

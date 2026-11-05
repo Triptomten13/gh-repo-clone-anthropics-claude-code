@@ -20,7 +20,12 @@ def _story(name: str, product: str, h_primary, h_secondary, materials: list[str]
             f"who deal with {problem}. Every claim on the label is one we can test.")
 
 
-def _tagline(style: str, product_noun: str, app: str, problem: str) -> str:
+TAGLINE_ROTATION = ("practical", "imaginative", "technical", "warm", "terse", "systematic", "scholarly")
+
+
+def _tagline(style: str, product_noun: str, app: str, problem: str, variant: int = 0) -> str:
+    if variant:
+        style = TAGLINE_ROTATION[(TAGLINE_ROTATION.index(style) + variant if style in TAGLINE_ROTATION else variant) % len(TAGLINE_ROTATION)]
     return {
         "cynical": f"{product_noun.capitalize()} that pays for its place in the bag.",
         "skeptical": f"Tested before it is promised: {app}.",
@@ -54,7 +59,7 @@ def author_concept(persona: dict[str, Any], product: dict[str, Any], profile: Pr
     app_tag = max(profile.tags, key=profile.tags.get) if profile.tags else ""
     app_phrase = G.TAG_PHRASES.get(app_tag, noun)
     concept = {
-        "name": d.title, "tagline": _tagline(persona.get("communication_style", ""), noun, app_phrase, problem),
+        "name": d.title, "tagline": _tagline(persona.get("communication_style", ""), noun, app_phrase, problem, pick),
         "primary_genre": comps[0], "secondary_genre": comps[1], "hybrid": {"id": d.hybrid_id, "name": d.title},
         "direction": d.brand_system.model_dump(), "audience": audience, "usp": usp,
         "story": _story(d.title, noun, gp, gs, d.brand_system.materials_textures, seg["label"].lower() if seg else gp.audience, problem),
@@ -86,8 +91,12 @@ def deterministic_revision(concept: dict[str, Any], flags: list[dict[str, str]],
     if codes & {"generic_name", "template_suffix", "trademark_conflict", "real_organisation", "empty_name"}:
         gp, gs = GENRES[c["primary_genre"]], GENRES[c["secondary_genre"]]
         styles = ["mythic", "latin", "single", "nordic"]
+        old_name = c["name"]
         c["name"] = G._name(gp, gs, seed=f"rev{attempt}", naming_style=styles[attempt % len(styles)])
         c["hybrid"] = {**c["hybrid"], "name": c["name"]}
+        if old_name:  # keep the copy consistent with the new name
+            for f_ in ("tagline", "story", "usp"):
+                c[f_] = re.sub(re.escape(old_name), c["name"], c.get(f_) or "")
     for field in ("tagline", "story", "usp", "description"):
         txt = c.get(field) or ""
         for p in O.AI_PHRASES + O.OVERUSED_SLOGANS + O.BUZZWORDS:

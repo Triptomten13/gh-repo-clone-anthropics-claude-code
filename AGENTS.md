@@ -21,6 +21,29 @@ human-approved `Approval` for each action. Admins can change levels in the Agent
 | Experimentation (`experiments`) | operations | 3 | `experiment.evaluate` | no | Scale / iterate / abandon against pre-registered metrics; A/B significance; writes `Lesson` |
 | Self-Improvement (`self_improvement`) | operations | 1 | `system.self_evaluate` | no | Forecast MAPE, agent success/failure rates, improvement *proposals* only |
 
+## Rocky Flare agents (`backend/app/agents/flare_agents.py`)
+
+| Agent (id) | Level | Task types | What it does |
+|---|---|---|---|
+| Rocky Flare Creative Engine (`flare_engine`) | 2 | `flare.directions`, `flare.mutate`, `flare.sideways`, `flare.field_analysis`, `flare.ecosystem`, `flare.campaign_matrix`, `flare.assets`, `flare.revise` | Runs the creative engines; persists graphs, concepts, campaigns and assets |
+| Council Chair (`flare_council`) | 2 | `flare.panel`, `flare.council`, `flare.competition`, `flare.discussion`, `flare.judge`, `flare.synthesize` | Spawns persona tasks with dependencies, then synthesises without forcing consensus |
+| Persona agents (`p_<persona>`) | 2 | `persona.evaluate`, `persona.concept`, `persona.turn` (addressed by agent id) | One per persona (studio, review panel, Field Ops). Personality is read from the DB on every task |
+| Creative Analyst (`p_creative_analyst`) | 1 | `flare.campaign_analysis` | Ranks campaigns by contribution; refreshes Style DNA; writes persona calibration memory |
+| Commercial agents (`p_audience_monetization`, `p_digital_assets`, `p_b2b_opportunity`, `p_licensing`, `p_local_opportunity`, `p_subscription_intel`, `p_waste_to_value`, `p_acquisition`) | 1 | `flare.commercial.<module>` | Commercial intelligence modules; recommend only |
+
+Every agent — including the original 14 — carries a persona from the **Personality Registry** (60 personas). Existing agents
+use theirs when they sit on panels, councils and discussions (`persona.*` tasks are dispatched by the orchestrator).
+Field Operations personas (21): Survival Researcher, Nordic Preparedness Analyst, Bushcraft Product Scout, E-Scooter Intelligence,
+E-Bike Intelligence, E-Mobility Engineer, Tactical Design Director, EDC Product Designer, Outdoor Innovation Engineer,
+Ancient Symbolism Art Director, Biblical Reference Researcher, Esoteric Visual Researcher, Conspiracy Culture Researcher,
+Modular Systems Architect, Product Compatibility Analyst, Safety & Compliance Officer, Outdoor Content Strategist,
+Tactical Brand Strategist, Supplier Intelligence Specialist, Product Mutation Specialist, Commercial Portfolio Analyst.
+
+Persona fields are behaviour, not decoration: `evaluation_lens` (weights over 12 criteria), `genre_affinities`,
+`novelty_appetite`, `risk_tolerance` (also sets the bar for "support"), `naming_style`, `communication_style`.
+Edit them in **Rocky Flare → Personalities**; every change is versioned and audited. Personas have no permission or
+budget fields — authority stays in the Agent Control Room.
+
 ## Message contract
 
 Every task produces an `AgentMessage` with: agent id, task id, timestamp, summary, findings, evidence, confidence,

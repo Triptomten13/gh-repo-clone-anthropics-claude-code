@@ -83,7 +83,8 @@ class FlareEngineAgent(BaseAgent):
         p = c["product_row"]
         nodes, edges = M.mutate(p.name, p.category, p.tags, p.supplier, p.retail_price, c["profile"].tags)
         S.save_graph(ctx.db, f"mutation:{p.id}",
-                     [{"key": n.key, "kind": n.mutation_type, "label": n.title, "data": n.model_dump()} for n in nodes],
+                     [{"key": n.key, "kind": n.mutation_type, "label": n.title if n.key == "base" else n.mutation_type.replace("_", " "),
+                       "data": n.model_dump()} for n in nodes],
                      [e.model_dump() for e in edges])
         return AgentOutput(summary=f"'{p.name}': {len(nodes) - 1} mutations; top: {nodes[0].title}",
                            result={"nodes": [n.model_dump() for n in nodes], "edges": [e.model_dump() for e in edges], "innovation": c["innovation"]},
@@ -570,18 +571,10 @@ def _discussion_turn(ctx: AgentContext, task: Task, p: dict[str, Any], s: Collab
         evidence = [{"trend_velocity": tv, "platforms": plats, "purchase_signal": prod.get("purchase_signal")}]
     elif seat == "visionary":
         ctx.check("brand.draft")
-        dirs = G.creative_directions(c["profile"], n=3, learned=c["learned"], usage=c["usage"], affinities=p["genre_affinities"],
-                                     novelty_appetite=p["novelty_appetite"], seed=f"d{s.id}", naming_style=p["naming_style"])
         ids = []
-        for i, d in enumerate(dirs):
-            concept = creative.revise_until_clean({
-                "name": d.title, "tagline": f"{G.TAG_PHRASES.get(max(c['profile'].tags, key=c['profile'].tags.get), 'gear').capitalize()} with a point of view.",
-                "primary_genre": d.hybrid_id.split("+")[0], "secondary_genre": d.hybrid_id.split("+")[1], "hybrid": {"id": d.hybrid_id, "name": d.title},
-                "direction": d.brand_system.model_dump(), "audience": c["segments"][0]["label"] if c["segments"] else GENRES[d.hybrid_id.split('+')[0]].audience,
-                "usp": (c["innovation"][0]["proposal"] if c["innovation"] else ""), "positioning": d.scores.expected_positioning,
-                "story": f"{d.title}: {d.brand_system.visual_direction}. Built from {', '.join(d.brand_system.materials_textures[:2])} for "
-                         f"{(c['segments'][0]['label'].lower() if c['segments'] else 'a specific audience')}.",
-                "evaluation": d.scores.model_dump(), "palette": d.brand_system.color_palette}, c["profile"], prod, c["usage"])
+        for i in range(3):  # three different directions, authored like any competition concept
+            concept = creative.author_concept(p, prod, c["profile"], c["segments"], c["innovation"], c["learned"], c["usage"],
+                                              seed=f"d{s.id}", pick=i)
             ids.append(S.save_concept(ctx.db, concept, prod["id"], p["id"], session_id=s.id).id)
         s.concept_ids = ids
         saved = [ctx.db.get(BrandConcept, i) for i in ids]

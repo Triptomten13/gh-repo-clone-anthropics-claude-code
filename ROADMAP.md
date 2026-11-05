@@ -52,7 +52,23 @@ Legend: ✅ complete & tested · 🟡 partial · ⛔ blocked (external dependenc
 - ⏳ Recalibrating scoring weights from outcomes (needs a history of launched products)
 - ⏳ Vector memory / retrieval over the intelligence archive
 
+## Rocky Flare & Field Operations ✅ (see ROCKY_FLARE.md)
+- ✅ Personality registry (60 personas, editable, versioned, audited), persona agents in the orchestrator, task dependencies
+- ✅ Genre taxonomy (45), matching, fusion, ≥5 directions, originality score + anti-generic gate, revisions as versions
+- ✅ Mutation Engine 2.0 + Survival Innovation Lab, Think Sideways + challenges, cross-industry graphs
+- ✅ Creative competition, review panel, creative council, structured discussions (dissent recorded, no forced consensus)
+- ✅ Campaign testing matrix, performance ingestion, creative analyst, Style DNA learning, persona calibration, genre evolution, creative reuse
+- ✅ Brand Portfolio Manager (overlap detection, trademark + launch gates), creative asset library (procedural SVG, versions)
+- ✅ Eight commercial modules, personalisation privacy guard
+- ✅ Field Ops: pillars, 16 segments, ecosystems, mounting standards, Nordic-first sourcing, compatibility matrix, extended compliance
+- 🟡 LLM persona voice / sideways ideas implemented and tested with a fake provider; ⛔ not exercised live (no API key here)
+- ⏳ External image-generation adapters (OpenAI Images, Stability AI, Replicate) — registered as planned
+- ⏳ Official trademark search integration (EUIPO / PRV) — manual recording by an admin today
+- ⏳ Ad-platform performance sync (Meta/TikTok/Google) — manual or imported rows today
+
 ## Known limitations
 - Single in-process task worker; long LLM tasks run sequentially.
 - The compliance engine is keyword-based decision support; it is conservative and must be reviewed by a human.
 - Advertising benchmarks are planning assumptions until real campaign data is ingested.
+- Persona judgement without an LLM is a transparent lens-weighted heuristic (labelled `heuristic`).
+- Segment profiles, think-sideways bridges and mounting standards are curated knowledge to validate, not market data.

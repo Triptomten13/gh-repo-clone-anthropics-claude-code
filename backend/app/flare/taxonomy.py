@@ -275,7 +275,7 @@ GENRES: dict[str, Genre] = {g.id: g for g in [
           "Fjords, fog, firelight", "Wood & iron, runic seals", "Saga-led storytelling", "Saga shorts",
           "Endurance and kinship (avoid symbols co-opted by extremists)", _t(.4, .8, .7),
           {"outdoor": .8, "survival": .8, "winter": .8, "edc": .6, "apparel": .6, "kitchen": .4},
-          "Nordic heritage and outdoor fans", .75, 3, 4, 5, ("Ask", "Yggdra", "Fenrir", "Mjöd", "Varg"), (), ("cultural_heritage",), (), "D"),
+          "Nordic heritage and outdoor fans", .75, 3, 4, 5, ("Ask", "Yggdra", "Fenrir", "Runa", "Varg"), (), ("cultural_heritage",), (), "D"),
     Genre("illuminated_manuscript", "Illuminated manuscripts", "narrative", "Monastic libraries, gilded initials, marginalia.",
           ("#efe3c8", "#7b1e1e", "#1e3a5f", "#c9a227", "#2b2b2b"), "Uncial / gothic initials", "Book serif",
           ("vellum-look paper", "gold ink", "leather bindings"), ("gilded initials", "foxing"), "Drop caps, marginalia creatures, rubrication",
