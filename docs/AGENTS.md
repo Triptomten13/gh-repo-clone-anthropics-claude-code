@@ -20,6 +20,7 @@ human-approved `Approval` for each action. Admins can change levels in the Agent
 | Store Generator (`store_builder`) | commerce | 3 | `store.draft_listing` | no | Creates a Shopify **draft** product (requires approved compliance) and requests `store.publish_listing` approval |
 | Experimentation (`experiments`) | operations | 3 | `experiment.evaluate` | no | Scale / iterate / abandon against pre-registered metrics; A/B significance; writes `Lesson` |
 | Self-Improvement (`self_improvement`) | operations | 1 | `system.self_evaluate` | no | Forecast MAPE, agent success/failure rates, improvement *proposals* only |
+| Performance Engineering (`perf_engineer`) | operations | 1 | `perf.analyze` (daily) | no | Measured optimisation *proposals* from telemetry: slow routes, N+1 queries, cache hit rates, model reload churn, context-budget overruns, failing sources/agents — each with its baseline and a verification step; never applied automatically |
 
 ## Rocky Flare agents (`backend/app/agents/flare_agents.py`)
 
@@ -71,3 +72,10 @@ class MyAgent(BaseAgent):
 ```
 
 Append it to `ALL_AGENTS`; it is registered, persisted and routable on next start.
+
+### Agent policies (DAEMON HYPERINTELLIGENCE)
+
+Every agent exposes (`GET /api/agents` → `policy`): model tier, **context budget** (tokens per model call: fast 4,000 ·
+standard 12,000 · deep 24,000; overruns are logged as `context_over_budget`, never silently truncated), allowed tools,
+**timeout** (deep-tier agents 900 s) and a **success criterion**. `GET /api/agents/efficiency` reports per agent: outcomes,
+average duration, tokens, cost per success and what delegation to sub-tasks achieved (sub-task success rate).

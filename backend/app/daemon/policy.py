@@ -22,6 +22,8 @@ PROFILE_INFO: dict[str, dict[str, Any]] = {
     "SPECIALIST": {"summary": "operator-defined chains (MODEL_CHAIN_<TIER>), still subject to offline/privacy/spend rules", "max_tokens": None},
     "OFFLINE": {"summary": "local and LAN workers only — external providers are never called", "max_tokens": None},
     "EMERGENCY": {"summary": "smallest local model, short outputs, nothing external — for degraded hardware or incidents", "max_tokens": 256},
+    "PERFORMANCE": {"summary": "routing as BALANCED; keeps models resident longer and prewarms the deep model for speed", "max_tokens": None},
+    "LOW_MEMORY": {"summary": "one resident model, short context, small models first — entered automatically under memory pressure", "max_tokens": 512},
 }
 LOCAL_TIER_SLOTS = {"fast": ["eco", "chat"], "standard": ["chat", "eco"], "deep": ["deep", "chat"], "local": ["chat", "eco"]}
 PRIVATE = {"private", "sensitive", "personal"}
@@ -54,6 +56,10 @@ def _external_chain(tier: str) -> list[tuple[str, str]]:
 def plan(tier: str, providers: dict[str, Any], *, sensitivity: str = "normal", profile: str | None = None) -> tuple[list[Candidate], list[dict]]:
     st = state.load()
     prof = (profile or st["profile"] or "BALANCED").upper()
+    if profile is None:
+        from . import residency
+
+        prof = residency.effective_mode() if residency.effective_mode() in ("LOW_MEMORY", "EMERGENCY") else prof
     offline = bool(st["offline_mode"]) or prof == "OFFLINE"
     excluded: list[dict] = []
 
@@ -72,7 +78,7 @@ def plan(tier: str, providers: dict[str, Any], *, sensitivity: str = "normal", p
         ext = _external_chain(tier)
         if prof == "EMERGENCY":
             order = local
-        elif prof in ("ECO", "OFFLINE"):
+        elif prof in ("ECO", "OFFLINE", "LOW_MEMORY"):
             order = local + workers + (ext if tier == "fast" else [])
         elif prof == "DEEP" or (prof == "BALANCED" and tier == "deep"):
             order = ext + workers + local

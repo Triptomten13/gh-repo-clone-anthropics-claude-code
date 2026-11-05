@@ -101,7 +101,11 @@ class Server:
     def stop(self) -> None:
         if self.proc and self.proc.poll() is None:
             self.proc.terminate()
-            self.proc.wait(timeout=20)
+            try:
+                self.proc.wait(timeout=20)
+            except subprocess.TimeoutExpired:  # a busy worker thread must not leave an orphan server behind
+                self.proc.kill()
+                self.proc.wait(timeout=10)
 
 
 def client(email: str | None = None, password: str | None = None) -> httpx.Client:

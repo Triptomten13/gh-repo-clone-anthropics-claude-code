@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from ..agents.catalog import build_orchestrator
 from ..agents.orchestrator import GovernanceError
 from ..ai.llm import get_provider
+from ..config import get_settings
 from ..db import get_db
 from ..engines import business_models, compliance, economics, finance, pricing, scoring
 from ..governance import core as gov
@@ -209,12 +210,20 @@ def overview(db: Session = Depends(get_db), _: User = Depends(current_user)):
 @router.get("/agents")
 def list_agents(db: Session = Depends(get_db), _: User = Depends(current_user)):
     rows = db.scalars(select(Agent).order_by(Agent.division, Agent.id)).all()
+    # one grouped query instead of two COUNTs per agent (was 124 statements per request with 61 agents)
+    counts: dict[tuple[str, str], int] = {(a, st): n for a, st, n in db.execute(
+        select(Task.agent_id, Task.status, func.count(Task.id)).where(Task.status.in_(("running", "queued"))).group_by(Task.agent_id, Task.status))}
+    s = get_settings()
     out = []
     for a in rows:
         d = row(a)
-        d["task_types"] = list(orch.agents[a.id].task_types) if a.id in orch.agents else []
-        d["running"] = db.scalar(select(func.count(Task.id)).where(Task.agent_id == a.id, Task.status == "running"))
-        d["queued"] = db.scalar(select(func.count(Task.id)).where(Task.agent_id == a.id, Task.status == "queued"))
+        ag = orch.agents.get(a.id)
+        d["task_types"] = list(ag.task_types) if ag else []
+        d["running"], d["queued"] = counts.get((a.id, "running"), 0), counts.get((a.id, "queued"), 0)
+        if ag:
+            d["policy"] = {"model_tier": ag.tier, "context_budget_tokens": ag.context_budget, "tools": list(ag.tools),
+                           "timeout_s": max(s.default_task_timeout_s, s.deep_task_timeout_s) if ag.tier == "deep" else s.default_task_timeout_s,
+                           "success_criterion": ag.success_criterion}
         out.append(d)
     return out
 

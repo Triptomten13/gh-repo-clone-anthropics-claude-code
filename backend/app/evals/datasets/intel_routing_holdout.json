@@ -1,0 +1,14 @@
+[
+  {"q": "What is 1250 * 0.8?", "strategy": "deterministic"},
+  {"q": "Convert 5 kg to pounds", "strategy": "deterministic"},
+  {"q": "Who invented the astrolabe?", "strategy": "archive"},
+  {"q": "What are the newest open-source embedding models released recently?", "current": true, "strategy": "research"},
+  {"q": "Is there a known vulnerability in jinja2 right now?", "current": true, "strategy": "research"},
+  {"q": "Label each of these support emails as billing, shipping or other", "category": "classification", "strategy": "model_fast"},
+  {"q": "Fix this bug: TypeError: 'NoneType' object is not subscriptable in my python script", "category": "programming", "strategy": "model_standard"},
+  {"q": "Write a tagline for a hand-crank emergency radio", "category": "creative", "strategy": "model_standard"},
+  {"q": "If shipping costs 45 SEK per parcel and we send 120 parcels with a 10% bulk discount, how much do we pay?", "strategy": "model_deep"},
+  {"q": "What are the pros and cons of selling on Etsy versus our own Shopify store?", "category": "complex_reasoning", "strategy": "model_deep"},
+  {"q": "Read the text in this screenshot.jpg", "strategy": "unavailable"},
+  {"q": "Watch for new arXiv papers on speculative decoding every week", "strategy": "gsus"}
+]

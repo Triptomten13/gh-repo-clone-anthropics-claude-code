@@ -1,0 +1,89 @@
+{
+  "label": "after-p9-sql-l1",
+  "ran_at": "2026-11-05T19:24:36.220910+00:00",
+  "n": 30,
+  "synthetic_llm_calls": 20000,
+  "endpoints": {
+    "GET /api/ai/status": {
+      "status": 200,
+      "first_ms": 307.6,
+      "p50_ms": 2.5,
+      "p95_ms": 3.5,
+      "sql_per_request": 1.2
+    },
+    "GET /api/system/status": {
+      "status": 200,
+      "first_ms": 5.3,
+      "p50_ms": 4.2,
+      "p95_ms": 4.8,
+      "sql_per_request": 4
+    },
+    "GET /api/approvals?status=pending": {
+      "status": 200,
+      "first_ms": 6.3,
+      "p50_ms": 3.9,
+      "p95_ms": 4.6,
+      "sql_per_request": 2
+    },
+    "GET /api/overview": {
+      "status": 200,
+      "first_ms": 22.3,
+      "p50_ms": 7.5,
+      "p95_ms": 9.0,
+      "sql_per_request": 12
+    },
+    "GET /api/daemon/costs?days=30": {
+      "status": 200,
+      "first_ms": 189.7,
+      "p50_ms": 186.0,
+      "p95_ms": 229.0,
+      "sql_per_request": 11
+    },
+    "GET /api/daemon/library": {
+      "status": 200,
+      "first_ms": 9.1,
+      "p50_ms": 5.9,
+      "p95_ms": 6.6,
+      "sql_per_request": 4
+    },
+    "GET /api/ai/health": {
+      "status": 200,
+      "first_ms": 7.2,
+      "p50_ms": 4.1,
+      "p95_ms": 4.8,
+      "sql_per_request": 1.1
+    },
+    "GET /api/agents": {
+      "status": 200,
+      "first_ms": 14.2,
+      "p50_ms": 8.6,
+      "p95_ms": 11.9,
+      "sql_per_request": 3
+    },
+    "GET /api/auth/me": {
+      "status": 200,
+      "first_ms": 3.4,
+      "p50_ms": 3.1,
+      "p95_ms": 3.6,
+      "sql_per_request": 1
+    },
+    "POST /api/archive/search": {
+      "status": 200,
+      "first_ms": 12.3,
+      "p50_ms": 4.3,
+      "p95_ms": 5.4,
+      "sql_per_request": 2
+    },
+    "POST /api/daemon/proposals/generate": {
+      "status": 200,
+      "first_ms": 56.3,
+      "p50_ms": 54.4,
+      "p95_ms": 65.3,
+      "sql_per_request": 25.1
+    }
+  },
+  "rss_mb_after_start": 104.9,
+  "shell_page_view_ms": 10.6,
+  "shell_page_view_sql": 7.2,
+  "rss_mb_after_endpoints": 128.5
+}

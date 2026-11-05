@@ -4,16 +4,20 @@ import asyncio
 import logging
 import os
 import threading
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import event as sa_event
 from sqlalchemy import func, select
+from sqlalchemy.engine import Engine
 
 from .agents.catalog import build_orchestrator
 from .api.core_routes import router as core_router
 from .api.daemon_routes import router as daemon_router
+from .api.hyper_routes import router as hyper_router
 from .api.flare_routes import router as flare_router
 from .api.routes import router
 from .config import get_settings
@@ -45,6 +49,10 @@ async def lifespan(app: FastAPI):
         queued = db.scalar(select(func.count(Task.id)).where(Task.status == "queued"))
     finally:
         db.close()
+    from .daemon import residency, telemetry
+
+    telemetry.start()
+    residency.prewarm()
     if queued and os.getenv("RESUME_TASKS_ON_START", "true").lower() == "true":
         logging.getLogger(__name__).info("resuming %s queued task(s) after start (recovered: %s)", queued, rec)
         threading.Thread(target=orch.drain, args=(200,), daemon=True).start()
@@ -65,6 +73,7 @@ app.include_router(router)
 app.include_router(flare_router)
 app.include_router(core_router)
 app.include_router(daemon_router)
+app.include_router(hyper_router)
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -78,6 +87,7 @@ SECURITY_HEADERS = {
 
 @app.middleware("http")
 async def security_middleware(request: Request, call_next):
+    from .daemon import telemetry
     from .security.ratelimit import api_requests
 
     if request.url.path.startswith("/api/"):
@@ -85,10 +95,29 @@ async def security_middleware(request: Request, call_next):
         ok, retry = api_requests.hit(f"ip:{ip}", get_settings().api_rate_per_min, 60)
         if not ok:
             return JSONResponse({"detail": "rate limit exceeded"}, status_code=429, headers={"Retry-After": str(retry), **SECURITY_HEADERS})
-    response = await call_next(request)
+    counter = [0]
+    token = telemetry.sql_count.set(counter)
+    t0 = time.perf_counter()
+    try:
+        response = await call_next(request)
+    finally:
+        telemetry.sql_count.reset(token)
     for k, v in SECURITY_HEADERS.items():
         response.headers.setdefault(k, v)
+    route = request.scope.get("route")
+    if request.url.path.startswith("/api/") and request.method != "OPTIONS":  # CORS preflights are not application work
+        telemetry.record_request(f"{request.method} {getattr(route, 'path', request.url.path)}", (time.perf_counter() - t0) * 1000,
+                                 response.status_code, counter[0], int(response.headers.get("content-length") or 0))
     return response
+
+
+@sa_event.listens_for(Engine, "before_cursor_execute")
+def _count_sql(conn, cursor, statement, parameters, context, executemany):  # noqa: ARG001 - SQLAlchemy hook signature
+    from .daemon import telemetry
+
+    c = telemetry.sql_count.get()
+    if c is not None:
+        c[0] += 1
 
 
 @app.get("/health")

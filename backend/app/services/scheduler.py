@@ -18,7 +18,7 @@ from ..governance import core as gov
 log = logging.getLogger("rocky.scheduler")
 
 JOBS: list[tuple[str, timedelta, list[tuple[str, dict]]]] = [
-    ("daily", timedelta(days=1), [("intel.scan_market", {}), ("ceo.evaluate_pipeline", {"limit": 25})]),
+    ("daily", timedelta(days=1), [("intel.scan_market", {}), ("ceo.evaluate_pipeline", {"limit": 25}), ("perf.analyze", {})]),
     ("weekly", timedelta(days=7), [("ceo.weekly_review", {})]),
     ("monthly", timedelta(days=30), [("system.self_evaluate", {})]),
 ]
@@ -51,7 +51,31 @@ def tick(now: datetime | None = None) -> dict[str, list]:
         db.close()
     if ran:
         orch.drain(max_tasks=200)
+    ran.update(_daemon_jobs(now))
     return ran
+
+
+def _daemon_jobs(now: datetime) -> dict[str, list]:
+    """Monitors that are due (skipped in offline mode) and hourly retention."""
+    from ..daemon import retention
+    from ..daemon import state as dstate
+    from ..internet import monitor
+
+    out: dict[str, list] = {}
+    db = SessionLocal()
+    try:
+        if not dstate.load(db)["offline_mode"]:
+            out["monitors"] = monitor.run_due(db)
+        st = gov.get_state(db, "scheduler")
+        last = st.get("retention")
+        if not last or now - datetime.fromisoformat(last) >= timedelta(hours=1):
+            out["retention"] = [retention.run(db)]
+            st["retention"] = now.isoformat()
+            gov.set_state(db, "scheduler", st)
+            db.commit()
+    finally:
+        db.close()
+    return out
 
 
 async def loop(interval_s: int) -> None:

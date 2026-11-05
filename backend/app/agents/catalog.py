@@ -548,8 +548,9 @@ ALL_AGENTS: list[BaseAgent] = [
 def build_orchestrator():
     from .flare_agents import flare_agents
     from .orchestrator import orchestrator
+    from .perf_agent import PerformanceEngineerAgent
 
-    for a in [*ALL_AGENTS, *flare_agents()]:
+    for a in [*ALL_AGENTS, *flare_agents(), PerformanceEngineerAgent()]:
         if a.id not in orchestrator.agents:
             orchestrator.register(a)
     return orchestrator

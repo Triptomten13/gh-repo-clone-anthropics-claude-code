@@ -142,6 +142,16 @@ def ingest(db: Session, ex: Extracted, meta: dict[str, Any], raw: bytes | None =
         raise ValueError(f"evidence_class must be one of {EVIDENCE_CLASSES}")
     h = content_hash(ex.text) if ex.text.strip() else hashlib.sha256(raw or b"").hexdigest()
     sh = simhash(ex.text) if ex.text.strip() else ""
+    # Chunk + embed BEFORE writing anything: embedding a large document takes minutes on CPU, and doing it inside the
+    # write transaction blocked every other writer (measured: "database is locked" during a 1.6 MB ingest).
+    known = db.scalars(select(Document.id).where(Document.content_hash == h, Document.status != "duplicate")).first() if ex.text.strip() else None
+    pieces = chunk(ex.text, ex.pages) if not known else []
+    model_id, embed = embedder()
+    deferred = len(pieces) > LARGE_DOC_CHUNKS and model_id.startswith(("gguf:", "ollama:"))
+    if deferred:  # measured ~4 chunks/s for local semantic embeddings on this CPU: index lexically now, upgrade in background
+        fast = LocalHashEmbedder()
+        model_id, embed = fast.id, lambda texts, kind="document": fast.embed(texts)
+    vectors = [v for i in range(0, len(pieces), 64) for v in embed([p["text"] for p in pieces[i:i + 64]])] if pieces else []
     doc = Document(uid=str(uuid.uuid4()), title=(meta.get("title") or meta.get("filename") or "Untitled")[:512],
                    description=meta.get("description", ""), source=meta.get("source", ""), source_url=meta.get("source_url", ""),
                    author=meta.get("author", ""), created_date=meta.get("created_date", ""), doc_type=ex.doc_type, mime=ex.mime,
@@ -171,16 +181,58 @@ def ingest(db: Session, ex: Extracted, meta: dict[str, Any], raw: bytes | None =
                 db.add(DocumentRelation(source_id=doc.id, target_id=other.id, relation="duplicates", note=f"near-duplicate (simhash Δ{hamming(sh, other.simhash)})"))
     if parent:
         db.add(DocumentRelation(source_id=doc.id, target_id=parent.id, relation="version_of", note=f"v{doc.version}"))
-    pieces = chunk(ex.text, ex.pages)
-    model_id, embed = embedder()
-    vectors = embed([p["text"] for p in pieces]) if pieces else []
     for p, vec in zip(pieces, vectors, strict=True):
         db.add(DocumentChunk(document_id=doc.id, ordinal=p["ordinal"], text=p["text"], start_char=p["start_char"], end_char=p["end_char"],
                              page=p["page"], embedding=vec, embedding_model=model_id, injection_risk=bool(detect(p["text"]))))
     _link_entities(db, doc, ex.text)
     doc.status = "ready"
     db.flush()
+    if deferred:
+        doc.error = (doc.error + "; " if doc.error else "") + f"semantic embeddings for {len(pieces)} chunks are being computed in the background"
+        db.flush()
+        _defer_semantic(doc.id)
     return doc
+
+
+LARGE_DOC_CHUNKS = int(os.getenv("ARCHIVE_SYNC_EMBED_MAX_CHUNKS", "200"))
+
+
+def _defer_semantic(doc_id: int) -> None:
+    """Upgrade one document's chunks to the semantic embedder after the request has returned. Commits every 64 chunks so
+    the SQLite write lock is held only briefly."""
+    import threading
+
+    def run() -> None:
+        from ..daemon import telemetry
+        from ..db import SessionLocal
+
+        db = SessionLocal()
+        try:
+            model_id, embed = embedder()
+            n = 0
+            while True:
+                batch = db.scalars(select(DocumentChunk).where(DocumentChunk.document_id == doc_id, DocumentChunk.embedding_model != model_id)
+                                   .limit(64)).all()
+                if not batch:
+                    break
+                for c, v in zip(batch, embed([c.text for c in batch]), strict=True):
+                    c.embedding, c.embedding_model = v, model_id
+                db.commit()
+                n += len(batch)
+            d = db.get(Document, doc_id)
+            if d is not None:
+                d.error = (d.error or "").replace(f"semantic embeddings for {n} chunks are being computed in the background", "").strip("; ")
+                db.commit()
+            telemetry.event("archive_semantic_upgrade", document=doc_id, chunks=n, model=model_id)
+        except Exception as e:  # pragma: no cover - background
+            db.rollback()
+            from ..daemon import telemetry
+
+            telemetry.event("archive_semantic_upgrade_failed", document=doc_id, error=str(e)[:200])
+        finally:
+            db.close()
+
+    threading.Thread(target=run, name=f"embed-doc-{doc_id}", daemon=True).start()
 
 
 def reembed(db: Session) -> int:

@@ -2,6 +2,26 @@
 
 Short records of decisions that shape the system. Newest first.
 
+### D-019 · 2026-11-05 · Conservative semantic answer reuse
+Two similar questions are not the same question. L3 reuse requires a semantic embedder, cosine ≥ 0.95, the same scope and
+task category, identical numbers and the same negation, and only verified (cited) answers are stored. Time-sensitive
+questions never use it.
+
+### D-018 · 2026-11-05 · Internet research through official APIs; the user is not identified to third parties
+Research uses documented APIs (Wikipedia, arXiv, Crossref, GitHub, HN Algolia, PyPI, OSV, NVD, Hugging Face, RSS) within
+their rate limits; general web search only through a keyed API. Search-result pages are not scraped. The User-Agent names
+the software, not the owner. Long Retry-After ⇒ the host is paused, not hammered.
+
+### D-017 · 2026-11-05 · Memory-aware model residency instead of "max 2 loaded"
+Measured: cold weight reads 14 MB/s vs 6.5 GB/s from page cache; the fixed limit caused 5 reloads in a 7-call sequence.
+Models now stay resident while RAM allows (reserve per mode), LRU-idle eviction only when room is needed, idle unload,
+automatic LOW_MEMORY/EMERGENCY under pressure. Result: 3 loads, repeat calls 3–9× faster; RSS higher by design.
+
+### D-016 · 2026-11-05 · Rules-first task routing
+The orchestrator classifies requests with rules (no model call) and prefers deterministic solvers, caches and the Archive
+before any model; research for current facts; deep model for multi-step reasoning; G-sus only for multi-agent work.
+Evaluated: 30/30 on the tuned set, 12/12 on a held-out set.
+
 ### D-015 · 2026-11-05 · Self-consistency for deep answers that matter
 **Context:** in the Independence Test environment a single sample of Qwen3 4B answered a margin problem with −40
 instead of 80 (it counted the marketplace's cut as income) — reproducibly, because each fresh process starts from the

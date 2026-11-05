@@ -76,6 +76,16 @@ agent to `PATCH /api/agents/*`; `sync_agents()` never overwrites a level set by 
 - Settings, model install/activation, credentials, provider records and workers are admin-only and audited; operators
   can use the internal AI API and run benchmarks on local models; viewers are read-only (Independence Test G).
 
+## Internet research
+
+- Only official APIs and public feeds; robots.txt respected for page fetches; per-host rate limits; Retry-After honoured
+  (long waits pause the host). No CAPTCHA, login, paywall or access-control bypass — none is implemented.
+- Retrieved text is untrusted: wrapped in `untrusted.wrap` before a model sees it, scanned with `untrusted.detect`
+  (flags stored on the web resource), never treated as instructions.
+- The research User-Agent identifies the software, not the owner; no personal data is sent to sources.
+- Offline mode stops every outbound research request at the client (tested).
+- Raw web excerpts expire (retention job); only a human "Save to Archive" keeps one, with URL, retrieval time and licence.
+
 ## Data protection (GDPR)
 
 - No personal data is scraped. Research connectors store aggregate signals (counts, views) and product listings;

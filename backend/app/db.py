@@ -22,10 +22,18 @@ def _make_engine(url: str):
             kwargs["poolclass"] = StaticPool
     eng = create_engine(url, **kwargs)
     if url.startswith("sqlite"):
+        file_db = url not in ("sqlite://", "sqlite:///:memory:")
+
         @event.listens_for(eng, "connect")
         def _fk(dbapi_conn, _):  # pragma: no cover - trivial
             cur = dbapi_conn.cursor()
             cur.execute("PRAGMA foreign_keys=ON")
+            if file_db:
+                # measured: a long ingest held the write lock and other writers failed with "database is locked".
+                # WAL lets readers proceed during a write; busy_timeout makes writers wait instead of failing at once.
+                cur.execute("PRAGMA journal_mode=WAL")
+                cur.execute("PRAGMA synchronous=NORMAL")
+                cur.execute("PRAGMA busy_timeout=30000")
             cur.close()
     return eng
 

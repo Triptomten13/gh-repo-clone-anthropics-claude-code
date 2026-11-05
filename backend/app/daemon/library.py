@@ -142,6 +142,9 @@ def install(db: Session, key: str, actor: str, *, client: httpx.Client | None = 
         m.installed_by, m.installed_at = actor, datetime.now(UTC)
         gov.audit(db, actor, "daemon.model.install", m.key, sha256=digest, license=m.license, source=entry.url)
         db.commit()
+        from . import cache as _cache
+
+        _cache.invalidate("model-slots", "ai-status")
         return m
     except Exception as e:
         tmp.unlink(missing_ok=True)
@@ -172,6 +175,9 @@ def import_file(db: Session, key: str, path: str, actor: str) -> LocalModel:
     m.installed_by, m.installed_at = actor, datetime.now(UTC)
     gov.audit(db, actor, "daemon.model.import", m.key, sha256=digest)
     db.commit()
+    from . import cache as _cache
+
+    _cache.invalidate("model-slots", "ai-status")
     return m
 
 
@@ -194,6 +200,9 @@ def activate(db: Session, slot: str, key: str | None, actor: str) -> dict[str, A
     state.save(db, st)
     gov.audit(db, actor, "daemon.model.activate", f"{slot}:{key}", previous=prev)
     db.commit()
+    from . import cache as _cache
+
+    _cache.invalidate("model-slots", "ai-status")
     from . import runtime
 
     runtime.get_local().unload_except(set(v for v in st["active"].values() if v))
@@ -219,11 +228,21 @@ def remove(db: Session, key: str, actor: str) -> LocalModel:
     m.status, m.file_path, m.sha256_actual, m.progress_bytes = "removed", "", "", 0
     gov.audit(db, actor, "daemon.model.remove", key)
     db.commit()
+    from . import cache as _cache
+
+    _cache.invalidate("model-slots", "ai-status")
     return m
 
 
 def resolve(db: Session | None, slot: str) -> LocalModel | None:
-    """The installed model behind a slot (chat falls back to eco and vice versa)."""
+    """The installed model behind a slot. Cached 5 s (L1; invalidated on install/activate/remove) — it is consulted on
+    every routing decision and status call. Returns a detached, read-only snapshot."""
+    from . import cache
+
+    return cache.get("model-slots", 5).get_or_set(slot, lambda: _resolve(slot))
+
+
+def _resolve(slot: str, db: Session | None = None) -> LocalModel | None:
     from .. import db as dbmod
 
     st = state.load(db)

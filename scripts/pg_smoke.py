@@ -28,7 +28,9 @@ with TestClient(app) as c:
                  "/api/ai/usage", "/api/ai/models", "/api/archivum/contradictions", "/api/archivum/timeline", "/api/memory", "/api/flare/personas",
                  "/api/flare/brands", "/api/field/overview", "/api/finance/summary", "/api/auth/users", "/api/ai/status", "/api/ai/health",
                  "/api/daemon/library", "/api/daemon/providers", "/api/daemon/settings", "/api/daemon/prompts", "/api/daemon/tools",
-                 "/api/daemon/credentials", "/api/daemon/benchmarks", "/api/daemon/workers", "/api/daemon/finetune/feasibility"]:
+                 "/api/daemon/credentials", "/api/daemon/benchmarks", "/api/daemon/workers", "/api/daemon/finetune/feasibility",
+                 "/api/control/overview", "/api/control/routes", "/api/control/history", "/api/research", "/api/monitors", "/api/monitors/events",
+                 "/api/agents/efficiency"]:
         r = c.get(path)
         print(f"{r.status_code} GET {path}")
         if r.status_code != 200:
@@ -40,7 +42,11 @@ with TestClient(app) as c:
             failures.append(("gsus", r.text[:300]))
     for method, path, body in [("patch", "/api/daemon/settings", {"profile": "ECO"}), ("post", "/api/daemon/proposals/generate", None),
                                ("post", "/api/daemon/selftest?generate=false", None), ("post", "/api/ai/embeddings", {"texts": ["smoke"]}),
-                               ("post", "/api/daemon/finetune/datasets", {"name": "smoke", "contains_private_data": True})]:
+                               ("post", "/api/daemon/finetune/datasets", {"name": "smoke", "contains_private_data": True}),
+                               ("post", "/api/ai/ask", {"question": "25% of 480"}), ("post", "/api/ai/ask", {"question": "What does our archive say about Jerusalem?"}),
+                               ("post", "/api/ai/plan", {"question": "Latest research on quantization"}),
+                               ("post", "/api/monitors", {"name": "smoke monitor", "purpose": "smoke", "query": "llama", "sources": ["hn"]}),
+                               ("post", "/api/control/retention", None)]:
         r = getattr(c, method)(path, json=body) if body is not None else getattr(c, method)(path)
         print(f"{r.status_code} {method.upper()} {path}")
         if r.status_code != 200:

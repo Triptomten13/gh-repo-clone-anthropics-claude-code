@@ -177,7 +177,7 @@ def test_ai_endpoints_evals_and_hq(client):
     assert client.get("/api/ai/providers").json()["active"] == "none"
     ev = client.post("/api/ai/evals/run").json()
     scores = {s["suite"]: s["score"] for s in ev["suites"]}
-    assert scores == {"planner_intents": 1.0, "injection_detection": 1.0, "anti_generic_gate": 1.0, "retrieval_grounding": 1.0}
+    assert scores == {"planner_intents": 1.0, "intel_routing": 1.0, "injection_detection": 1.0, "anti_generic_gate": 1.0, "retrieval_grounding": 1.0}
     skipped = client.post("/api/ai/evals/run?include_llm=true").json()["suites"][-1]
     assert skipped["suite"] == "llm_grounding" and skipped["skipped"] is True  # never reported as passed
     depts = {d["id"]: d for d in client.get("/api/hq/departments").json()}

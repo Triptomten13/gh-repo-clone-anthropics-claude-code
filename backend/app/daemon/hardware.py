@@ -64,6 +64,12 @@ def _gpus() -> list[dict[str, Any]]:
 
 
 def runtime_available() -> dict[str, Any]:
+    from . import cache
+
+    return cache.get("runtime", 300).get_or_set("llama_cpp", _runtime_available)
+
+
+def _runtime_available() -> dict[str, Any]:
     try:
         import llama_cpp
 
@@ -73,6 +79,13 @@ def runtime_available() -> dict[str, Any]:
 
 
 def snapshot() -> dict[str, Any]:
+    """Cached for 5 s (L1): statvfs, /proc reads and an nvidia-smi probe on every page view were wasted work."""
+    from . import cache
+
+    return cache.get("hardware", 5).get_or_set("snapshot", _snapshot)
+
+
+def _snapshot() -> dict[str, Any]:
     mem = _meminfo()
     du = shutil.disk_usage(models_dir())
     gpus = _gpus()

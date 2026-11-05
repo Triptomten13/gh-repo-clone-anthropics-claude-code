@@ -7,6 +7,10 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 os.environ.setdefault("LLM_ENABLED", "false")
 os.environ.setdefault("SECRET_KEY", "test-secret")
+# background threads off in tests: the telemetry sampler re-evaluates the global resource mode every 5 s from REAL memory
+# readings, which raced with the memory-pressure test; prewarm would load models. Tests call telemetry.sample() directly.
+os.environ.setdefault("TELEMETRY_DISABLED", "1")
+os.environ.setdefault("DAEMON_PREWARM", "0")
 
 from app import db as dbmod  # noqa: E402
 
@@ -30,6 +34,9 @@ def fresh_db(tmp_path):
     state.invalidate()
     quota.reset()
     credentials.invalidate()
+    from app.daemon import cache as l1
+
+    l1.invalidate()
     workers.invalidate()
     os.environ["ARCHIVE_DIR"] = str(tmp_path / "archive")
     s = dbmod.SessionLocal()
@@ -41,6 +48,9 @@ def fresh_db(tmp_path):
     state.invalidate()
     quota.reset()
     credentials.invalidate()
+    from app.daemon import cache as l1
+
+    l1.invalidate()
 
 
 @pytest.fixture()

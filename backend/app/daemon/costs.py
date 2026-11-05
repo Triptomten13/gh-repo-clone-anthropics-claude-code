@@ -3,7 +3,6 @@ local costs are ESTIMATES from configured watts × inference time; savings are s
 from __future__ import annotations
 
 import calendar
-from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -18,54 +17,67 @@ FAILED = {"error", "unavailable", "rate_limited", "refused", "spend_blocked"}
 REFERENCE = {"fast": "claude-haiku-5-5", "standard": "claude-sonnet-5-5", "deep": "claude-opus-5-5", "local": "claude-sonnet-5-5"}
 
 
-def _agg() -> dict[str, float]:
-    return defaultdict(float)
+def _cases():
+    """SQL CASE expressions shared by every aggregation (portable SQLite/PostgreSQL)."""
+    from sqlalchemy import and_, case, func, or_
+
+    ok = LLMCall.status == "ok"
+    local = or_(LLMCall.locality.in_(("local", "lan")), and_(LLMCall.locality == "", LLMCall.provider.in_(("local", "ollama"))))
+    failed = LLMCall.status.in_(tuple(FAILED))
+    return {
+        "calls": func.count(LLMCall.id),
+        "cost_usd": func.coalesce(func.sum(LLMCall.cost_usd), 0.0),
+        "tokens": func.coalesce(func.sum(case((ok, LLMCall.input_tokens + LLMCall.output_tokens), else_=0)), 0),
+        "local_calls": func.coalesce(func.sum(case((and_(ok, local), 1), else_=0)), 0),
+        "failed": func.coalesce(func.sum(case((failed, 1), else_=0)), 0),
+    }, ok, local, failed
+
+
+def _by(db: Session, col: Any, since: datetime) -> dict[str, dict[str, float]]:
+    agg, *_ = _cases()
+    rows = db.execute(select(col.label("k"), *[v.label(k) for k, v in agg.items()]).where(LLMCall.created_at >= since).group_by(col)).all()
+    return {str(r.k) if r.k not in (None, "") else "—": {k: (round(float(getattr(r, k)), 6) if k == "cost_usd" else int(getattr(r, k))) for k in agg}
+            for r in rows}
 
 
 def dashboard(db: Session, days: int = 30) -> dict[str, Any]:
+    """All aggregation happens in SQL (one grouped query per dimension). Before: every row in the window was loaded
+    into Python — 563 ms at 20k rows (docs/perf/baseline.json)."""
+    from sqlalchemy import and_, case, func
+
     now = datetime.now(UTC)
     since = now - timedelta(days=days)
     st = state.load(db)
-    rows = db.scalars(select(LLMCall).where(LLMCall.created_at >= since)).all()
     price_kwh = float(st["energy"]["usd_per_kwh"])
-    by: dict[str, dict[str, dict[str, float]]] = {k: defaultdict(_agg) for k in ("agent", "workflow", "project", "model", "day")}
-    t = defaultdict(float)
-    for r in rows:
-        loc = r.locality or ("local" if r.provider in ("local", "ollama") else "external")
-        ok = r.status == "ok"
-        t["calls"] += 1
-        t["failed"] += r.status in FAILED
-        t["excluded_by_policy"] += r.status.startswith("excluded") or r.status == "paused"
-        t["external_cost_usd"] += r.cost_usd
-        t["input_tokens"] += r.input_tokens if ok else 0
-        t["output_tokens"] += r.output_tokens if ok else 0
-        t["provider_cached_tokens"] += r.cached_input_tokens
-        if r.cache_hit:
-            t["cache_hits"] += 1
-            t["response_cache_tokens"] += r.input_tokens + r.output_tokens
-            t["savings_actual_usd"] += r.saved_usd
-        if ok and loc in ("local", "lan"):
-            t["local_calls"] += 1
-            t["local_tokens"] += r.input_tokens + r.output_tokens
-            t["energy_wh"] += r.energy_wh
-            ref = registry.find("anthropic", REFERENCE.get(r.tier or "standard", "claude-sonnet-5-5"))
-            if ref:
-                t["savings_estimated_usd"] += ref.cost(r.input_tokens, r.output_tokens)
-        if ok and loc == "external":
-            t["external_calls"] += 1
-        created = r.created_at if r.created_at.tzinfo else r.created_at.replace(tzinfo=UTC)
-        for dim, key in (("agent", r.agent_id or "—"), ("workflow", r.workflow or r.purpose or "—"), ("project", r.project or "—"),
-                         ("model", f"{r.provider}:{r.model}"), ("day", created.date().isoformat())):
-            b = by[dim][key]
-            b["calls"] += 1
-            b["cost_usd"] += r.cost_usd
-            b["tokens"] += (r.input_tokens + r.output_tokens) if ok else 0
-            b["local_calls"] += 1 if ok and loc in ("local", "lan") else 0
-            b["failed"] += 1 if r.status in FAILED else 0
+    agg, ok, local, failed = _cases()
+    tot = db.execute(select(
+        *[v.label(k) for k, v in agg.items()],
+        func.coalesce(func.sum(case((ok, LLMCall.input_tokens), else_=0)), 0).label("input_tokens"),
+        func.coalesce(func.sum(case((ok, LLMCall.output_tokens), else_=0)), 0).label("output_tokens"),
+        func.coalesce(func.sum(LLMCall.cached_input_tokens), 0).label("provider_cached_tokens"),
+        func.coalesce(func.sum(case((LLMCall.cache_hit.is_(True), 1), else_=0)), 0).label("cache_hits"),
+        func.coalesce(func.sum(case((LLMCall.cache_hit.is_(True), LLMCall.input_tokens + LLMCall.output_tokens), else_=0)), 0).label("response_cache_tokens"),
+        func.coalesce(func.sum(LLMCall.saved_usd), 0.0).label("savings_actual_usd"),
+        func.coalesce(func.sum(case((and_(ok, local), LLMCall.energy_wh), else_=0.0)), 0.0).label("energy_wh"),
+        func.coalesce(func.sum(case((and_(ok, ~local, LLMCall.provider != "cache"), 1), else_=0)), 0).label("external_calls"),
+        func.coalesce(func.sum(case((LLMCall.status.like("excluded%") | (LLMCall.status == "paused"), 1), else_=0)), 0).label("excluded_by_policy"),
+    ).where(LLMCall.created_at >= since)).one()
+    t: dict[str, Any] = dict(tot._mapping)
+    t["external_cost_usd"] = round(float(t.pop("cost_usd")), 6)
+    t.pop("tokens", None)
+    # estimated savings: local work priced at the reference Claude model for its tier (pricing is linear in tokens)
+    est = 0.0
+    for tier, i, o in db.execute(select(LLMCall.tier, func.sum(LLMCall.input_tokens), func.sum(LLMCall.output_tokens))
+                                 .where(LLMCall.created_at >= since, ok, local).group_by(LLMCall.tier)):
+        ref = registry.find("anthropic", REFERENCE.get(tier or "standard", "claude-sonnet-5-5"))
+        est += ref.cost(int(i or 0), int(o or 0)) if ref else 0.0
+    t["savings_estimated_usd"] = round(est, 6)
+    t = {k: (round(float(v), 6) if isinstance(v, float) else int(v)) for k, v in t.items()}
+    day = func.date(LLMCall.created_at)
+    by_day = _by(db, day, since)
+    workflow = case((LLMCall.workflow != "", LLMCall.workflow), else_=LLMCall.purpose)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    mtd = sum(r.cost_usd for r in rows if (r.created_at if r.created_at.tzinfo else r.created_at.replace(tzinfo=UTC)) >= month_start)
-    if month_start < since:
-        mtd = quota.spent(None, month_start)
+    mtd = quota.spent(None, month_start)
     dim_days = calendar.monthrange(now.year, now.month)[1]
     elapsed = max((now - month_start).total_seconds() / 86400, 1 / 24)
     quality = {}
@@ -73,10 +85,9 @@ def dashboard(db: Session, days: int = 30) -> dict[str, Any]:
         quality[f"{b.provider}:{b.model}"] = {"accuracy": b.summary.get("accuracy"), "cost_per_success_usd": b.summary.get("cost_per_success_usd"),
                                               "avg_latency_ms": b.summary.get("avg_latency_ms"), "run_id": b.id, "at": b.finished_at}
     lim = st["limits"]
-    rnd = {k: round(v, 6) if isinstance(v, float) else v for k, v in t.items()}
     return {
         "days": days,
-        "totals": {**rnd, "local_energy_cost_usd_estimate": round(t["energy_wh"] / 1000 * price_kwh, 6),
+        "totals": {**t, "local_energy_cost_usd_estimate": round(t["energy_wh"] / 1000 * price_kwh, 6),
                    "local_share": round(t["local_calls"] / max(1, t["local_calls"] + t["external_calls"]), 3)},
         "savings": {"actual_usd": round(t["savings_actual_usd"], 6), "estimated_usd": round(t["savings_estimated_usd"], 6),
                     "basis": "actual = recorded cost of responses served from cache; estimated = list price of the reference Claude model for "
@@ -84,9 +95,9 @@ def dashboard(db: Session, days: int = 30) -> dict[str, Any]:
         "forecast": {"month_to_date_usd": round(mtd, 6), "projected_month_usd": round(mtd / elapsed * dim_days, 4),
                      "method": "linear extrapolation of month-to-date external spend"},
         "limits": {"daily_usd": lim.get("daily_usd"), "monthly_usd": lim.get("monthly_usd"), "per_provider": lim.get("per_provider", {})},
-        "by_agent": {k: dict(v) for k, v in by["agent"].items()}, "by_workflow": {k: dict(v) for k, v in by["workflow"].items()},
-        "by_project": {k: dict(v) for k, v in by["project"].items()}, "by_model": {k: dict(v) for k, v in by["model"].items()},
-        "by_day": dict(sorted((k, dict(v)) for k, v in by["day"].items())),
+        "by_agent": _by(db, LLMCall.agent_id, since), "by_workflow": _by(db, workflow, since),
+        "by_project": _by(db, LLMCall.project, since), "by_model": _by(db, LLMCall.provider + ":" + LLMCall.model, since),
+        "by_day": dict(sorted(by_day.items())),
         "quality": quality, "quotas": quota.snapshot(),
         "note": "API costs use list prices — your provider invoice is authoritative. Local costs are estimates.",
     }

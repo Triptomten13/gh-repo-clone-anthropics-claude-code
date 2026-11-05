@@ -1,0 +1,133 @@
+{
+  "label": "after-p4-residency",
+  "ran_at": "2026-11-05T19:24:59.456652+00:00",
+  "n": 5,
+  "synthetic_llm_calls": 20000,
+  "endpoints": {
+    "GET /api/ai/status": {
+      "status": 200,
+      "first_ms": 307.0,
+      "p50_ms": 4.7,
+      "p95_ms": 6.9,
+      "sql_per_request": 2.4
+    },
+    "GET /api/system/status": {
+      "status": 200,
+      "first_ms": 5.3,
+      "p50_ms": 3.9,
+      "p95_ms": 5.3,
+      "sql_per_request": 4
+    },
+    "GET /api/approvals?status=pending": {
+      "status": 200,
+      "first_ms": 7.4,
+      "p50_ms": 3.0,
+      "p95_ms": 3.3,
+      "sql_per_request": 2
+    },
+    "GET /api/overview": {
+      "status": 200,
+      "first_ms": 19.3,
+      "p50_ms": 5.9,
+      "p95_ms": 6.8,
+      "sql_per_request": 12
+    },
+    "GET /api/daemon/costs?days=30": {
+      "status": 200,
+      "first_ms": 266.3,
+      "p50_ms": 227.9,
+      "p95_ms": 243.2,
+      "sql_per_request": 11
+    },
+    "GET /api/daemon/library": {
+      "status": 200,
+      "first_ms": 8.8,
+      "p50_ms": 6.6,
+      "p95_ms": 7.2,
+      "sql_per_request": 4
+    },
+    "GET /api/ai/health": {
+      "status": 200,
+      "first_ms": 4.7,
+      "p50_ms": 3.9,
+      "p95_ms": 4.2,
+      "sql_per_request": 1
+    },
+    "GET /api/agents": {
+      "status": 200,
+      "first_ms": 10.3,
+      "p50_ms": 7.5,
+      "p95_ms": 7.6,
+      "sql_per_request": 3
+    },
+    "GET /api/auth/me": {
+      "status": 200,
+      "first_ms": 3.0,
+      "p50_ms": 2.8,
+      "p95_ms": 3.0,
+      "sql_per_request": 1
+    },
+    "POST /api/archive/search": {
+      "status": 200,
+      "first_ms": 10.7,
+      "p50_ms": 5.3,
+      "p95_ms": 7.4,
+      "sql_per_request": 2
+    },
+    "POST /api/daemon/proposals/generate": {
+      "status": 200,
+      "first_ms": 78.8,
+      "p50_ms": 52.6,
+      "p95_ms": 58.6,
+      "sql_per_request": 25.4
+    }
+  },
+  "rss_mb_after_start": 104.9,
+  "shell_page_view_ms": 11.6,
+  "shell_page_view_sql": 8.4,
+  "rss_mb_after_endpoints": 128.0,
+  "model_churn": {
+    "sequence": [
+      "chat",
+      "deep",
+      "chat",
+      "eco",
+      "chat",
+      "deep",
+      "eco"
+    ],
+    "total_ms": 43569,
+    "calls": [
+      {
+        "slot": "chat",
+        "ms": 9567
+      },
+      {
+        "slot": "deep",
+        "ms": 27984
+      },
+      {
+        "slot": "chat",
+        "ms": 575
+      },
+      {
+        "slot": "eco",
+        "ms": 3250
+      },
+      {
+        "slot": "chat",
+        "ms": 591
+      },
+      {
+        "slot": "deep",
+        "ms": 1233
+      },
+      {
+        "slot": "eco",
+        "ms": 368
+      }
+    ],
+    "loads": 3,
+    "rss_mb": 7959.4
+  }
+}

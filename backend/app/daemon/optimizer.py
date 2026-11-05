@@ -3,7 +3,6 @@ spending, credentials, accounts or provider terms needs an admin decision, and a
 from __future__ import annotations
 
 import hashlib
-from collections import Counter, defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -20,60 +19,54 @@ def _fp(*parts: Any) -> str:
 
 
 def generate(db: Session, days: int = 14) -> list[OptimizationProposal]:
+    """Grouped SQL queries only (before: every row of the window was loaded into Python — 172 ms at 20k rows)."""
+    from sqlalchemy import func
+
     since = datetime.now(UTC) - timedelta(days=days)
-    rows = db.scalars(select(LLMCall).where(LLMCall.created_at >= since)).all()
+    W = LLMCall.created_at >= since
+    label = func.coalesce(func.nullif(LLMCall.purpose, ""), func.nullif(LLMCall.workflow, ""), "—")
     props: list[dict[str, Any]] = []
 
-    deep_short = defaultdict(list)
-    for r in rows:
-        if r.status == "ok" and r.tier == "deep" and r.locality == "external" and r.output_tokens < 300:
-            deep_short[r.purpose or r.workflow or "—"].append(r)
-    for purpose, rs in deep_short.items():
-        if len(rs) >= 3:
-            props.append({"kind": "downgrade_tier", "title": f"'{purpose}' uses the deep tier for short answers",
-                          "detail": f"{len(rs)} deep-tier calls produced < 300 output tokens. Try the standard tier (or a local model) and compare with the benchmark.",
-                          "evidence": {"calls": len(rs), "cost_usd": round(sum(r.cost_usd for r in rs), 6)},
-                          "estimated_saving_usd": round(sum(r.cost_usd for r in rs) * 0.5, 6), "fp": _fp("downgrade", purpose)})
-
-    dup = Counter(r.prompt_hash for r in rows if r.prompt_hash and r.status == "ok" and not r.cache_hit and r.cost_usd > 0)
-    for ph, n in dup.items():
+    for purpose, n, cost in db.execute(select(label, func.count(LLMCall.id), func.sum(LLMCall.cost_usd)).where(
+            W, LLMCall.status == "ok", LLMCall.tier == "deep", LLMCall.locality == "external", LLMCall.output_tokens < 300).group_by(label)):
         if n >= 3:
-            rs = [r for r in rows if r.prompt_hash == ph and r.status == "ok"]
-            props.append({"kind": "enable_cache", "title": f"Identical prompt sent {n}× to a paid model ({rs[0].purpose or rs[0].workflow or '—'})",
-                          "detail": "Mark this call cacheable (response cache) or move the stable prefix into the system prompt for provider-side caching.",
-                          "evidence": {"prompt_hash": ph, "repeats": n}, "estimated_saving_usd": round(sum(r.cost_usd for r in rs[1:]), 6),
-                          "fp": _fp("cache", ph)})
+            props.append({"kind": "downgrade_tier", "title": f"'{purpose}' uses the deep tier for short answers",
+                          "detail": f"{n} deep-tier calls produced < 300 output tokens. Try the standard tier (or a local model) and compare with the benchmark.",
+                          "evidence": {"calls": n, "cost_usd": round(cost or 0, 6)}, "estimated_saving_usd": round((cost or 0) * 0.5, 6),
+                          "fp": _fp("downgrade", purpose)})
+
+    for ph, n, cost, first_cost, purpose in db.execute(
+            select(LLMCall.prompt_hash, func.count(LLMCall.id), func.sum(LLMCall.cost_usd), func.min(LLMCall.cost_usd), func.max(label))
+            .where(W, LLMCall.prompt_hash != "", LLMCall.status == "ok", LLMCall.cache_hit.is_(False), LLMCall.cost_usd > 0)
+            .group_by(LLMCall.prompt_hash).having(func.count(LLMCall.id) >= 3)):
+        props.append({"kind": "enable_cache", "title": f"Identical prompt sent {n}× to a paid model ({purpose})",
+                      "detail": "Mark this call cacheable (response cache) or move the stable prefix into the system prompt for provider-side caching.",
+                      "evidence": {"prompt_hash": ph, "repeats": n}, "estimated_saving_usd": round((cost or 0) - (first_cost or 0), 6),
+                      "fp": _fp("cache", ph)})
 
     best_local = None
     for b in db.scalars(select(BenchmarkRun).where(BenchmarkRun.status == "completed", BenchmarkRun.provider == "local")).all():
         if best_local is None or (b.summary.get("accuracy") or 0) > (best_local.summary.get("accuracy") or 0):
             best_local = b
     if best_local and (best_local.summary.get("accuracy") or 0) >= 0.8:
-        ext = defaultdict(list)
-        for r in rows:
-            if r.status == "ok" and r.locality == "external" and r.tier in ("fast", "standard"):
-                ext[r.purpose or r.workflow or "—"].append(r)
-        for purpose, rs in ext.items():
+        for purpose, n, cost in db.execute(select(label, func.count(LLMCall.id), func.sum(LLMCall.cost_usd)).where(
+                W, LLMCall.status == "ok", LLMCall.locality == "external", LLMCall.tier.in_(("fast", "standard"))).group_by(label)):
             props.append({"kind": "move_local", "title": f"Run '{purpose}' on the local model {best_local.model}",
                           "detail": f"Local benchmark accuracy {best_local.summary['accuracy']:.0%}. Verify on real '{purpose}' samples before switching.",
-                          "evidence": {"calls": len(rs), "cost_usd": round(sum(r.cost_usd for r in rs), 6), "benchmark_run": best_local.id},
-                          "estimated_saving_usd": round(sum(r.cost_usd for r in rs), 6), "fp": _fp("local", purpose, best_local.id)})
+                          "evidence": {"calls": n, "cost_usd": round(cost or 0, 6), "benchmark_run": best_local.id},
+                          "estimated_saving_usd": round(cost or 0, 6), "fp": _fp("local", purpose, best_local.id)})
 
-    rl = Counter(r.provider for r in rows if r.status == "rate_limited")
-    for prov, n in rl.items():
+    for prov, n in db.execute(select(LLMCall.provider, func.count(LLMCall.id)).where(W, LLMCall.status == "rate_limited").group_by(LLMCall.provider)):
         if n >= 3:
             props.append({"kind": "rate_limits", "title": f"{prov} hit its rate limit {n}× in {days} days",
                           "detail": "Reduce concurrency or batch requests. Never add accounts or rotate keys to get around limits.",
                           "evidence": {"events": n}, "estimated_saving_usd": None, "fp": _fp("rl", prov, n // 10)})
 
-    big = defaultdict(list)
-    for r in rows:
-        if r.status == "ok" and r.input_tokens > 20000:
-            big[r.purpose or r.workflow or "—"].append(r.input_tokens)
-    for purpose, toks in big.items():
-        props.append({"kind": "context_size", "title": f"'{purpose}' sends very large prompts (avg {sum(toks) // len(toks):,} tokens)",
+    for purpose, n, avg in db.execute(select(label, func.count(LLMCall.id), func.avg(LLMCall.input_tokens)).where(
+            W, LLMCall.status == "ok", LLMCall.input_tokens > 20000).group_by(label)):
+        props.append({"kind": "context_size", "title": f"'{purpose}' sends very large prompts (avg {int(avg or 0):,} tokens)",
                       "detail": "Use Archive retrieval + context assembly instead of whole documents; required evidence is kept, duplicates dropped.",
-                      "evidence": {"calls": len(toks)}, "estimated_saving_usd": None, "fp": _fp("ctx", purpose)})
+                      "evidence": {"calls": n}, "estimated_saving_usd": None, "fp": _fp("ctx", purpose)})
 
     if library.resolve(db, "chat") is None:
         props.append({"kind": "install_local", "title": "No local chat model is active",

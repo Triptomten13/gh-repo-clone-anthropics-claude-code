@@ -1,0 +1,32 @@
+{
+  "ran_at": "2026-11-05T20:18:08Z",
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "ram_gb": 16.9,
+    "gpu": "none"
+  },
+  "models": {
+    "chat": "qwen2.5-1.5b-instruct-q4_k_m",
+    "eco": "qwen2.5-0.5b-instruct-q4_k_m",
+    "deep": "qwen3-4b-q4_k_m",
+    "embedding": "nomic-embed-text-v1.5-q8_0",
+    "replacement": "smollm2-360m-instruct-q8_0"
+  },
+  "scenarios": [
+    {
+      "scenario": "7 large document ingest + search",
+      "bytes": 1616670,
+      "ingest_ms": 6393,
+      "chunks": 2250,
+      "search_ms": 433,
+      "completion": 1,
+      "wall_s": 6.8,
+      "server_rss_peak_mb": 289,
+      "server_cpu_s": 7.5,
+      "network_bytes": 0,
+      "tokens": 0,
+      "cost_usd": 0.0
+    }
+  ]
+}

@@ -10,11 +10,12 @@
 | Admin access: first-run setup, `python -m app.cli`, Users & access UI, token revocation | `test_daemon.py`, manual CLI run |
 | DAEMON CORE: hardware manager, verified model library, llama.cpp runtime, profiles, offline mode, internal AI API, prompts, tools, workers, recovery, fine-tuning feasibility | `test_daemon.py`, Independence Tests A–G **all passed** with real models (docs/INDEPENDENCE_TESTS.md, incl. two failed runs and why) |
 | **Local deep reasoning** (owner decision: deep reasoning required, Swedish not): Qwen3 4B in a `deep` slot, two-phase thinking with a budget, incomplete reasoning flagged, working notes kept apart, self-consistency voting, Chamber → Deep reasoning | benchmark 17/17 (deep reasoning 7/7 vs 1–2/7 for the small models); Independence Tests A (self-consistency) and B (offline) solve multi-step problems |
+| **DAEMON HYPERINTELLIGENCE**: audit + baseline, telemetry, memory-aware residency + resource modes, rules-first orchestrator (`/api/ai/ask`), deterministic solvers, L1/L2/L3/L4 caches, internet research (10 official sources, QUICK/STANDARD/DEEP, citations, contradictions), monitors, retention, Performance Engineering Agent, delegation report, Control Center + Research pages | `test_hyper.py`, measured before/after (docs/HYPERINTELLIGENCE.md §3), routing eval 30/30 + held-out 12/12, 13-scenario system benchmark |
 | DAEMON COST INTELLIGENCE: registry, credentials, routing, quota backoff, spend limits, caches, benchmarks, dashboard, proposals | `test_daemon.py`, real benchmark runs on two local models |
 | Backup / restore | round-trip + tamper refusal tested (docs/BACKUP_RECOVERY.md) |
 | Docs restructure | docs/ holds architecture, AI system, knowledge, agents, security, design system, decisions, testing, roadmap, DAEMON, cost, install, backup |
 
-Totals: 128 backend tests pass; ruff clean; frontend type-checks and builds (28 routes); migrations 0001–0004 verified
+Totals: 155 backend tests pass; ruff clean; frontend type-checks and builds (28 routes); migrations 0001–0004 verified
 upgrade/downgrade/upgrade on SQLite and PostgreSQL.
 
 ## Measured facts worth remembering
@@ -26,6 +27,9 @@ upgrade/downgrade/upgrade on SQLite and PostgreSQL.
   fresh process); self-consistency (3 samples) outvoted it 2/3. Use `samples` + human review for consequential answers.
 * The 1.5B model once invented a fact about the company when asked offline; the identity prompt now limits what G-SUS
   may claim about itself.
+
+* Hot paths after optimisation: page view 24 → 10.6 ms (28 → 7 SQL), agents list 124 → 3 SQL, cost dashboard 563 → 186 ms
+  at 20k rows; model reloads 5 → 3 in a mixed sequence. Cold model reads run at 14 MB/s on this disk.
 
 ## Not done / blocked (honest list)
 

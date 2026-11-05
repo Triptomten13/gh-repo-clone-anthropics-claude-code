@@ -87,6 +87,14 @@ Legend: ✅ complete & tested · 🟡 partial · ⛔ blocked (external dependenc
 - ⏳ Stronger local models (needs more RAM/GPU), multimodal (local STT/TTS/vision), semantic response cache,
   rate-limit header parsing, research connector for provider verification, LoRA (needs GPU + training stack)
 
+## DAEMON HYPERINTELLIGENCE ✅ (see HYPERINTELLIGENCE.md)
+- ✅ Audit + measured baseline; telemetry (system, routes, SQL, network, events); memory-aware model residency and
+  resource modes; rules-first orchestrator with deterministic solvers; multi-layer caches; internet research over 10
+  official sources with depth levels, citations and contradiction flags; monitors with change detection; retention;
+  Performance Engineering Agent; delegation report; Control Center and Research pages; 13-scenario system benchmark
+- ⏳ Vision/speech models, keyed web search (needs a key), Archive inverted/vector index (when the Archive grows),
+  multi-worker orchestration (when measurements show queueing)
+
 ## Known limitations
 - Local models are much weaker than frontier models; deep reasoning on CPU takes ~1–5 minutes per problem (Qwen3 4B).
 - Single in-process task worker; long LLM tasks run sequentially.

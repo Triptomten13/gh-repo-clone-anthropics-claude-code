@@ -67,15 +67,48 @@ class ChatIn(BaseModel):
 def ai_chat(c: ChatIn, db: Session = Depends(get_db), user: User = Depends(operator)):
     """Conversation through the G-SUS identity layer — the same identity whichever model serves it."""
     system = prompts.active(db, "gsus.identity").text
-    hist = c.messages[:-1][-12:]
-    transcript = "\n".join(f"{m.role.upper()}: {m.content}" for m in hist)
+    transcript, ctx_info = _chat_context(db, c.messages[:-1])
     prompt = (f"Conversation so far:\n{transcript}\n\n" if transcript else "") + f"USER: {c.messages[-1].content}"
     try:
         out = gateway.complete(db, system=system, prompt=prompt, tier=c.tier, max_tokens=c.max_tokens, sensitivity=c.sensitivity,
                                profile=c.profile, agent_id="gsus", purpose="ai.chat", workflow=c.workflow or "chat", project=c.project)
     except Exception as e:
         raise _ai_error(e) from e
-    return {"reply": out["text"], "identity": "G-SUS", **{k: v for k, v in out.items() if k != "text"}}
+    return {"reply": out["text"], "identity": "G-SUS", "context": ctx_info, **{k: v for k, v in out.items() if k != "text"}}
+
+
+CHAT_HISTORY_BUDGET = 1200  # estimated tokens of history sent with each turn
+KEEP_RECENT = 4
+
+
+def _chat_context(db: Session, history: list[ChatMsg]) -> tuple[str, dict[str, Any]]:
+    """Hierarchical context: recent turns verbatim; older turns summarised once by the small model (cached), so long
+    conversations do not resend everything every turn. If no model can summarise, the oldest turns are dropped and that
+    is reported — never silently."""
+    lines = [f"{m.role.upper()}: {m.content}" for m in history]
+    full = "\n".join(lines)
+    est = prompts.estimate_tokens(full)
+    info: dict[str, Any] = {"history_turns": len(history), "history_tokens_est": est, "budget": CHAT_HISTORY_BUDGET, "summarized": False, "dropped_turns": 0}
+    if est <= CHAT_HISTORY_BUDGET:
+        info["sent_tokens_est"] = est
+        return full, info
+    old, recent = lines[:-KEEP_RECENT], lines[-KEEP_RECENT:]
+    try:
+        r = gateway.complete(db, system="You compress conversations faithfully. Keep names, numbers, decisions and open questions.",
+                             prompt=prompts.render(db, "ai.summarize", max_words=150, text="\n".join(old)), tier="fast", max_tokens=300,
+                             cacheable=True, purpose="chat.summarize", workflow="chat")
+        text = f"[Summary of {len(old)} earlier turns — generated]\n{r['text']}\n" + "\n".join(recent)
+        info["summarized"] = True
+    except Exception:
+        keep: list[str] = []
+        for ln in reversed(lines):
+            if prompts.estimate_tokens("\n".join([ln, *keep])) > CHAT_HISTORY_BUDGET:
+                break
+            keep.insert(0, ln)
+        info["dropped_turns"] = len(lines) - len(keep)
+        text = "\n".join(keep)
+    info["sent_tokens_est"] = prompts.estimate_tokens(text)
+    return text, info
 
 
 class GenerateIn(BaseModel):
@@ -241,6 +274,13 @@ def ai_health(_: User = Depends(current_user)):
 
 @router.get("/ai/status")
 def ai_status(db: Session = Depends(get_db), _: User = Depends(current_user)):
+    """Fetched on every page view by the shell header — cached 3 s (L1), invalidated on settings/model changes."""
+    from ..daemon import cache
+
+    return cache.get("ai-status", 3, maxsize=4).get_or_set("status", lambda: _ai_status(db))
+
+
+def _ai_status(db: Session) -> dict[str, Any]:
     st = state.load(db)
     snap = hardware.snapshot()
     router_ = get_router()
@@ -271,7 +311,7 @@ def d_hardware(_: User = Depends(current_user)):
 
 class SettingsPatch(BaseModel):
     offline_mode: bool | None = None
-    profile: Literal["ECO", "BALANCED", "DEEP", "SPECIALIST", "OFFLINE", "EMERGENCY"] | None = None
+    profile: Literal["ECO", "BALANCED", "PERFORMANCE", "DEEP", "LOW_MEMORY", "SPECIALIST", "OFFLINE", "EMERGENCY"] | None = None
     external_allowed: bool | None = None
     limits: dict[str, Any] | None = None
     cache: dict[str, Any] | None = None

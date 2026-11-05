@@ -31,6 +31,23 @@ def planner_suite() -> dict[str, Any]:
             "metric": "expected intents ⊆ detected intents", "requires_llm": False}
 
 
+def intel_routing_suite() -> dict[str, Any]:
+    """Does the orchestrator pick the cheapest reliable strategy? (category, time-sensitivity, strategy, research depth)"""
+    from ..daemon import intel
+
+    cases = _load("intel_routing.json")
+    fails = []
+    for c in cases:
+        cl = intel.classify(c["q"])
+        pl = intel.plan(cl, offline=False, has_local={"eco": True, "chat": True, "deep": True})
+        got = {"category": cl.category, "current": cl.needs_current_info, "strategy": pl.strategy, "depth": pl.research_depth}
+        want = {k: c[k] for k in ("category", "current", "strategy", "depth") if k in c}
+        if any(got[k] != v for k, v in want.items()):
+            fails.append({"q": c["q"], "expected": want, "got": {k: got[k] for k in want}})
+    return {"suite": "intel_routing", "cases": len(cases), "score": round(1 - len(fails) / len(cases), 3), "failures": fails,
+            "metric": "classification + chosen strategy match the expected cheapest reliable route", "requires_llm": False}
+
+
 def injection_suite() -> dict[str, Any]:
     from ..security.untrusted import detect
 
@@ -138,7 +155,7 @@ def llm_grounding_suite() -> dict[str, Any]:
 
 def run_all(include_llm: bool = False) -> dict[str, Any]:
     t0 = time.time()
-    suites = [planner_suite(), injection_suite(), originality_suite(), retrieval_suite()]
+    suites = [planner_suite(), intel_routing_suite(), injection_suite(), originality_suite(), retrieval_suite()]
     if include_llm:
         suites.append(llm_grounding_suite())
     return {"ran_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "duration_s": round(time.time() - t0, 2), "suites": suites}

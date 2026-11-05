@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Archive, Beaker, BookOpen, Bot, Briefcase, Building2, CloudOff, Compass, Cpu, Flame, Dna, FlaskConical, Gauge, GitFork, Landmark, Library, Lightbulb, Megaphone, MessagesSquare, Palette, Power, Radar, Settings, ShieldCheck, Sparkles, UserCog, WandSparkles } from "lucide-react";
+import { Activity, Archive, Beaker, Telescope, BookOpen, Bot, Briefcase, Building2, CloudOff, Compass, Cpu, Flame, Dna, FlaskConical, Gauge, GitFork, Landmark, Library, Lightbulb, Megaphone, MessagesSquare, Palette, Power, Radar, Settings, ShieldCheck, Sparkles, UserCog, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -16,7 +16,9 @@ const GSUS: NavItem[] = [
 ];
 const DEMON: NavItem[] = [
   { href: "/hq", label: "Demonkoncernen HQ", icon: Building2 },
+  { href: "/control", label: "Control Center", icon: Gauge },
   { href: "/daemon", label: "DAEMON CORE", icon: Flame },
+  { href: "/research", label: "Research & Monitoring", icon: Telescope },
   { href: "/ai", label: "AI Core", icon: Cpu },
   { href: "/agents", label: "Agent Registry", icon: Bot },
   { href: "/approvals", label: "Approval Center", icon: ShieldCheck },

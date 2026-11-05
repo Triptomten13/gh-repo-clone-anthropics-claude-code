@@ -13,7 +13,6 @@ import os
 import re
 import threading
 import time
-from collections import OrderedDict
 from collections.abc import Iterator
 from typing import Any
 from urllib.parse import urlparse
@@ -63,13 +62,18 @@ def locality_of_url(url: str) -> str:
 class LocalLlamaProvider:
     id = "local"
     locality = "local"
-    MAX_LOADED = int(os.getenv("DAEMON_MAX_LOADED_MODELS", "2"))
+    RECENT_S = 10  # a model used within this window is never chosen for eviction
 
     def __init__(self) -> None:
-        self._models: OrderedDict[str, Any] = OrderedDict()
+        self._models: dict[str, Any] = {}
+        self.meta: dict[str, dict[str, Any]] = {}  # cache_key → size, loaded_at, last_used, uses, load_ms
         self._locks: dict[str, threading.Lock] = {}
-        self._glock = threading.Lock()
+        self._load_locks: dict[str, threading.Lock] = {}
+        self._glock = threading.RLock()
         self.last_error: str | None = None
+        self.load_count = 0  # telemetry: model (re)loads — high numbers mean residency churn
+        self.load_ms_total = 0
+        self.unload_count = 0
 
     # -- availability
     def configured(self) -> bool:
@@ -83,41 +87,105 @@ class LocalLlamaProvider:
         from . import library
 
         chat, eco, emb = (library.resolve(None, s) for s in ("chat", "eco", "embedding"))
-        return {"configured": self.configured(), "runtime": hardware.runtime_available(), "loaded": list(self._models),
+        return {"configured": self.configured(), "runtime": hardware.runtime_available(), "loaded": self.resident(),
                 "chat_model": chat.key if chat else None, "eco_model": eco.key if eco else None,
                 "embedding_model": emb.key if emb else None, "network_listener": False, "last_error": self.last_error}
 
+    # -- residency (decisions in daemon/residency.py)
+    def resident(self) -> list[str]:
+        with self._glock:
+            return list(self._models)
+
+    def residency(self) -> list[dict[str, Any]]:
+        now = time.time()
+        with self._glock:
+            return [{"cache_key": k, **m, "idle_s": round(now - m["last_used"]), "busy": self._locks[k].locked()} for k, m in self.meta.items()]
+
+    def lru_idle(self) -> str | None:
+        now = time.time()
+        with self._glock:
+            cands = [(m["last_used"], k) for k, m in self.meta.items() if not self._locks[k].locked() and now - m["last_used"] > self.RECENT_S]
+        return min(cands)[1] if cands else None
+
+    def unload(self, cache_key: str, reason: str = "") -> bool:
+        from . import telemetry
+
+        with self._glock:
+            lock = self._locks.get(cache_key)
+            if lock is None or not lock.acquire(blocking=False):
+                return False  # unknown or in use: never pulled out from under a running inference
+            try:
+                llm = self._models.pop(cache_key, None)
+                meta = self.meta.pop(cache_key, None)
+            finally:
+                lock.release()
+        if llm is not None:
+            close = getattr(llm, "close", None)
+            if callable(close):
+                close()
+            del llm
+            self.unload_count += 1
+            telemetry.event("model_unload", model=cache_key, reason=reason, size_mb=round((meta or {}).get("size_bytes", 0) / 1e6))
+        return True
+
+    def unload_except(self, keep: set[str]) -> None:
+        for k in [k for k in self.resident() if k.split("|")[0] not in keep]:
+            self.unload(k, reason="activation changed")
+
+    def ensure_loaded(self, model: str) -> None:
+        from .library import is_thinking
+
+        m = self._resolve(model)
+        self._load(m.key, m.file_path, thinking=is_thinking(m))
+
     # -- model management
     def _load(self, key: str, path: str, *, embedding: bool = False, n_ctx: int | None = None, thinking: bool = False) -> Any:
+        from . import residency, telemetry
+
         cache_key = f"{key}|{'emb' if embedding else 'gen'}"
         with self._glock:
             if cache_key in self._models:
-                self._models.move_to_end(cache_key)
+                self.meta[cache_key]["last_used"] = time.time()
+                self.meta[cache_key]["uses"] += 1
                 return self._models[cache_key]
-        try:
-            from llama_cpp import Llama
-        except Exception as e:  # pragma: no cover - depends on install
-            raise ProviderUnavailable(f"llama-cpp-python not installed: {e}") from e
-        st = state.load()
-        threads = st["local"]["n_threads"] or max(1, (hardware.snapshot()["cpu"]["usable_cores"]))
-        ctx = n_ctx or (512 if embedding else (max(st["local"]["n_ctx"], 8192) if thinking else st["local"]["n_ctx"]))
-        try:
-            llm = Llama(model_path=path, n_ctx=ctx, n_threads=threads, embedding=embedding, verbose=False)
-        except Exception as e:
-            self.last_error = f"load {key}: {e}"[:300]
-            raise ProviderUnavailable(f"could not load local model {key}: {e}") from e
-        with self._glock:
-            self._models[cache_key] = llm
-            self._locks.setdefault(cache_key, threading.Lock())
-            while len(self._models) > self.MAX_LOADED:
-                old, _ = self._models.popitem(last=False)
-                self._locks.pop(old, None)
-        return llm
-
-    def unload_except(self, keep: set[str]) -> None:
-        with self._glock:
-            for k in [k for k in self._models if k.split("|")[0] not in keep]:
-                self._models.pop(k, None)
+            load_lock = self._load_locks.setdefault(cache_key, threading.Lock())
+        with load_lock:  # concurrent requests for the same model load it once
+            with self._glock:
+                if cache_key in self._models:
+                    self.meta[cache_key]["last_used"] = time.time()
+                    return self._models[cache_key]
+            try:
+                from llama_cpp import Llama
+            except Exception as e:  # pragma: no cover - depends on install
+                raise ProviderUnavailable(f"llama-cpp-python not installed: {e}") from e
+            st = state.load()
+            threads = st["local"]["n_threads"] or max(1, (hardware.snapshot()["cpu"]["usable_cores"]))
+            ctx = n_ctx or (512 if embedding else (max(st["local"]["n_ctx"], 8192) if thinking else st["local"]["n_ctx"]))
+            cap = residency.policy().get("n_ctx_cap")
+            if cap and not embedding:
+                ctx = min(ctx, cap)
+            size = os.path.getsize(path) if os.path.exists(path) else 0
+            need = int(size * 1.1 + 0.25e9 * max(1, ctx / 4096))
+            try:
+                residency.make_room(self, need)
+            except MemoryError as e:
+                raise ProviderUnavailable(f"{key}: {e}") from e
+            t0 = time.monotonic()
+            try:
+                llm = Llama(model_path=path, n_ctx=ctx, n_threads=threads, embedding=embedding, verbose=False)
+            except Exception as e:
+                self.last_error = f"load {key}: {e}"[:300]
+                raise ProviderUnavailable(f"could not load local model {key}: {e}") from e
+            ms = int((time.monotonic() - t0) * 1000)
+            self.load_count += 1
+            self.load_ms_total += ms
+            with self._glock:
+                self._models[cache_key] = llm
+                self._locks.setdefault(cache_key, threading.Lock())
+                self.meta[cache_key] = {"model": key, "kind": "embedding" if embedding else "generation", "size_bytes": size, "n_ctx": ctx,
+                                        "loaded_at": time.time(), "last_used": time.time(), "uses": 1, "load_ms": ms}
+            telemetry.event("model_load", model=cache_key, ms=ms, size_mb=round(size / 1e6), n_ctx=ctx, mode=residency.effective_mode())
+            return llm
 
     def _resolve(self, model: str):
         from . import library
@@ -235,13 +303,16 @@ class LocalLlamaProvider:
         prefix = extra.get("query_prefix" if kind == "query" else "doc_prefix", "")
         llm = self._load(m.key, m.file_path, embedding=True, n_ctx=min(m.context_length or 512, 2048))
         out: list[list[float]] = []
-        with self._locks[f"{m.key}|emb"]:
-            for t in texts:
+        lock = self._locks[f"{m.key}|emb"]
+        for t in texts:
+            # lock per text, not per batch: a background re-embed of a large document must not make an interactive
+            # query wait for 64 chunks (measured: 22.5 s search during an upgrade vs 0.18–0.42 s without it)
+            with lock:
                 v = llm.embed(prefix + t[:6000])
-                if v and isinstance(v[0], list):  # token-level output → mean-pool
-                    v = [sum(col) / len(v) for col in zip(*v, strict=True)]
-                n = sum(x * x for x in v) ** 0.5 or 1.0
-                out.append([round(x / n, 6) for x in v])
+            if v and isinstance(v[0], list):  # token-level output → mean-pool
+                v = [sum(col) / len(v) for col in zip(*v, strict=True)]
+            n = sum(x * x for x in v) ** 0.5 or 1.0
+            out.append([round(x / n, 6) for x in v])
         return f"gguf:{m.key}", out
 
     def _resolve_embedding(self):

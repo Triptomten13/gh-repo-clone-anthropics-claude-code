@@ -12,6 +12,9 @@
 | Model benchmark | DAEMON CORE → Benchmarks | 12 graded tasks per model, cost per success (real models) |
 | Independence | `python scripts/independence_test.py` | Tests A–G against a live server, real local models, network namespace for offline — see [INDEPENDENCE_TESTS.md](INDEPENDENCE_TESTS.md) |
 | Backup | `scripts/backup.sh` → `scripts/restore.sh` | round-trip, `--force` guard, tamper refusal (see BACKUP_RECOVERY.md) |
+| Performance | `python scripts/perf_bench.py --label <x> [--models] [--compare <baseline>]` | endpoint p50/p95, SQL per request, RSS, model load churn on a DB copy (+ synthetic rows in the copy only) — results in `docs/perf/` |
+| System benchmark | `python scripts/system_benchmark.py` | 13 scenarios (deterministic, small model, deep reasoning, research, multi-agent, semantic retrieval, large document, concurrency, low memory, offline, provider failure, network failure, crash recovery) with accuracy, latency, RSS peak, CPU, network bytes, tokens — `docs/benchmarks/` |
+| Routing | `POST /api/ai/evals/run` (suite `intel_routing`) + held-out set `evals/datasets/intel_routing_holdout.json` | strategy choice per request category |
 
 `scripts/verify.sh` runs lint, pytest, type check and build in one go. CI (`.github/workflows/ci.yml`) runs pytest,
 ruff, the PostgreSQL smoke and dependency audits for Python and npm. The independence test is not in CI: it needs the

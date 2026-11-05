@@ -39,6 +39,7 @@ division for survival, tactical, outdoor and e-mobility products. See [ROCKY_FLA
 | DAEMON CORE: local models (llama.cpp), model library, offline mode, internal AI API, prompts, tools, workers, recovery | ✅ tested; Independence Tests A–G passed with real local models |
 | Cost intelligence: provider registry, encrypted credentials, spend limits, caching, benchmarks, cost dashboard, proposals | ✅ tested; real benchmarks of two local models |
 | Admin access: first-run setup, `python -m app.cli`, Users & access UI | ✅ tested |
+| DAEMON HYPERINTELLIGENCE: rules-first orchestrator, deterministic solvers, multi-layer caches, internet research over official APIs with citations, monitors, telemetry, memory-aware model residency, Control Center | ✅ tested; measured before/after in docs/HYPERINTELLIGENCE.md |
 | Local deep reasoning: Qwen3 4B reasoning model (deep tier), thinking budget, self-consistency, Chamber → Deep reasoning | ✅ benchmark 17/17 (deep reasoning 7/7); Independence Tests A & B |
 
 ## Quick start (local, no Docker)
@@ -50,7 +51,7 @@ pip install -r requirements-dev.txt
 cp ../.env.example ../.env            # optional; defaults work for local use
 alembic upgrade head                   # or let the app create tables on first start
 uvicorn app.main:app --reload --port 8000
-python -m pytest -q                    # 128 tests
+python -m pytest -q                    # 155 tests
 
 # frontend (separate shell)
 cd frontend
@@ -92,6 +93,7 @@ Deterministic agents (scoring, economics, compliance, trends, business models, e
 - [INTEGRATIONS.md](docs/INTEGRATIONS.md) — every connector, its state and the credentials it needs
 - [ROCKY_FLARE.md](docs/ROCKY_FLARE.md) — creative intelligence layer & Field Operations: modules, workflows, acceptance map
 - [ROADMAP.md](docs/ROADMAP.md) — completed / partial / blocked / planned
+- [HYPERINTELLIGENCE.md](docs/HYPERINTELLIGENCE.md) — audit, measured optimisation, orchestrator, internet research, Control Center
 - [DAEMON_CORE.md](docs/DAEMON_CORE.md) — sovereign AI infrastructure: audit, architecture, plan, limits
 - [COST_INTELLIGENCE.md](docs/COST_INTELLIGENCE.md) — provider registry, credentials, routing, limits, benchmarks
 - [INDEPENDENCE_TESTS.md](docs/INDEPENDENCE_TESTS.md) — Tests A–G with actual results

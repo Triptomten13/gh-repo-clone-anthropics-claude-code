@@ -7,7 +7,9 @@ G-SUS is the intelligence, Demonkoncernen AB the infrastructure, the Archive the
 - `frontend/` Next.js 16 / React 19 / Tailwind 4 command center. Scoped rules: `frontend/CLAUDE.md`.
 - `docs/` architecture, AI system, knowledge system, agents, security, design system, decisions, testing, roadmap,
   DAEMON CORE (sovereign local AI), cost intelligence, install/admin access, backup. `progress.md` = current state.
-- `backend/app/daemon/` local model runtime, routing policy, model library, credentials, costs. Admin CLI: `python -m app.cli`.
+- `backend/app/daemon/` local model runtime, residency, routing policy, orchestrator (`intel.py`), caches, telemetry, model library,
+  credentials, costs. `backend/app/internet/` official-API research, monitors. Admin CLI: `python -m app.cli`.
+- Performance work: measure first (`scripts/perf_bench.py --label … --compare baseline`); never claim an improvement without it.
 
 ## Non-negotiables
 - Never fabricate data, sources, quotations, citations, model output, test results or integration status. Unknown ⇒ say unknown / mark `blocked`.

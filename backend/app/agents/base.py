@@ -66,6 +66,13 @@ class AgentContext:
         from ..ai.llm import LLMRefused, LLMUnavailable
 
         self.orch.check_token_budget(self.db, self.agent_row)
+        from ..daemon import prompts, telemetry
+
+        est = prompts.estimate_tokens(system) + prompts.estimate_tokens(prompt)
+        agent = self.orch.agents.get(self.agent_row.id)
+        budget = agent.context_budget if agent else CONTEXT_BUDGET.get(self.agent_row.model_tier, 12000)
+        if est > budget:  # measured and surfaced (never silently truncated: that could drop evidence)
+            telemetry.event("context_over_budget", agent=self.agent_row.id, task=self.task.type, est_tokens=est, budget=budget)
         try:
             res = get_provider().complete(system=system, prompt=prompt, schema=schema, tier=tier or self.agent_row.model_tier)
         except (LLMUnavailable, LLMRefused) as e:
@@ -81,6 +88,9 @@ class AgentContext:
         gov.audit(self.db, f"agent:{self.agent_row.id}", action, target, **details)
 
 
+CONTEXT_BUDGET = {"fast": 4000, "standard": 12000, "deep": 24000}  # tokens per model call; measured, then enforced
+
+
 class BaseAgent:
     id: str = ""
     name: str = ""
@@ -89,6 +99,13 @@ class BaseAgent:
     level: int = 0
     tier: str = "standard"
     task_types: tuple[str, ...] = ()
+    tools: tuple[str, ...] = ()  # DAEMON tools this agent may call; empty = none
+    success_criterion: str = "returns an AgentOutput with a summary and labelled evidence; blocked/failed outcomes are reported, never faked"
+    context_budget_tokens: int | None = None  # default by tier (CONTEXT_BUDGET)
+
+    @property
+    def context_budget(self) -> int:
+        return self.context_budget_tokens or CONTEXT_BUDGET.get(self.tier, 12000)
 
     def handle(self, ctx: AgentContext, task: Task) -> AgentOutput:  # pragma: no cover - abstract
         raise NotImplementedError

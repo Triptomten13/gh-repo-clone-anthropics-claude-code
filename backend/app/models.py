@@ -1007,3 +1007,103 @@ class TrainingDataset(Base):
     status: Mapped[str] = mapped_column(String(24), default="registered")  # registered | blocked_no_consent
     created_by: Mapped[str] = mapped_column(String(255), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+# =====================================================================================
+# DAEMON HYPERINTELLIGENCE — internet intelligence, research, monitoring, semantic cache
+# Knowledge kinds are kept apart: web_resources = raw source material (expiring excerpts, never treated as our own
+# knowledge), research_runs.findings = extracted facts (quote + source), research_runs.answer = generated conclusion
+# (labelled), Archive documents = curated sources promoted by a human.
+# =====================================================================================
+class WebResource(Base):
+    """L4 research cache + source registry for one URL. Excerpts expire; full pages are not kept."""
+
+    __tablename__ = "web_resources"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    url: Mapped[str] = mapped_column(String(1024), unique=True, index=True)
+    host: Mapped[str] = mapped_column(String(255), index=True)
+    source: Mapped[str] = mapped_column(String(32), index=True)  # wikipedia | arxiv | crossref | github | hn | pypi | nvd | hf | rss | web
+    kind: Mapped[str] = mapped_column(String(16), default="document")  # document | api | feed
+    title: Mapped[str] = mapped_column(String(512), default="")
+    excerpt: Mapped[str] = mapped_column(Text, default="")
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    retrieved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    etag: Mapped[str] = mapped_column(String(255), default="")
+    last_modified: Mapped[str] = mapped_column(String(64), default="")
+    content_hash: Mapped[str] = mapped_column(String(64), default="")
+    reliability: Mapped[str] = mapped_column(String(16), default="unknown")  # primary | secondary | tertiary | unknown
+    license_note: Mapped[str] = mapped_column(String(255), default="")
+    bytes: Mapped[int] = mapped_column(Integer, default=0)
+    injection_flags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    promoted_document_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class ResearchRun(Base):
+    __tablename__ = "research_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    query: Mapped[str] = mapped_column(Text)
+    query_norm: Mapped[str] = mapped_column(String(512), index=True)
+    depth: Mapped[str] = mapped_column(String(16))  # quick | standard | deep
+    status: Mapped[str] = mapped_column(String(24))  # completed | insufficient_evidence | offline | failed
+    answer: Mapped[str] = mapped_column(Text, default="")
+    answer_kind: Mapped[str] = mapped_column(String(24), default="extractive")  # extractive | generated_conclusion
+    sources: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    findings: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    contradictions: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    missing: Mapped[list[str]] = mapped_column(JSON, default=list)
+    stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # requests, bytes, cache hits, rounds, model calls, ms
+    time_sensitive: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class Monitor(Base):
+    __tablename__ = "monitors"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    purpose: Mapped[str] = mapped_column(Text, default="")
+    query: Mapped[str] = mapped_column(String(512))
+    sources: Mapped[list[str]] = mapped_column(JSON, default=list)
+    every_minutes: Mapped[int] = mapped_column(Integer, default=1440)
+    max_requests: Mapped[int] = mapped_column(Integer, default=6)  # resource budget per run
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    fingerprint: Mapped[str] = mapped_column(String(64), default="")
+    seen: Mapped[list[str]] = mapped_column(JSON, default=list)  # item ids already reported (bounded)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    last_change_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MonitorEvent(Base):
+    __tablename__ = "monitor_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    monitor_id: Mapped[int] = mapped_column(ForeignKey("monitors.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(16))  # change | error
+    summary: Mapped[str] = mapped_column(Text, default="")
+    items: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    acknowledged: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class SemanticCacheEntry(Base):
+    """L2/L3 answer cache: exact (normalised text) and near-identical (embedding similarity) reuse of VERIFIED answers
+    to stable questions. Scoped (never shared across users for private data), category-checked, expiring."""
+
+    __tablename__ = "semantic_cache"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    scope: Mapped[str] = mapped_column(String(64), index=True)  # global | user:<id>
+    category: Mapped[str] = mapped_column(String(32), index=True)
+    question: Mapped[str] = mapped_column(Text)
+    question_norm: Mapped[str] = mapped_column(String(512), index=True)
+    embedding: Mapped[list[float]] = mapped_column(JSON, default=list)
+    embedding_model: Mapped[str] = mapped_column(String(96), default="")
+    answer: Mapped[str] = mapped_column(Text)
+    sources: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    hits: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)

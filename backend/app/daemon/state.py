@@ -9,7 +9,7 @@ import threading
 import time
 from typing import Any
 
-PROFILES = ("ECO", "BALANCED", "DEEP", "SPECIALIST", "OFFLINE", "EMERGENCY")
+PROFILES = ("ECO", "BALANCED", "PERFORMANCE", "DEEP", "LOW_MEMORY", "SPECIALIST", "OFFLINE", "EMERGENCY")
 
 DEFAULTS: dict[str, Any] = {
     "offline_mode": False,          # True ⇒ no external provider is ever called, not even as a fallback
@@ -83,3 +83,9 @@ def invalidate() -> None:
     global _cache
     with _lock:
         _cache = None
+    try:
+        from . import cache
+
+        cache.invalidate("ai-status", "model-slots")
+    except Exception:  # noqa: S110 - cache module optional during early import
+        pass
