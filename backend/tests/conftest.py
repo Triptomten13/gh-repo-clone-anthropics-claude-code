@@ -37,6 +37,9 @@ def fresh_db(tmp_path):
     from app.daemon import cache as l1
 
     l1.invalidate()
+    from app.knowledge import index as archive_index
+
+    archive_index.invalidate()
     workers.invalidate()
     os.environ["ARCHIVE_DIR"] = str(tmp_path / "archive")
     s = dbmod.SessionLocal()
@@ -51,6 +54,9 @@ def fresh_db(tmp_path):
     from app.daemon import cache as l1
 
     l1.invalidate()
+    from app.knowledge import index as archive_index
+
+    archive_index.invalidate()
 
 
 @pytest.fixture()

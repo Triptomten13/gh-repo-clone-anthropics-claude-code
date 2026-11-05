@@ -234,7 +234,7 @@ def archive_delete(did: int, confirm: bool = False, db: Session = Depends(get_db
     d = _404(db.get(Document, did), "document")
     if not confirm:
         raise HTTPException(400, "deleting archive data is irreversible: repeat with confirm=true")
-    db.query(DocumentChunk).filter(DocumentChunk.document_id == did).delete()
+    db.query(DocumentChunk).filter(DocumentChunk.document_id == did).execution_options(archive_docs=[did]).delete()
     db.query(EntityMention).filter(EntityMention.document_id == did).delete()
     db.query(Annotation).filter(Annotation.document_id == did).delete()
     db.query(DocumentRelation).filter((DocumentRelation.source_id == did) | (DocumentRelation.target_id == did)).delete(synchronize_session=False)

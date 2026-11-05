@@ -10,7 +10,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
 from ..ai.providers import LocalHashEmbedder, OllamaProvider, tokenize
@@ -190,11 +190,24 @@ def ingest(db: Session, ex: Extracted, meta: dict[str, Any], raw: bytes | None =
     if deferred:
         doc.error = (doc.error + "; " if doc.error else "") + f"semantic embeddings for {len(pieces)} chunks are being computed in the background"
         db.flush()
-        _defer_semantic(doc.id)
+        db.info.setdefault("defer_semantic", []).append(doc.id)  # started AFTER commit — see _start_deferred
     return doc
 
 
 LARGE_DOC_CHUNKS = int(os.getenv("ARCHIVE_SYNC_EMBED_MAX_CHUNKS", "200"))
+
+
+@event.listens_for(Session, "after_commit")
+def _start_deferred(session: Session) -> None:
+    """The upgrade thread reads the document's chunks in its own session: started before the ingest transaction commits,
+    it saw no chunks and silently upgraded nothing (found by test_index_picks_up_background_semantic_upgrade)."""
+    for doc_id in session.info.pop("defer_semantic", []):
+        _defer_semantic(doc_id)
+
+
+@event.listens_for(Session, "after_rollback")
+def _drop_deferred(session: Session) -> None:
+    session.info.pop("defer_semantic", None)
 
 
 def _defer_semantic(doc_id: int) -> None:

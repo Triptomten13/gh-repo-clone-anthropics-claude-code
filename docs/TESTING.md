@@ -13,6 +13,7 @@
 | Independence | `python scripts/independence_test.py` | Tests A–G against a live server, real local models, network namespace for offline — see [INDEPENDENCE_TESTS.md](INDEPENDENCE_TESTS.md) |
 | Backup | `scripts/backup.sh` → `scripts/restore.sh` | round-trip, `--force` guard, tamper refusal (see BACKUP_RECOVERY.md) |
 | Performance | `python scripts/perf_bench.py --label <x> [--models] [--compare <baseline>]` | endpoint p50/p95, SQL per request, RSS, model load churn on a DB copy (+ synthetic rows in the copy only) — results in `docs/perf/` |
+| Archive retrieval | `python scripts/archive_bench.py --label <x> [--compare archive-baseline]` | search p50/p95 at 2k/10k/20k synthetic chunks (temp DB, fixed seed), cold build, first search after add/delete, RSS, and whether top-k is identical to the baseline — `docs/perf/archive-*.json` |
 | System benchmark | `python scripts/system_benchmark.py` | 13 scenarios (deterministic, small model, deep reasoning, research, multi-agent, semantic retrieval, large document, concurrency, low memory, offline, provider failure, network failure, crash recovery) with accuracy, latency, RSS peak, CPU, network bytes, tokens — `docs/benchmarks/` |
 | Routing | `POST /api/ai/evals/run` (suite `intel_routing`) + held-out set `evals/datasets/intel_routing_holdout.json` | strategy choice per request category |
 

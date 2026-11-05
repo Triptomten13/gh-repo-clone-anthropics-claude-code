@@ -124,6 +124,7 @@ export default function ControlCenter() {
               <span className="text-ink-3">Energy / successful task</span><span className="num">{d.efficiency.energy_wh_per_successful_task_estimate ?? "—"} Wh (est.)</span>
               <span className="text-ink-3">Response-cache hits (24 h)</span><span className="num">{d.efficiency.response_cache_hits_24h}</span>
               <span className="text-ink-3">Answer cache L2 / L3</span><span className="num">{d.efficiency.semantic_cache.l2_hits} / {d.efficiency.semantic_cache.l3_hits} hits · {d.efficiency.semantic_cache.misses} misses</span>
+              <span className="text-ink-3">Archive index</span><span className="num">{!d.archive_index?.enabled ? "off (scan)" : d.archive_index.rows === 0 && d.archive_index.builds === 0 ? "not built yet (first search builds it)" : `${d.archive_index.live_rows} chunks · ${(d.archive_index.bytes / 1048576).toFixed(1)} MB · last refresh ${d.archive_index.last_build_ms ?? "—"} ms`}</span>
             </div>
             <Table head={["L1 cache", "Hit rate", "Hits", "Size"]}>
               {d.efficiency.l1_caches.filter((c: any) => c.hits !== undefined).map((c: any) => <tr key={c.name}><td className="text-[12px]">{c.name}</td>

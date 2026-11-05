@@ -398,3 +398,116 @@ def test_no_pickle_backed_disk_cache_is_used():
     app = Path(__file__).resolve().parents[1] / "app"
     hits = [str(p) for p in app.rglob("*.py") if any(s in p.read_text(encoding="utf-8") for s in ("LlamaDiskCache", "import diskcache"))]
     assert hits == []
+
+
+# ------------------------------------------------------------------ Archive index (measured: docs/perf/archive-*.json)
+TEXTS = ["Jerusalem fell to Babylon in 587 BCE and many were deported to Babylon.", "The temple was rebuilt after the exile under Persian rule.",
+         "Lantern pallets were inspected at the Gothenburg warehouse in March.", "Babylon's hanging gardens are attested only in later Greek sources.",
+         "The covenant texts were copied by scribes during the exile in Babylon.", "Warehouse inventory: 400 lanterns, 12 pallets, 3 inspections."]
+
+
+def _seed_archive(client):
+    ids = []
+    for i, t in enumerate(TEXTS * 3):
+        ids.append(client.post("/api/archive/text", json={"title": f"doc {i}", "text": t, "tags": ["even"] if i % 2 == 0 else [],
+                                                          "evidence_class": "historical_fact" if i % 3 else "primary_source"}).json()["id"])
+    return ids
+
+
+def test_index_ranks_exactly_like_the_scan(client, fresh_db):
+    from app.knowledge import search
+
+    _seed_archive(client)
+    db = fresh_db.SessionLocal()
+    cases = [("Babylon exile", "hybrid", None), ("warehouse lanterns", "keyword", None), ("temple rebuilt Persian", "semantic", None),
+             ("Babylon", "hybrid", {"evidence_class": "primary_source"}), ("exile", "hybrid", {"tag": "even"}), ("nothing-matches-this", "hybrid", None)]
+    for q, mode, f in cases:
+        indexed = search.search(db, q, k=10, mode=mode, filters=f)
+        scan = search._search_scan(db, q, k=10, mode=mode, filters=f)
+        assert [(h["chunk_id"], h["score"]) for h in indexed] == [(h["chunk_id"], h["score"]) for h in scan], (q, mode, f)
+    db.close()
+
+
+def test_index_never_serves_deleted_or_stale_chunks(client, fresh_db):
+    from app.knowledge import index, search
+    from app.models import DocumentChunk
+
+    ids = _seed_archive(client)
+    q = {"query": "Gothenburg warehouse", "mode": "keyword", "k": 50}
+    before = client.post("/api/archive/search", json=q).json()["results"]
+    victim = before[0]["document_id"]
+    builds = index.stats["builds"]
+    assert client.delete(f"/api/archive/documents/{victim}?confirm=true").status_code == 200
+    after = client.post("/api/archive/search", json=q).json()["results"]
+    assert victim not in {h["document_id"] for h in after} and len(after) == len(before) - 1
+    assert index.stats["builds"] == builds  # the delete was applied incrementally, not by a full rebuild
+    # a write from ANOTHER session (another process would look the same: it only sees the database) is picked up
+    other = fresh_db.SessionLocal()
+    c = other.query(DocumentChunk).filter(DocumentChunk.document_id == ids[1]).first()
+    c.text = "Zanzibar spice ledger, rewritten in another session."
+    other.commit()
+    other.close()
+    db = fresh_db.SessionLocal()
+    assert [h["document_id"] for h in search.search(db, "zanzibar ledger", mode="keyword")] == [ids[1]]
+    db.close()
+
+
+def test_index_picks_up_background_semantic_upgrade(client, fresh_db, monkeypatch):
+    from app.knowledge import process, search
+
+    monkeypatch.setattr(process, "LARGE_DOC_CHUNKS", 3)
+    vec = {"doc": [1.0, 0.0], "query": [1.0, 0.0]}
+    fake = ("gguf:fake", lambda texts, kind="document": [vec["doc"] for _ in texts])
+    monkeypatch.setattr(process, "embedder", lambda: fake)
+    monkeypatch.setattr(search, "embedder", lambda: fake)
+    text = " ".join(f"Section {i}: lantern audit notes from the northern depot." for i in range(300))
+    did = client.post("/api/archive/text", json={"title": "big", "text": text, "evidence_class": "unclassified"}).json()["id"]
+    db = fresh_db.SessionLocal()
+    for _ in range(100):  # semantic hits appear once the background upgrade has committed — no restart, no manual refresh
+        db.rollback()
+        hits = search.search(db, "anything", k=3, mode="semantic")
+        if hits and all(h["document_id"] == did for h in hits):
+            break
+        time.sleep(0.1)
+    db.close()
+    assert hits and hits[0]["document_id"] == did
+
+
+def test_index_is_safe_under_concurrent_search_and_writes(client, fresh_db):
+    """Updates are copy-on-write: searches running while documents change never see a half-updated index."""
+    from app.knowledge import search
+    from app.models import Document, DocumentChunk
+
+    _seed_archive(client)
+    errors: list[str] = []
+    stop = threading.Event()
+
+    def reader():
+        db = fresh_db.SessionLocal()
+        try:
+            while not stop.is_set():
+                db.rollback()
+                search.search(db, "Babylon warehouse exile", k=5)
+        except Exception as e:  # noqa: BLE001 - any failure is the finding
+            errors.append(repr(e))
+        finally:
+            db.close()
+
+    readers = [threading.Thread(target=reader) for _ in range(3)]
+    for t in readers:
+        t.start()
+    db = fresh_db.SessionLocal()
+    for i in range(25):
+        d = Document(uid=f"cc-{i}", title=f"concurrent {i}", doc_type="txt", content_hash=f"cc{i}", status="ready")
+        db.add(d)
+        db.flush()
+        db.add(DocumentChunk(document_id=d.id, ordinal=0, text=f"Babylon warehouse ledger {i}", embedding=[], embedding_model=""))
+        db.commit()
+    db.close()
+    stop.set()
+    for t in readers:
+        t.join()
+    assert errors == []
+    s = fresh_db.SessionLocal()
+    assert len(search.search(s, "ledger", k=50, mode="keyword")) == 25
+    s.close()

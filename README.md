@@ -51,7 +51,7 @@ pip install -r requirements-dev.txt
 cp ../.env.example ../.env            # optional; defaults work for local use
 alembic upgrade head                   # or let the app create tables on first start
 uvicorn app.main:app --reload --port 8000
-python -m pytest -q                    # 169 tests
+python -m pytest -q                    # 173 tests
 
 # frontend (separate shell)
 cd frontend

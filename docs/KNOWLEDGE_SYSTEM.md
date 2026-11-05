@@ -12,7 +12,9 @@
 * **Retrieval** — BM25 + vector similarity fused with reciprocal rank fusion (k = 60). Vectors come from the active
   local embedding model (`gguf:<key>`, e.g. nomic-embed-text v1.5, 768-d), else Ollama, else the lexical hash embedder.
   Each embedder has a relevance floor (GGUF 0.5, Ollama 0.35, hash 0.2) so noise is not presented as relevance.
-  Changing the embedding model ⇒ `POST /api/archive/reembed`.
+  Changing the embedding model ⇒ `POST /api/archive/reembed`. Queries run against an in-memory index
+  (`knowledge/index.py`: BM25 postings + embedding matrix, refreshed per document from a transactional change token;
+  document status and filters are checked in SQL on every query) — measured 5.9 s → 22 ms at 20 000 chunks.
 * **Citations** — `[uid8§ordinal]` referencing a specific chunk; grounded answers are extractive without a model, or
   model-written with citation validation (unsupported citations are rejected).
 * **Injection screening** — chunks with injection patterns are flagged; all retrieved text reaches models only inside

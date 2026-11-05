@@ -233,6 +233,11 @@ def control_overview(db: Session = Depends(get_db), _: User = Depends(current_us
     from ..daemon import state as dstate
     from ..daemon.runtime import get_local
     from ..internet.http import paused_hosts
+    from ..knowledge.index import enabled as index_enabled
+    from ..knowledge.index import stats as _ix_stats
+
+    def index_stats() -> dict[str, Any]:
+        return dict(_ix_stats)
 
     now = datetime.now(UTC)
     day = now - timedelta(days=1)
@@ -276,6 +281,7 @@ def control_overview(db: Session = Depends(get_db), _: User = Depends(current_us
                            round(float(calls[3]) / succeeded, 4) if succeeded else None},
         "events": telemetry.events(20),
         "archive_documents": db.scalar(select(func.count(Document.id))) or 0,
+        "archive_index": {**index_stats(), "enabled": index_enabled()},
     }
 
 

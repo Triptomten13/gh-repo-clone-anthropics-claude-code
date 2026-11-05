@@ -15,7 +15,7 @@
 | Backup / restore | round-trip + tamper refusal tested (docs/BACKUP_RECOVERY.md) |
 | Docs restructure | docs/ holds architecture, AI system, knowledge, agents, security, design system, decisions, testing, roadmap, DAEMON, cost, install, backup |
 
-Totals: 169 backend tests pass; ruff clean; frontend type-checks and builds (30 routes); migrations 0001–0005 verified
+Totals: 173 backend tests pass; ruff clean; frontend type-checks and builds (30 routes); migrations 0001–0005 verified
 upgrade/downgrade/upgrade on SQLite and PostgreSQL; PostgreSQL smoke passes; Independence Tests A–G pass
 (2026-11-05T20:27Z, after the HYPERINTELLIGENCE changes).
 
@@ -29,6 +29,8 @@ upgrade/downgrade/upgrade on SQLite and PostgreSQL; PostgreSQL smoke passes; Ind
 * The 1.5B model once invented a fact about the company when asked offline; the identity prompt now limits what G-SUS
   may claim about itself.
 
+* Archive search (retrieval only): 454 ms → 3.8 ms at 2 000 chunks, 5.9 s → 22 ms at 20 000, identical rankings
+  (in-memory index, docs/perf/archive-*.json).
 * Hot paths after optimisation: page view 24 → 10.6 ms (28 → 7 SQL), agents list 124 → 3 SQL, cost dashboard 563 → 186 ms
   at 20k rows; model reloads 5 → 3 in a mixed sequence. Cold model reads run at 14 MB/s on this disk.
 
@@ -41,8 +43,7 @@ upgrade/downgrade/upgrade on SQLite and PostgreSQL; PostgreSQL smoke passes; Ind
 * Multimodal (speech, vision, OCR) — the orchestrator classifies image/audio requests and answers "unavailable" honestly.
 * General web search — Brave adapter exists but is off (no key); research uses the 10 official keyless APIs only.
 * Provider-verification research connector, LoRA/fine-tuning (needs GPU + training stack), multi-worker task queue
-  (one process; background work runs in threads), vector index for the Archive (linear scan, measured 433 ms on the
-  1.6 MB benchmark document).
+  (one process; background work runs in threads).
 * Wikipedia rate-limits this host's shared egress IP intermittently (429/403 measured); research falls back to other
   sources and reports the failure instead of hiding it.
 * Archivum canon content — none exists in the repository; nothing is invented.

@@ -2,6 +2,12 @@
 
 Short records of decisions that shape the system. Newest first.
 
+### D-020 · 2026-11-05 · In-process Archive index, not a vector database (yet)
+Measured: the per-query scan cost 0.45 s at 2 000 chunks and 5.9 s at 20 000. An in-memory index (BM25 postings + a
+float32 matrix, numpy) brings that to 3.8 / 22 ms with identical rankings and no new service to run, secure or back up.
+Freshness comes from a change token written in the same transaction as every chunk change, so it is correct across
+processes. Revisit (pgvector / ANN) when the Archive outgrows memory — roughly beyond a few hundred thousand chunks.
+
 ### D-019 · 2026-11-05 · Conservative semantic answer reuse
 Two similar questions are not the same question. L3 reuse requires a semantic embedder, cosine ≥ 0.95, the same scope and
 task category, identical numbers and the same negation, and only verified (cited) answers are stored. Time-sensitive

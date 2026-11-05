@@ -1107,3 +1107,7 @@ class SemanticCacheEntry(Base):
     hits: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+# Archive index change tracking: every process that writes document_chunks must record change tokens (see knowledge/index.py)
+from .knowledge import index as _archive_index  # noqa: E402,F401

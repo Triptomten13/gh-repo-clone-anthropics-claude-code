@@ -64,6 +64,33 @@ eco 1.3 s → 0.4 s; resident RSS 6.2 → 8.0 GB (three models kept while RAM al
 the reserve and the LOW_MEMORY mode). The total sequence time (248 s → 44 s) is **not** claimed as an improvement: most
 of the baseline was a cold disk read that depends on the OS page cache, not on this change.
 
+### Archive retrieval index (after the system benchmark)
+
+The scan behind `knowledge.search` loaded, JSON-decoded and tokenised every chunk on every query. `knowledge/index.py`
+keeps BM25 postings and a float32 embedding matrix per model in memory; documents' visibility is still decided in SQL
+per query. Freshness: every commit that touches `document_chunks` writes a change token (with the documents touched)
+to `system_state` in the same transaction; a search reads it and re-reads only those documents (PostgreSQL: `FOR
+UPDATE` serialises concurrent writers — 8 concurrent commits all logged and applied, checked on PG 16).
+
+`scripts/archive_bench.py --label archive-after-index --compare archive-baseline` (synthetic 768-d Archive, retrieval only;
+the real query embedding, ~0.1–0.3 s with nomic on this CPU, comes on top and is unchanged):
+
+| Chunks | Search p50 before | After | p95 after | Identical top-8 | RSS before → after |
+|---|---|---|---|---|---|
+| 2 000 | 454 ms | **3.8 ms** | 4.8 ms | 12/12 | 145 → 132 MB |
+| 10 000 | 2 558 ms | **11.1 ms** | 16.1 ms | 12/12 | 297 → 310 MB |
+| 20 000 | 5 939 ms | **22.0 ms** | 28.4 ms | 12/12 | 486 → 561 MB |
+
+Cost: building the index the first time takes about one old search (0.5 s / 2.9 s / 7.7 s); after a change only the
+touched documents are re-read — first search after adding a 50-chunk document 25 ms, after deleting a document 31 ms
+(20 000 chunks). The index adds ~75 MB at 20 000 chunks. Rankings match the scan exactly (test + benchmark); the scan
+stays as the fallback (`ARCHIVE_INDEX=0`, or numpy missing).
+
+Found while testing it: (1) an in-place incremental update could be read half-done by a concurrent search — updates are
+now copy-on-write (`test_index_is_safe_under_concurrent_search_and_writes` failed 3/3 without it); (2) the background
+semantic upgrade of a large document was started BEFORE the ingest transaction committed, so it could see no chunks and
+upgrade nothing (2 of 3 runs with a fast embedder) — it now starts from an `after_commit` hook (6/6 runs pass).
+
 ## 4. How a request is solved now
 
 ```
@@ -136,8 +163,9 @@ during the background semantic upgrade **433 ms** (was 22,544 ms), server RSS pe
 * Vision, speech, OCR: no local models installed; reported as unavailable.
 * No GPU here: VRAM/GPU panels show "no GPU detected".
 * General web search needs an API key; without it, research covers the official sources above only.
-* Archive search still scans every chunk (fine at the current size; an inverted index / vector index is the next step
-  when the Archive grows — the Performance Engineering Agent will flag it from the route latency).
+* Archive index rebuilds from scratch (~8 s at 20 000 chunks on this CPU) only after a bulk change it cannot attribute to
+  documents, a process start, or when >30 % of rows are tombstoned; ordinary ingest/delete/upgrade are incremental.
+  The index lives in process memory (~3 KB per 768-d chunk) — a much larger Archive would want pgvector or an ANN index.
 * The task orchestrator stays single-worker: local inference is serialised per model anyway, and no measurement yet
   shows queueing delay worth the added complexity.
 * Semantic (L3) answer reuse only activates with a semantic embedder and a ≥ 0.95 match plus identical numbers/negation;
