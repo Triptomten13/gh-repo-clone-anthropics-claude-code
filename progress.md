@@ -1,0 +1,41 @@
+# Progress — current state (2026-11-05)
+
+## Done and verified
+
+| Area | Evidence |
+|---|---|
+| Commerce platform (agents, engines, approvals, connectors, dashboard) | pytest, browser checks (Phase 1) |
+| Rocky Flare + Field Operations | pytest, browser checks (Phase 2) |
+| Master evolution: AI core, Archive, Archivum tools, G-sus head orchestrator, security hardening, dev tooling, new UI | pytest, evals 1.0, PostgreSQL smoke, browser checks |
+| Admin access: first-run setup, `python -m app.cli`, Users & access UI, token revocation | `test_daemon.py`, manual CLI run |
+| DAEMON CORE: hardware manager, verified model library, llama.cpp runtime, profiles, offline mode, internal AI API, prompts, tools, workers, recovery, fine-tuning feasibility | `test_daemon.py` (24 tests), Independence Tests A–G **all passed** with real models (docs/INDEPENDENCE_TESTS.md) |
+| DAEMON COST INTELLIGENCE: registry, credentials, routing, quota backoff, spend limits, caches, benchmarks, dashboard, proposals | `test_daemon.py`, real benchmark runs on two local models |
+| Backup / restore | round-trip + tamper refusal tested (docs/BACKUP_RECOVERY.md) |
+| Docs restructure | docs/ holds architecture, AI system, knowledge, agents, security, design system, decisions, testing, roadmap, DAEMON, cost, install, backup |
+
+Totals: 118 backend tests pass; ruff clean; frontend type-checks and builds (28 routes); migrations 0001–0004 verified
+upgrade/downgrade/upgrade on SQLite and PostgreSQL.
+
+## Measured facts worth remembering
+
+* CPU-only host (4 vCPU, 16.9 GB): Qwen2.5 1.5B ~0.8 s per classification, 6–10 s per short chat answer; Qwen2.5 0.5B
+  ~0.5 s. Benchmark 9/12 and 10/12; **both 0/2 on Swedish**.
+* The 1.5B model once invented a fact about the company when asked offline; the identity prompt now limits what G-SUS
+  may claim about itself. Consequential answers still need verification and human review.
+
+## Not done / blocked (honest list)
+
+* Live external connectors (YouTube, Reddit, eBay, Etsy, Shopify) — implemented against official APIs, never exercised
+  live (no credentials here).
+* Anthropic models — adapter tested with fakes only; no key in this environment.
+* Docker images were never built here (no Docker daemon); compose file validated only.
+* Multimodal (speech, vision, OCR), semantic response cache, rate-limit header parsing, research connector for provider
+  verification, LoRA/fine-tuning (needs GPU + training stack), multi-worker task queue.
+* Archivum canon content — none exists in the repository; nothing is invented.
+
+## Next sensible steps
+
+1. Run `python scripts/independence_test.py` and `scripts/verify.sh` on the production host.
+2. Decide whether a stronger local model (7–8B, needs ≥ 16 GB free RAM, ideally a GPU) or an authorised external
+   provider should handle Swedish and deep reasoning; benchmark it with DAEMON CORE → Benchmarks before switching.
+3. Configure connectors with real credentials one at a time and verify each against its live API.

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button, Card, ErrorBanner, PageHeader, StatusBadge, Table } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useApi } from "@/lib/hooks";
+import { PasswordCard, UsersCard } from "@/components/users";
 
 export default function SettingsPage() {
   const integ = useApi<any[]>("/api/integrations");
@@ -23,7 +24,7 @@ export default function SettingsPage() {
           {status.data && (
             <dl className="grid grid-cols-2 gap-y-1.5 text-[13px]">
               <dt className="text-ink-3">AI provider</dt><dd>{status.data.llm_provider === "none" ? <StatusBadge status="missing_credentials" /> : status.data.llm_provider}</dd>
-              <dt className="text-ink-3">Models</dt><dd className="font-mono text-[11.5px]">{Object.entries(status.data.models).map(([k, v]) => <div key={k}>{k}: {v as string}</div>)}</dd>
+              <dt className="text-ink-3">External tier models</dt><dd className="font-mono text-[11.5px]">{Object.entries(status.data.models).map(([k, v]) => <div key={k}>{k}: {v as string}</div>)}</dd>
               <dt className="text-ink-3">Daily AI cost limit</dt><dd className="num">${status.data.daily_cost_limit_usd}</dd>
               <dt className="text-ink-3">Max delegation depth</dt><dd className="num">{status.data.max_task_depth}</dd>
               <dt className="text-ink-3">Scheduler</dt><dd>{status.data.scheduler_enabled ? "enabled" : "disabled (SCHEDULER_ENABLED)"}</dd>
@@ -39,6 +40,10 @@ export default function SettingsPage() {
           <p className="mb-3 text-[13px] text-ink-2">Loads synthetic, clearly badged sample products, trends and ledger entries so you can explore the command center before any connector is configured. It is not market data and must be removed before real use.</p>
           <div className="flex gap-2"><Button onClick={() => call("/api/demo", "POST", "Demo loaded")}>Load demo data</Button><Button variant="danger" onClick={() => call("/api/demo", "DELETE", "Demo removed")}>Remove demo data</Button></div>
         </Card>
+      </div>
+      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+        <div className="xl:col-span-2"><UsersCard /></div>
+        <PasswordCard />
       </div>
       {groups.map((g) => {
         const rows = (integ.data ?? []).filter((i) => i.kind === g);

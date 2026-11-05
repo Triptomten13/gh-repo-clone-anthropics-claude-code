@@ -13,13 +13,16 @@ services:
       retries: 10
 
   api:
-    build: ./backend
+    build:
+      context: ./backend
+      args: { LOCAL_AI: "${LOCAL_AI:-1}" }   # 1 = include llama.cpp so DAEMON CORE can run local models
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://rocky:${POSTGRES_PASSWORD:-rocky}@db/rocky
     depends_on:
       db: { condition: service_healthy }
-    ports: ["8000:8000"]
+    volumes: ["models:/app/data/models", "archive:/app/data/archive"]   # weights + uploaded documents survive rebuilds
+    ports: ["127.0.0.1:8000:8000"]   # loopback only by default; put a TLS reverse proxy in front for LAN access
 
   web:
     build:
@@ -27,7 +30,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
     depends_on: [api]
-    ports: ["3000:3000"]
+    ports: ["127.0.0.1:3000:3000"]
 
   backup:
     # Daily logical backup into ./backups; dumps older than 14 days are pruned.
@@ -35,7 +38,7 @@ services:
     depends_on: [db]
     environment:
       PGPASSWORD: ${POSTGRES_PASSWORD:-rocky}
-    volumes: ["./backups:/backups"]
+    volumes: ["./backups:/backups", "archive:/archive:ro"]
     entrypoint: ["sh", "/backups-script/backup.sh"]
     configs:
       - source: backup_script
@@ -46,9 +49,13 @@ configs:
     content: |
       while true; do
         pg_dump -h db -U rocky rocky | gzip > "/backups/rocky-$$(date +%F).sql.gz"
+        tar -czf "/backups/archive-$$(date +%F).tar.gz" -C /archive .
         find /backups -name 'rocky-*.sql.gz' -mtime +14 -delete
+        find /backups -name 'archive-*.tar.gz' -mtime +14 -delete
         sleep 86400
       done
 
 volumes:
   pgdata:
+  models:
+  archive:

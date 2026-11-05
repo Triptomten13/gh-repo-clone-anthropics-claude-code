@@ -225,7 +225,8 @@ def ai_status(db: Session = Depends(get_db), _: User = Depends(current_user)):
     chains = {}
     for tier in ("fast", "standard", "deep"):
         c, ex = policy.plan(tier, provs)
-        chains[tier] = {"order": [f"{x.provider}:{x.model} ({x.locality})" for x in c],
+        chains[tier] = {"order": [f"{x.provider}:{x.model} ({x.locality}{'' if provs.get(x.provider) is not None and provs[x.provider].configured() else ' · not configured'})"
+                                  for x in c],
                         "excluded": [f"{e['provider']}:{e['model']} — {e['status']}" for e in ex]}
     chat, eco, emb = (library.resolve(db, s) for s in ("chat", "eco", "embedding"))
     return {

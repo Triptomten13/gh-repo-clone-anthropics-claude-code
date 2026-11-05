@@ -316,10 +316,9 @@ def test_chat_uses_gsus_identity_whatever_the_model(client):
 
 
 def test_agents_execute_runs_through_orchestrator(client):
-    r = client.post("/api/ai/agents/execute", json={"type": "compliance.check", "payload": {"title": "LED camping lantern", "category": "lighting"}})
-    assert r.status_code in (200, 409)
-    if r.status_code == 200:
-        assert r.json()["status"] in ("succeeded", "blocked", "failed")
+    r = client.post("/api/ai/agents/execute", json={"type": "system.self_evaluate", "payload": {}})
+    assert r.status_code == 200 and r.json()["status"] == "succeeded" and r.json()["agent_id"]
+    assert client.post("/api/ai/agents/execute", json={"type": "no.such.task"}).status_code == 409
 
 
 # ------------------------------------------------------------------ benchmark + optimiser + recovery + self-test

@@ -41,6 +41,11 @@ agent to `PATCH /api/agents/*`; `sync_agents()` never overwrites a level set by 
 - First-run setup endpoint only works while no user exists.
 - In `APP_ENV=production` the API refuses to start with the default `SECRET_KEY`.
 - Roles: `admin`, `operator` (can submit work, cannot approve), `viewer` (read-only).
+- Tokens carry a `token_version`; password reset, role change and disabling an account revoke all existing sessions.
+  Disabled accounts cannot log in. The last active admin cannot be demoted or disabled (API and CLI).
+- Login lockout: 5 failures per account (×4 per IP) within 15 minutes → 429. API rate limit 600 requests/min.
+- Owner recovery: `python -m app.cli` on the server (create-admin, reset-password, list-users, set-role, disable/enable);
+  passwords are read from a prompt or stdin, never argv; actions audited as `cli:<os user>`.
 
 ## Secrets
 
@@ -49,6 +54,27 @@ agent to `PATCH /api/agents/*`; `sync_agents()` never overwrites a level set by 
   passed to LLM prompts. `/api/integrations` reports only *which* variables are missing.
 - Use scoped credentials: read-only keys for research; Shopify custom app limited to `write_products`;
   Stripe restricted keys for ledger sync.
+
+## DAEMON CORE (local AI, providers, credentials)
+
+- **Provider credentials** stored in the app are Fernet-encrypted (`CREDENTIALS_KEY`, else HKDF from `SECRET_KEY`), require
+  the account owner's attestation, are admin-only, never returned by the API, never logged, never given to agents or
+  prompts. One active key per provider. Validate / rotate / disconnect are audited; disconnect destroys the secret.
+- **No accounts are created and no provider terms are accepted by the system.** Discovered providers stay "unverified"
+  until a human records the official source.
+- **Offline mode** removes every external provider from routing (no fallback) and disables downloads and credential tests.
+  `private` / `sensitive` requests never leave the machine (sensitive: not even to LAN workers).
+- **Model supply chain:** downloads only from huggingface.co over HTTPS, redirects outside the Hub refused; licence and
+  sha256 re-checked against the Hub before download, file sha256 verified after; offline imports must match the
+  verified catalogue checksum. Weights never enter git or the database.
+- **No code execution:** there is no shell/code tool; `code.execute` is declared blocked until an isolated sandbox
+  exists. The benchmark checks generated code statically and never runs it.
+- **Network surface:** the llama.cpp runtime is in-process and opens no port (verified: the only listening socket is the
+  API). Docker binds API and web to 127.0.0.1 by default — use a TLS reverse proxy for LAN access.
+- **Spending:** paid calls are checked against daily/monthly/per-provider limits before they are made; unverifiable spend
+  blocks the call.
+- Settings, model install/activation, credentials, provider records and workers are admin-only and audited; operators
+  can use the internal AI API and run benchmarks on local models; viewers are read-only (Independence Test G).
 
 ## Data protection (GDPR)
 

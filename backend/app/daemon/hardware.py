@@ -29,7 +29,7 @@ def _meminfo() -> dict[str, int]:
 
 
 def _cpu() -> dict[str, Any]:
-    model, flags = platform.processor() or "", set()
+    model, flags = "", set()
     try:
         for line in Path("/proc/cpuinfo").read_text().splitlines():
             if line.startswith("model name") and not model:
@@ -42,7 +42,7 @@ def _cpu() -> dict[str, Any]:
         usable = len(os.sched_getaffinity(0))
     except Exception:
         usable = os.cpu_count() or 1
-    return {"model": model or platform.machine(), "logical_cores": os.cpu_count() or 1, "usable_cores": usable,
+    return {"model": model or platform.processor() or platform.machine(), "logical_cores": os.cpu_count() or 1, "usable_cores": usable,
             "simd": sorted(f for f in flags if f in {"avx", "avx2", "avx512f", "fma", "f16c", "neon", "asimd"}),
             "arch": platform.machine()}
 

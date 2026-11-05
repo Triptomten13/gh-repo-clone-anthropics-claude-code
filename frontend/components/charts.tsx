@@ -68,3 +68,26 @@ export function ScoreComponents({ components }: { components: Record<string, { s
     </ResponsiveContainer>
   );
 }
+
+/** Calls per day split by where they ran — one unit (calls), stacked, legend + total label. */
+export function LocalExternalBars({ data }: { data: { date: string; local: number; external: number }[] }) {
+  return (
+    <div>
+      <div className="mb-2 flex gap-4 text-[11.5px] text-ink-2">
+        <span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-series-3" />Local / LAN (calls)</span>
+        <span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-series-2" />External API (calls)</span>
+      </div>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={data} margin={{ top: 14, right: 8, bottom: 0, left: 0 }}>
+          <CartesianGrid stroke="#2e2d2a" vertical={false} />
+          <XAxis dataKey="date" {...AXIS} tickFormatter={(d: string) => d.slice(5)} minTickGap={16} />
+          <YAxis {...AXIS} width={32} allowDecimals={false} />
+          <Tooltip {...TOOLTIP} cursor={{ fill: "#ffffff08" }} />
+          <Bar dataKey="local" name="Local / LAN" stackId="a" fill="#199e70" />
+          <Bar dataKey="external" name="External API" stackId="a" fill="#d95926" radius={[3, 3, 0, 0]}
+            label={(p: any) => { const d = data[p.index]; const tot = (d?.local ?? 0) + (d?.external ?? 0); return tot ? <text x={p.x + p.width / 2} y={p.y - 4} textAnchor="middle" fill="#c3c2b7" fontSize={10}>{tot}</text> : <g />; }} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

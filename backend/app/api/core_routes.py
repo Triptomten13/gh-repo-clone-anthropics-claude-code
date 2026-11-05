@@ -51,7 +51,10 @@ def ai_models(db: Session = Depends(get_db), _: User = Depends(current_user)):
         if last:
             d["evaluations"] = [e for e in last.get("suites", []) if e.get("model") in (m.model_id, None) and e.get("requires_llm") == (m.provider != "local")]
         out.append(d)
-    return {"models": out, "chains": {t: registry.tier_chain(t) for t in ("deep", "standard", "fast")}}
+    from ..daemon import policy
+
+    provs = get_router()._all_providers()
+    return {"models": out, "chains": {t: [[c.provider, c.model] for c in policy.plan(t, provs)[0]] for t in ("deep", "standard", "fast")}}
 
 
 @router.get("/ai/providers")

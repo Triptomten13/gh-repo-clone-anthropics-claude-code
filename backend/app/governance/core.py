@@ -26,7 +26,7 @@ def audit(db: Session, actor: str, action: str, target: str = "", **details: Any
 class EventBus:
     """In-process pub/sub for WebSocket subscribers. Durable state lives in the DB;
     this bus only fans out live notifications. Swap for Redis pub/sub when running
-    multiple API replicas (see ARCHITECTURE.md)."""
+    multiple API replicas (see docs/ARCHITECTURE.md)."""
 
     def __init__(self) -> None:
         self._subs: dict[asyncio.Queue, asyncio.AbstractEventLoop] = {}

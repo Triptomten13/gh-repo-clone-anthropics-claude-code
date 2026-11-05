@@ -66,7 +66,27 @@ Legend: ✅ complete & tested · 🟡 partial · ⛔ blocked (external dependenc
 - ⏳ Official trademark search integration (EUIPO / PRV) — manual recording by an admin today
 - ⏳ Ad-platform performance sync (Meta/TikTok/Google) — manual or imported rows today
 
+## Master evolution — G-SUS & Demonkoncernen ✅
+- ✅ Provider-independent AI core (tiers, fallback, breakers, tracing), Archive (provenance, evidence classes, hybrid
+  retrieval, citations, memory), Archivum canon tools (empty until real canon is imported), G-sus head orchestrator,
+  security hardening, Claude Code dev tooling, new interface (Chamber, Archive, Archivum, HQ, AI Core)
+- ✅ docs/ restructure: AI_SYSTEM, KNOWLEDGE_SYSTEM, DESIGN_SYSTEM, DECISIONS, TESTING, progress.md
+
+## DAEMON CORE & Cost Intelligence ✅ (see DAEMON_CORE.md, COST_INTELLIGENCE.md)
+- ✅ Hardware manager, verified local model library (install / offline import / activate / rollback / remove)
+- ✅ In-process llama.cpp runtime, OpenAI-compatible workers, local GGUF embeddings
+- ✅ Execution profiles, offline mode without external fallback, privacy routing
+- ✅ Internal AI API (chat, generate, embeddings, classify, reason, agents/execute, health, status) with G-SUS identity layer
+- ✅ Versioned prompts, context assembly, tool registry (code execution blocked by design)
+- ✅ Provider registry, encrypted owner-attested credentials, quota backoff, spend limits, response + prompt caching,
+  benchmarks with cost per success, cost dashboard, optimisation proposals
+- ✅ Crash recovery, backup/restore scripts, admin CLI and user management
+- ✅ Independence Tests A–G passed on CPU-only hardware (INDEPENDENCE_TESTS.md)
+- ⏳ Stronger local models (needs more RAM/GPU), multimodal (local STT/TTS/vision), semantic response cache,
+  rate-limit header parsing, research connector for provider verification, LoRA (needs GPU + training stack)
+
 ## Known limitations
+- Local models (0.5B–1.5B on CPU) are much weaker than frontier models; measured 0/2 on Swedish tasks.
 - Single in-process task worker; long LLM tasks run sequentially.
 - The compliance engine is keyword-based decision support; it is conservative and must be reviewed by a human.
 - Advertising benchmarks are planning assumptions until real campaign data is ingested.

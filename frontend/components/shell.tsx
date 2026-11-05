@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Archive, Beaker, BookOpen, Bot, Briefcase, Building2, Compass, Cpu, Dna, FlaskConical, Gauge, GitFork, Landmark, Library, Lightbulb, Megaphone, MessagesSquare, Palette, Power, Radar, Settings, ShieldCheck, Sparkles, UserCog, WandSparkles } from "lucide-react";
+import { Activity, Archive, Beaker, BookOpen, Bot, Briefcase, Building2, CloudOff, Compass, Cpu, Flame, Dna, FlaskConical, Gauge, GitFork, Landmark, Library, Lightbulb, Megaphone, MessagesSquare, Palette, Power, Radar, Settings, ShieldCheck, Sparkles, UserCog, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -16,6 +16,7 @@ const GSUS: NavItem[] = [
 ];
 const DEMON: NavItem[] = [
   { href: "/hq", label: "Demonkoncernen HQ", icon: Building2 },
+  { href: "/daemon", label: "DAEMON CORE", icon: Flame },
   { href: "/ai", label: "AI Core", icon: Cpu },
   { href: "/agents", label: "Agent Registry", icon: Bot },
   { href: "/approvals", label: "Approval Center", icon: ShieldCheck },
@@ -75,6 +76,7 @@ export function Shell({ children }: { children: ReactNode }) {
   }, [router]);
   const status = useApi<Status>(ready ? "/api/system/status" : null);
   const approvals = useApi<any[]>(ready ? "/api/approvals?status=pending" : null);
+  const daemon = useApi<any>(ready ? "/api/ai/status" : null);
   const { connected } = useLiveEvents((e) => {
     if (e.type === "kill_switch" || e.type === "task") status.reload();
     if (e.type === "approval") approvals.reload();
@@ -126,8 +128,12 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className={`sticky top-0 z-10 flex flex-wrap items-center gap-x-5 gap-y-1 border-b px-6 py-2.5 text-[12px] backdrop-blur ${engaged ? "border-critical/60 bg-critical/15" : "border-line bg-bg/80"}`}>
           <span className="font-mono font-bold uppercase tracking-[0.14em] md:hidden">{identity.company_name}</span>
-          <span className="text-ink-3">AI: <span className={status.data?.llm_provider === "none" ? "text-warning" : "text-ink-2"}>
-            {status.data?.llm_provider === "none" ? "not configured" : status.data?.llm_provider ?? "…"}</span></span>
+          <Link href="/daemon" className="inline-flex items-center gap-1.5 text-ink-3 hover:text-ink-2" title="DAEMON CORE status">
+            {daemon.data?.offline_mode ? <CloudOff size={13} className="text-cyan" /> : <Cpu size={13} />}
+            <span className={daemon.data?.offline_mode ? "font-mono text-[11px] uppercase tracking-wider text-cyan" : ""}>{daemon.data ? (daemon.data.offline_mode ? "offline" : daemon.data.profile.toLowerCase()) : "…"}</span>
+            <span>· AI: <span className={status.data?.llm_provider === "none" ? "text-warning" : "text-ink-2"}>
+              {status.data?.llm_provider === "none" ? "not configured" : daemon.data?.active_models?.chat ? `local ${daemon.data.active_models.chat.split("-q")[0]}` : status.data?.llm_provider ?? "…"}</span></span>
+          </Link>
           <span className="num text-ink-3">AI spend today: <span className="text-ink-2">${status.data?.cost_today_usd?.toFixed(2) ?? "…"}</span> / ${status.data?.daily_cost_limit_usd ?? "…"}</span>
           <span className="flex-1" />
           <KillSwitch engaged={engaged} onChange={status.reload} />

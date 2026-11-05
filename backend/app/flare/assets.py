@@ -3,7 +3,7 @@
 ``procedural_svg`` is a real, offline generator: palette boards, wordmarks,
 sigils/monograms and packaging front panels rendered as SVG from the brand
 system. External image models plug in through the same ``ImageProvider``
-interface (configured via env; see INTEGRATIONS.md) — they are registered as
+interface (configured via env; see docs/INTEGRATIONS.md) — they are registered as
 planned until implemented, so nothing pretends to call an API it doesn't.
 Text briefs (photography, packaging, landing page, ad concepts) are generated
 from the brand system as structured text.
@@ -181,5 +181,5 @@ def generate(kind: str, spec: dict[str, Any], provider: str = "procedural_svg", 
     if kind in BRIEF_KINDS:
         return {"content": brief(kind, spec), "mime": "text/plain", "provider": "template"}
     if provider not in PROVIDERS:
-        raise LookupError(f"image provider '{provider}' is not implemented (see INTEGRATIONS.md)")
+        raise LookupError(f"image provider '{provider}' is not implemented (see docs/INTEGRATIONS.md)")
     return PROVIDERS[provider].generate(kind, spec, variation)
