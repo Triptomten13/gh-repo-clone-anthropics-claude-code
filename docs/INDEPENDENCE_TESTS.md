@@ -1,6 +1,6 @@
 # Independence Tests A–G — actual results
 
-Run: `python scripts/independence_test.py`. Latest run: 2026-11-05 17:26 UTC — **all 7 tests passed**.
+Run: `python scripts/independence_test.py`. Latest run: 2026-11-05 21:23 UTC (after the Archive index and the research SSRF guard) — **all 7 tests passed**.
 Raw output with every check's evidence: [independence_results.json](independence_results.json); every run, including
 failed ones, is kept in [independence_runs/](independence_runs/).
 
