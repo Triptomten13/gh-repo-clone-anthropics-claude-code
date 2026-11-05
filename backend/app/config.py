@@ -14,6 +14,8 @@ def _bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     env: str = field(default_factory=lambda: os.getenv("APP_ENV", "development"))
+    company_name: str = field(default_factory=lambda: os.getenv("COMPANY_NAME", "Demonkoncernen AB"))
+    platform_name: str = field(default_factory=lambda: os.getenv("PLATFORM_NAME", "Rocky"))
     database_url: str = field(default_factory=lambda: os.getenv("DATABASE_URL", "sqlite:///./rocky.db"))
     redis_url: str | None = field(default_factory=lambda: os.getenv("REDIS_URL") or None)
     secret_key: str = field(default_factory=lambda: os.getenv("SECRET_KEY", "dev-insecure-change-me"))

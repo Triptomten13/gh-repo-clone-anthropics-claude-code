@@ -4,7 +4,7 @@ def test_auth_required(fresh_db):
     from app.main import app
 
     with TestClient(app) as c:
-        assert c.get("/api/auth/status").json() == {"setup_required": True}
+        assert c.get("/api/auth/status").json()["setup_required"] is True
         assert c.get("/api/overview").status_code == 401
         assert c.post("/api/auth/setup", json={"email": "a@b.se", "password": "short"}).status_code == 422
         assert c.post("/api/auth/setup", json={"email": "a@b.se", "password": "long-enough-pw"}).status_code == 200
@@ -125,3 +125,14 @@ def test_reevaluation_recomputes_children(client):
     assert len(econ) == 2 and all(t["status"] == "succeeded" for t in econ)
     p = client.get(f"/api/products/{pid}").json()
     assert p["opportunities"][0]["economics"]["assumptions"]["retail_price_incl_vat"] == 199
+
+
+def test_company_identity(client):
+    st = client.get("/api/auth/status").json()
+    assert st["company_name"] == "Demonkoncernen AB" and st["platform_name"] == "Rocky"
+    assert client.get("/api/system/status").json()["company_name"] == "Demonkoncernen AB"
+    sid = client.post("/api/suppliers", json={"name": "Nordic Bags AB", "country": "SE", "eu_based": True}).json()["id"]
+    client.post("/api/tasks", json={"type": "supplier.inquiry_draft", "payload": {"supplier_id": sid}})
+    draft = next(t for t in client.get("/api/tasks").json() if t["type"] == "supplier.inquiry_draft")
+    body = client.get(f"/api/tasks/{draft['id']}").json()["result"]["draft"]
+    assert body.rstrip().endswith("Demonkoncernen AB")

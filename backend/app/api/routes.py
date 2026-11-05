@@ -38,7 +38,10 @@ class Credentials(BaseModel):
 
 @router.get("/auth/status")
 def auth_status(db: Session = Depends(get_db)):
-    return {"setup_required": db.scalar(select(func.count(User.id))) == 0}
+    from ..config import get_settings
+
+    s = get_settings()
+    return {"setup_required": db.scalar(select(func.count(User.id))) == 0, "company_name": s.company_name, "platform_name": s.platform_name}
 
 
 @router.post("/auth/setup")
@@ -598,6 +601,8 @@ def system_status(db: Session = Depends(get_db), _: User = Depends(current_user)
     start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     spent = db.scalar(select(func.coalesce(func.sum(Task.cost_usd), 0.0)).where(Task.created_at >= start))
     return {
+        "company_name": s.company_name,
+        "platform_name": s.platform_name,
         "kill_switch": gov.get_state(db, "kill_switch"),
         "llm_provider": get_provider().name,
         "models": {"deep": s.model_deep, "standard": s.model_standard, "fast": s.model_fast},

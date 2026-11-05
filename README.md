@@ -1,4 +1,7 @@
-# Rocky — Autonomous Commerce Intelligence Platform
+# Demonkoncernen AB — Rocky Commerce Intelligence Platform
+
+Operated by **Demonkoncernen AB**. The company name is one setting (`COMPANY_NAME` in `.env`) used across the dashboard,
+page titles and supplier correspondence; *Rocky* is the platform and *Rocky Flare* its creative intelligence layer.
 
 A governed multi-agent system that **discovers → analyses → validates → transforms → brands → prices → (with approval) launches**
 commercial opportunities, initially for the Swedish / EU market.

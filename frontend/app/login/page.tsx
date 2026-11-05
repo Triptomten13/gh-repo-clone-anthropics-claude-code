@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { RockyMark } from "@/components/shell";
 import { Button, ErrorBanner, Field } from "@/components/ui";
 import { api, setToken } from "@/lib/api";
+import { useIdentity } from "@/lib/identity";
 
 export default function Login() {
   const router = useRouter();
+  const identity = useIdentity();
   const [setup, setSetup] = useState<boolean | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,8 +32,8 @@ export default function Login() {
         <div className="mb-6 flex items-center gap-3">
           <RockyMark size={36} />
           <div>
-            <div className="font-mono text-lg font-bold tracking-[0.32em]">ROCKY</div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">Commerce Intelligence HQ</div>
+            <div className="font-mono text-[15px] font-bold uppercase tracking-[0.14em]">{identity.company_name}</div>
+            <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">{identity.platform_name} · Commerce Intelligence HQ</div>
           </div>
         </div>
         <ErrorBanner error={error} />

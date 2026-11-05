@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, getToken, setToken } from "@/lib/api";
 import { useApi, useLiveEvents } from "@/lib/hooks";
+import { useIdentity } from "@/lib/identity";
 
 type NavItem = { href: string; label: string; icon: typeof Gauge };
 const GROUPS: { title: string; tone: string; items: NavItem[] }[] = [];
@@ -51,6 +52,7 @@ type Status = { kill_switch: { engaged?: boolean }; llm_provider: string; cost_t
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
+  const identity = useIdentity();
   const [ready, setReady] = useState(false);
   useEffect(() => {
     if (!getToken()) router.replace("/login");
@@ -70,9 +72,9 @@ export function Shell({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-[#121211]/90 md:flex">
         <div className="flex items-center gap-2.5 px-5 pb-3 pt-5">
           <RockyMark />
-          <div>
-            <div className="font-mono text-[15px] font-bold tracking-[0.32em]">ROCKY</div>
-            <div className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-ink-3">Commerce Intelligence HQ</div>
+          <div className="min-w-0">
+            <div className="truncate font-mono text-[12.5px] font-bold uppercase tracking-[0.14em]" title={identity.company_name}>{identity.company_name}</div>
+            <div className="whitespace-nowrap font-mono text-[9.5px] uppercase tracking-[0.12em] text-ink-3">{identity.platform_name} · Intelligence HQ</div>
           </div>
         </div>
         <div className="scan-line mx-5 mb-3 opacity-50" />
@@ -108,7 +110,7 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className={`sticky top-0 z-10 flex flex-wrap items-center gap-x-5 gap-y-1 border-b px-6 py-2.5 text-[12px] backdrop-blur ${engaged ? "border-critical/60 bg-critical/15" : "border-line bg-bg/80"}`}>
-          <span className="font-mono font-bold tracking-[0.3em] md:hidden">ROCKY</span>
+          <span className="font-mono font-bold uppercase tracking-[0.14em] md:hidden">{identity.company_name}</span>
           <span className="text-ink-3">AI: <span className={status.data?.llm_provider === "none" ? "text-warning" : "text-ink-2"}>
             {status.data?.llm_provider === "none" ? "not configured" : status.data?.llm_provider ?? "…"}</span></span>
           <span className="num text-ink-3">AI spend today: <span className="text-ink-2">${status.data?.cost_today_usd?.toFixed(2) ?? "…"}</span> / ${status.data?.daily_cost_limit_usd ?? "…"}</span>

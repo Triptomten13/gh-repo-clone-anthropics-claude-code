@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Rocky · Commerce Intelligence HQ",
+  title: `${process.env.NEXT_PUBLIC_COMPANY_NAME || "Demonkoncernen AB"} · Rocky Commerce Intelligence`,
   description: "Multi-agent market intelligence, opportunity discovery and commerce operations.",
 };
 

@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
         loop_task.cancel()
 
 
-app = FastAPI(title="Rocky — Autonomous Commerce Intelligence", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title=f"{get_settings().company_name} — {get_settings().platform_name} Commerce Intelligence", version="0.2.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=list(get_settings().cors_origins), allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)

@@ -359,7 +359,9 @@ class SupplierAgent(BaseAgent):
         p = ctx.db.get(Product, task.payload.get("product_id")) if task.payload.get("product_id") else None
         asks = task.payload.get("asks") or ["samples", "wholesale price tiers and MOQ", "custom packaging / private label options",
                                             "CE / test reports and technical documentation", "shipping terms to Sweden", "return / defect policy"]
-        company = task.payload.get("company", "[Your company name]")
+        from ..config import get_settings
+
+        company = task.payload.get("company") or get_settings().company_name
         body = (f"Subject: Wholesale inquiry – {p.name if p else 'your product range'}\n\n"
                 f"Dear {s.name} team,\n\nWe are a Sweden-based e-commerce company evaluating "
                 f"{'the product ' + repr(p.name) if p else 'products from your catalogue'} for the EU market.\n"
