@@ -42,11 +42,11 @@ export default function CreativeIntelligence() {
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <Card title="Hybrid fusion lab" className="xl:col-span-1">
           <p className="mb-2 text-[12.5px] text-ink-3">Pick 2–4 genres. Order matters: the first carries structure, the second the story.</p>
-          <div className="mb-2 flex flex-wrap gap-1.5">{picked.map((g) => <button key={g} onClick={() => setPicked(picked.filter((x) => x !== g))} className="rounded border border-ember-dim px-2 py-0.5 text-[12px] text-ember">{label(g)} ×</button>)}</div>
+          <div className="mb-2 flex flex-wrap gap-1.5">{picked.map((g) => <button key={g} onClick={() => setPicked(picked.filter((x) => x !== g))} className="rounded border border-violet-dim px-2 py-0.5 text-[12px] text-violet">{label(g)} ×</button>)}</div>
           <div className="flex gap-2"><input placeholder="optional name" value={name} onChange={(e) => setName(e.target.value)} className="flex-1" /><Button variant="primary" disabled={picked.length < 2} onClick={fuse}>Fuse</Button></div>
           {hybrid && (
             <div className="mt-3 space-y-1.5 rounded-md border border-line bg-bg/60 p-3 text-[12.5px]">
-              <div className="flex items-center justify-between"><b className="text-[14px]">{hybrid.name}</b>{hybrid.novel && <span className="text-[11px] text-ember">novel hybrid</span>}</div>
+              <div className="flex items-center justify-between"><b className="text-[14px]">{hybrid.name}</b>{hybrid.novel && <span className="text-[11px] text-violet">novel hybrid</span>}</div>
               <Swatches colors={hybrid.palette} />
               <div className="text-ink-2">{hybrid.concept}</div>
               <div className="text-ink-3"><b className="text-ink-2">Philosophy:</b> {hybrid.philosophy}</div>
@@ -63,7 +63,7 @@ export default function CreativeIntelligence() {
           <div className="grid max-h-[460px] gap-2 overflow-auto pr-1 md:grid-cols-2">
             {list.map((g: any) => (
               <button key={g.id} onClick={() => setPicked((p) => p.includes(g.id) || p.length >= 4 ? p : [...p, g.id])}
-                className="rounded-md border border-line bg-bg/50 p-2.5 text-left hover:border-ember-dim">
+                className="rounded-md border border-line bg-bg/50 p-2.5 text-left hover:border-violet-dim">
                 <div className="flex items-center justify-between gap-2"><span className="text-[13px] font-medium">{g.name}</span><Swatches colors={g.palette} size={12} /></div>
                 <div className="mt-0.5 text-[11.5px] text-ink-3">{g.description}</div>
                 <div className="mt-1 font-mono text-[10px] uppercase text-ink-3">{g.family}{g.pillar && " · pillar D"} · video {Math.round(g.video_fit * 100)} · used in {g.used_in_hybrids} hybrids{g.sensitivity.length ? ` · review: ${g.sensitivity.join(", ")}` : ""}</div>
@@ -74,7 +74,7 @@ export default function CreativeIntelligence() {
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <Card title="Originality scores · recent concepts" action={<Link href="/flare/brands" className="text-[12px] text-ember hover:underline">Brand Laboratory →</Link>} pad={false}>
+        <Card title="Originality scores · recent concepts" action={<Link href="/flare/brands" className="text-[12px] text-violet hover:underline">Brand Laboratory →</Link>} pad={false}>
           {recent.length ? (
             <Table head={["Concept", "Genres", "Originality", "Status", "Author"]}>
               {recent.map((c) => (

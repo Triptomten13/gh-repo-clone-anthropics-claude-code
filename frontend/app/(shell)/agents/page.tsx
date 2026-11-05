@@ -86,7 +86,7 @@ export default function AgentsPage() {
           <Card title="Live bus">
             <ul className="max-h-80 space-y-1 overflow-auto font-mono text-[11px]">
               {events.length ? events.map((e, i) => (
-                <li key={i} className="text-ink-3"><span className="text-ink-2">{e.ts.slice(11, 19)}</span> {e.type} {e.task_type ?? e.action ?? ""} {e.agent ?? e.actor ?? ""} <span className="text-ember">{e.status ?? ""}</span></li>
+                <li key={i} className="text-ink-3"><span className="text-ink-2">{e.ts.slice(11, 19)}</span> {e.type} {e.task_type ?? e.action ?? ""} {e.agent ?? e.actor ?? ""} <span className="text-violet">{e.status ?? ""}</span></li>
               )) : <li className="text-ink-3">Waiting for agent activity…</li>}
             </ul>
           </Card>

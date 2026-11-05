@@ -30,7 +30,7 @@ export default function BrandLab() {
           <Button disabled={!pid} busy={busy === "flare.panel"} onClick={() => go("flare.panel", { product_id: pid })}>Review panel</Button>
           <Button disabled={!pid} busy={busy === "flare.discussion"} onClick={() => go("flare.discussion", { product_id: pid })}>Agent discussion</Button>
           <Button disabled={cmp.length < 2} onClick={doCompare}>Compare selected ({cmp.length})</Button>
-          <Link href="/flare/collab" className="self-center text-[12px] text-ember hover:underline">Collaboration log →</Link>
+          <Link href="/flare/collab" className="self-center text-[12px] text-violet hover:underline">Collaboration log →</Link>
         </div>
         <p className="mt-2 text-[12px] text-ink-3">Competitors develop concepts independently; judges score every concept through their own lens. All concepts are kept; shortlisting is not approval.</p>
       </Card>

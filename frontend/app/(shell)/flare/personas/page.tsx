@@ -79,7 +79,7 @@ export default function PersonasPage() {
                     {(genres.data?.genres ?? []).map((g: any) => {
                       const on = g.id in draft.genre_affinities;
                       return <button key={g.id} onClick={() => { const a = { ...draft.genre_affinities }; on ? delete a[g.id] : (a[g.id] = 1); setDraft({ ...draft, genre_affinities: a }); }}
-                        className={`rounded border px-2 py-0.5 text-[11.5px] ${on ? "border-ember text-ember" : "border-line-strong text-ink-3 hover:text-ink-2"}`}>{g.name}</button>;
+                        className={`rounded border px-2 py-0.5 text-[11.5px] ${on ? "border-violet text-violet" : "border-line-strong text-ink-3 hover:text-ink-2"}`}>{g.name}</button>;
                     })}
                   </div>
                 </div>

@@ -5,7 +5,7 @@ import { Button, Card, Empty, Epistemic, ErrorBanner, PageHeader, Table } from "
 import { label, useRun } from "@/lib/flare";
 import { useApi } from "@/lib/hooks";
 
-const STATUS_STYLE: Record<string, string> = { existing_product: "text-ember", supplier_customization: "text-[#5fd35f]", proposed_modification: "text-series-1", original_concept: "text-[#b4acf0]" };
+const STATUS_STYLE: Record<string, string> = { existing_product: "text-violet", supplier_customization: "text-[#5fd35f]", proposed_modification: "text-series-1", original_concept: "text-[#b4acf0]" };
 
 export default function MutationLab() {
   const [pid, setPid] = useState<number | null>(null);

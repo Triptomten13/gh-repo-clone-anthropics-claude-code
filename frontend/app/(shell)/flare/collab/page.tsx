@@ -4,7 +4,7 @@ import { Card, Empty, Epistemic, ErrorBanner, Json, PageHeader, Table } from "@/
 import { ago } from "@/lib/api";
 import { useApi, useRefreshOn } from "@/lib/hooks";
 
-const STANCE: Record<string, string> = { support: "text-[#5fd35f]", oppose: "text-[#f08a8a]", caution: "text-warning", propose: "text-series-1", decide: "text-ember", neutral: "text-ink-3" };
+const STANCE: Record<string, string> = { support: "text-[#5fd35f]", oppose: "text-[#f08a8a]", caution: "text-warning", propose: "text-series-1", decide: "text-violet", neutral: "text-ink-3" };
 
 export default function CollabPage() {
   const [kind, setKind] = useState("");
@@ -53,7 +53,7 @@ export default function CollabPage() {
               {d.decision?.ranking ? (
                 <Table head={["Concept", "Mean", "Spread", "Verdict", "Stances", "Dissent"]}>
                   {d.decision.ranking.map((r: any) => (
-                    <tr key={r.concept_id}><td className="font-medium">{r.name}{d.decision.shortlisted === r.concept_id && <span className="ml-1.5 text-[11px] text-ember">shortlisted</span>}</td>
+                    <tr key={r.concept_id}><td className="font-medium">{r.name}{d.decision.shortlisted === r.concept_id && <span className="ml-1.5 text-[11px] text-violet">shortlisted</span>}</td>
                       <td className="num">{r.mean}</td><td className="num">±{r.stdev}</td><td className={r.consensus === "split" ? "text-warning" : "text-ink-2"}>{r.consensus}</td>
                       <td className="text-[12px] text-ink-3">{Object.entries(r.stances).map(([k, v]) => `${k} ${v}`).join(" · ")}</td>
                       <td className="text-[12px] text-ink-3">{r.dissent.map((x: any) => `${x.persona}: ${x.why}`).join(" | ") || "—"}</td></tr>

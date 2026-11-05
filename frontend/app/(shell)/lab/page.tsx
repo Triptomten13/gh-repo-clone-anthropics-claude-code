@@ -75,7 +75,7 @@ export default function LabPage() {
             {list.map((p) => (
               <tr key={p.id}>
                 <td><input type="checkbox" aria-label="compare" checked={compare.includes(p.id)} onChange={(e) => setCompare((c) => e.target.checked ? [...c, p.id] : c.filter((x) => x !== p.id))} /></td>
-                <td className="max-w-72 truncate font-medium"><Link className="hover:text-ember" href={`/lab/${p.id}`}>{p.name}</Link><DemoBadge show={p.is_demo} /></td>
+                <td className="max-w-72 truncate font-medium"><Link className="hover:text-violet" href={`/lab/${p.id}`}>{p.name}</Link><DemoBadge show={p.is_demo} /></td>
                 <td className="text-ink-2">{p.category || "—"}</td>
                 <td><ScoreBar score={p.opportunity_score} confidence={p.score_confidence} /></td>
                 <td className="num">{pct(p.net_margin)}</td>

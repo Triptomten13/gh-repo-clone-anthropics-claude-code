@@ -46,7 +46,7 @@ export default function ThinkSideways() {
               <Card title="Highest-potential combinations">
                 {res.high_potential.map((c: any, i: number) => (
                   <div key={i} className="mb-3 rounded-md border border-line bg-bg/50 p-3">
-                    <div className="flex justify-between text-[13px] font-medium"><span>{c.title}</span><span className="num text-ember">{c.potential}</span></div>
+                    <div className="flex justify-between text-[13px] font-medium"><span>{c.title}</span><span className="num text-violet">{c.potential}</span></div>
                     <div className="text-[12px] text-ink-2">{c.customer_group} · via {c.channel}</div>
                     <div className="text-[11.5px] text-ink-3">{c.reasoning.join(" · ")}</div>
                   </div>

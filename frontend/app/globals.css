@@ -1,17 +1,19 @@
 @import "tailwindcss";
 
-/* Rocky command center — granite surfaces, ember accent. Dark-first by design. */
+/* G-SUS & Demonkoncernen AB — dark technomysticism meets a research workstation.
+   Tokens only; components never use raw hex. Contrast checked (WCAG AA) — see docs/DESIGN_SYSTEM.md. */
 @theme {
-  --color-bg: #0f0f0e;
-  --color-surface: #1a1a19;
-  --color-surface-2: #222220;
-  --color-line: #2e2d2a;
-  --color-line-strong: #3d3c38;
-  --color-ink: #f0efec;
-  --color-ink-2: #c3c2b7;
-  --color-ink-3: #8c8b84;
-  --color-ember: #f2a93b;
-  --color-ember-dim: #7a5419;
+  --color-bg: #0c0b11;          /* obsidian */
+  --color-surface: #15141c;     /* charcoal panel */
+  --color-surface-2: #1e1d28;
+  --color-line: #2a2937;
+  --color-line-strong: #3b3950;
+  --color-ink: #ecebf4;
+  --color-ink-2: #c2c0d3;
+  --color-ink-3: #8e8ba3;
+  --color-violet: #a78bfa;      /* primary action / G-SUS */
+  --color-violet-dim: #4b3d85;
+  --color-cyan: #22d3ee;        /* live data / Demonkoncernen machinery */
   --color-good: #0ca30c;
   --color-warning: #fab219;
   --color-serious: #ec835a;
@@ -20,6 +22,7 @@
   --color-series-2: #d95926;
   --color-series-3: #199e70;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
@@ -29,18 +32,20 @@ body {
   font-family: var(--font-sans);
   font-feature-settings: "tnum" 1, "cv11" 1;
   background-image:
-    radial-gradient(1200px 600px at 85% -10%, rgba(242, 169, 59, 0.06), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, rgba(57, 135, 229, 0.05), transparent 60%);
+    radial-gradient(1100px 560px at 88% -12%, rgba(167, 139, 250, 0.07), transparent 60%),
+    radial-gradient(900px 520px at -12% 112%, rgba(34, 211, 238, 0.045), transparent 60%),
+    radial-gradient(1px 1px at 20% 30%, rgba(236, 235, 244, 0.25), transparent 2px),
+    radial-gradient(1px 1px at 70% 80%, rgba(236, 235, 244, 0.18), transparent 2px);
   background-attachment: fixed;
 }
-::selection { background: var(--color-ember-dim); color: var(--color-ink); }
+::selection { background: var(--color-violet-dim); color: var(--color-ink); }
 .num { font-variant-numeric: tabular-nums; }
-.scan-line { background: linear-gradient(90deg, transparent, var(--color-ember), transparent); height: 1px; }
+.scan-line { background: linear-gradient(90deg, transparent, var(--color-violet), transparent); height: 1px; }
 input, select, textarea {
   background: var(--color-bg); border: 1px solid var(--color-line-strong); border-radius: 6px;
   padding: 6px 10px; color: var(--color-ink); font-size: 13px;
 }
-input:focus, select:focus, textarea:focus { outline: 2px solid var(--color-ember-dim); outline-offset: 0; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--color-violet-dim); outline-offset: 0; }
 
 /* ---------------------------------------------------------------- Rocky Flare & Field Operations */
 @theme {
@@ -59,3 +64,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--color-ember
 }
 .parchment-rule { height: 1px; background: linear-gradient(90deg, transparent, var(--color-gold), transparent); opacity: .55; }
 .compass-mark { border: 1px solid var(--color-bronze); border-radius: 9999px; }
+
+/* G-SUS details: manuscript rule and celestial ring — decorative only, aria-hidden in markup */
+.manuscript-rule { height: 1px; background: linear-gradient(90deg, transparent, var(--color-gold) 20%, var(--color-violet) 50%, var(--color-cyan) 80%, transparent); opacity: .45; }
+@media (prefers-reduced-motion: no-preference) {
+  .pulse-dot { animation: pulse 2.4s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: .45 } 50% { opacity: 1 } }
+}

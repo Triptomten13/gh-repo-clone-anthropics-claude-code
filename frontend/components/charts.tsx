@@ -62,7 +62,7 @@ export function ScoreComponents({ components }: { components: Record<string, { s
         <Tooltip {...TOOLTIP} cursor={{ fill: "#2e2d2a55" }}
           formatter={(v, _n, p: any) => [`${v} (weight ${(p.payload.weight * 100).toFixed(0)}%, data coverage ${(p.payload.coverage * 100).toFixed(0)}%)`, "Component score"]} />
         <Bar dataKey="score" radius={[0, 4, 4, 0]} barSize={12} label={{ position: "right", fill: "#c3c2b7", fontSize: 11 }}>
-          {data.map((d, i) => <Cell key={i} fill="#f2a93b" fillOpacity={0.35 + 0.65 * d.coverage} />)}
+          {data.map((d, i) => <Cell key={i} fill="#a78bfa" fillOpacity={0.35 + 0.65 * d.coverage} />)}
         </Bar>
       </BarChart>
     </ResponsiveContainer>

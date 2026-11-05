@@ -29,7 +29,7 @@ export function SvgAsset({ svg, alt, className = "" }: { svg: string; alt: strin
 }
 
 const KIND_COLOR: Record<string, string> = {
-  existing: "#f2a93b", product: "#f2a93b", domain: "#3987e5", module: "#199e70",
+  existing: "#a78bfa", product: "#a78bfa", base: "#a78bfa", domain: "#3987e5", module: "#199e70", document: "#22d3ee",
 };
 
 /** Radial relationship graph: centre node, first ring = direct relations, second ring = their children. */
@@ -85,10 +85,10 @@ export function ConceptCard({ c, selected, onSelect, onOpen }: { c: any; selecte
   const orig = c.originality?.score;
   const flags = (c.originality?.flags ?? []).filter((f: any) => f.severity === "block");
   return (
-    <div className={`rounded-lg border p-3 ${selected ? "border-ember" : "border-line"} bg-bg/50`}>
+    <div className={`rounded-lg border p-3 ${selected ? "border-violet" : "border-line"} bg-bg/50`}>
       <div className="flex items-start justify-between gap-2">
         <button onClick={onOpen} className="text-left">
-          <div className="text-[14px] font-semibold hover:text-ember">{c.name}<span className="ml-1.5 text-[11px] font-normal text-ink-3">v{c.version}</span></div>
+          <div className="text-[14px] font-semibold hover:text-violet">{c.name}<span className="ml-1.5 text-[11px] font-normal text-ink-3">v{c.version}</span></div>
           <div className="text-[12px] text-ink-3">{c.tagline}</div>
         </button>
         {onSelect && <input type="checkbox" aria-label="compare" checked={!!selected} onChange={onSelect} />}

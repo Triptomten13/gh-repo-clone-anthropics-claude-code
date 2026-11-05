@@ -1,7 +1,7 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { RockyMark } from "@/components/shell";
+import { Sigil } from "@/components/shell";
 import { Button, ErrorBanner, Field } from "@/components/ui";
 import { api, setToken } from "@/lib/api";
 import { useIdentity } from "@/lib/identity";
@@ -30,9 +30,9 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-line bg-surface p-7">
         <div className="mb-6 flex items-center gap-3">
-          <RockyMark size={36} />
+          <Sigil size={40} />
           <div>
-            <div className="font-mono text-[15px] font-bold uppercase tracking-[0.14em]">{identity.company_name}</div>
+            <div className="font-serif text-[19px] font-semibold leading-tight">{identity.company_name}</div>
             <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-3">{identity.platform_name} · Commerce Intelligence HQ</div>
           </div>
         </div>

@@ -26,8 +26,8 @@ export default function OverviewPage() {
       {d && (
         <>
           {d.finance.contains_demo_data && (
-            <div className="mb-4 rounded-md border border-ember-dim bg-ember/5 px-3 py-2 text-[12.5px] text-ink-2">
-              Financials include <b className="text-ember">synthetic demo data</b>. Remove it under Systems &amp; Integrations before relying on these figures.
+            <div className="mb-4 rounded-md border border-violet-dim bg-violet/5 px-3 py-2 text-[12.5px] text-ink-2">
+              Financials include <b className="text-violet">synthetic demo data</b>. Remove it under Systems &amp; Integrations before relying on these figures.
             </div>
           )}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 xl:grid-cols-6">
@@ -44,7 +44,7 @@ export default function OverviewPage() {
               {fin.data?.daily?.length ? <RevenueProfitChart data={fin.data.daily} /> :
                 <Empty title="No ledger data yet">Connect a payment provider or import ledger entries. Figures are only ever computed from recorded transactions.</Empty>}
             </Card>
-            <Card title="Emerging & exploding trends" action={<Link className="text-[12px] text-ember hover:underline" href="/radar">Radar →</Link>}>
+            <Card title="Emerging & exploding trends" action={<Link className="text-[12px] text-violet hover:underline" href="/radar">Radar →</Link>}>
               {d.emerging_trends.length ? (
                 <ul className="space-y-2.5">
                   {d.emerging_trends.map((t) => (
@@ -59,12 +59,12 @@ export default function OverviewPage() {
           </div>
 
           <div className="mt-4 grid gap-4 xl:grid-cols-2">
-            <Card title="Best opportunities" action={<Link className="text-[12px] text-ember hover:underline" href="/lab">Laboratory →</Link>}>
+            <Card title="Best opportunities" action={<Link className="text-[12px] text-violet hover:underline" href="/lab">Laboratory →</Link>}>
               {d.top_products.length ? (
                 <ul className="divide-y divide-line/60">
                   {d.top_products.map((p) => (
                     <li key={p.id} className="flex items-center justify-between gap-3 py-2 text-[13px]">
-                      <Link href={`/lab/${p.id}`} className="truncate hover:text-ember">{p.name}<DemoBadge show={p.is_demo} /></Link>
+                      <Link href={`/lab/${p.id}`} className="truncate hover:text-violet">{p.name}<DemoBadge show={p.is_demo} /></Link>
                       <span className="flex items-center gap-3"><StatusBadge status={p.compliance} /><ScoreBar score={p.score} confidence={p.confidence} /></span>
                     </li>
                   ))}

@@ -51,7 +51,7 @@ export default function SettingsPage() {
                   <td className="font-medium">{i.name}</td><td><StatusBadge status={i.state} /></td>
                   <td className="font-mono text-[11.5px]">{i.required_env.map((e: string) => <div key={e} className={i.missing_env.includes(e) ? "text-warning" : "text-ink-2"}>{e}</div>)}</td>
                   <td className="max-w-md text-[12px] text-ink-3">{i.access_notes}</td>
-                  <td>{i.docs_url && <a className="text-[12px] text-ember hover:underline" href={i.docs_url} target="_blank" rel="noreferrer">docs ↗</a>}</td>
+                  <td>{i.docs_url && <a className="text-[12px] text-violet hover:underline" href={i.docs_url} target="_blank" rel="noreferrer">docs ↗</a>}</td>
                 </tr>
               ))}
             </Table>

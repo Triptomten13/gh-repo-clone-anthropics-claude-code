@@ -27,7 +27,7 @@ export default function PortfolioPage() {
           {Object.keys(modelCount).length ? (
             <div className="flex flex-wrap gap-2">
               {Object.entries(modelCount).sort((a, b) => b[1] - a[1]).map(([m, n]) => (
-                <span key={m} className="rounded-md border border-line-strong px-2.5 py-1 text-[12.5px]">{m.replaceAll("_", " ")} <span className="num ml-1 text-ember">×{n}</span></span>
+                <span key={m} className="rounded-md border border-line-strong px-2.5 py-1 text-[12.5px]">{m.replaceAll("_", " ")} <span className="num ml-1 text-violet">×{n}</span></span>
               ))}
             </div>
           ) : <Empty title="No opportunities yet" />}
@@ -38,7 +38,7 @@ export default function PortfolioPage() {
           <Table head={["Opportunity", "Top 3 business models", "Concepts", "Standard price", "Status", "Created"]}>
             {latest.map((o) => (
               <tr key={o.id}>
-                <td className="font-medium"><Link href={`/lab/${o.product_id}`} className="hover:text-ember">{o.product_name}</Link></td>
+                <td className="font-medium"><Link href={`/lab/${o.product_id}`} className="hover:text-violet">{o.product_name}</Link></td>
                 <td className="text-ink-2">{o.business_models.map((m: any) => m.model.replaceAll("_", " ")).join(" · ")}</td>
                 <td className="num">{o.transformations.length}</td>
                 <td className="num">{o.pricing?.scenarios?.standard?.price ? `${o.pricing.scenarios.standard.price} kr` : "—"}</td>

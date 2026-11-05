@@ -99,7 +99,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
             <ol className="space-y-3">
               {opp.business_models.map((m: any, i: number) => (
                 <li key={m.model}>
-                  <div className="flex justify-between text-[13.5px] font-medium"><span>{i + 1}. {m.model.replaceAll("_", " ")}</span><span className="num text-ember">{m.score}</span></div>
+                  <div className="flex justify-between text-[13.5px] font-medium"><span>{i + 1}. {m.model.replaceAll("_", " ")}</span><span className="num text-violet">{m.score}</span></div>
                   <ul className="mt-1 space-y-0.5 text-[12px] text-ink-3">{m.fit_reasons.map((r: string) => <li key={r}>{r}</li>)}</ul>
                 </li>
               ))}

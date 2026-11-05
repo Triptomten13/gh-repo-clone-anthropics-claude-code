@@ -32,7 +32,7 @@ export default function FinancePage() {
       <ErrorBanner error={err || sum.error} />
       {s && (
         <>
-          {s.contains_demo_data && <div className="mb-4 rounded-md border border-ember-dim bg-ember/5 px-3 py-2 text-[12.5px] text-ink-2">Includes <b className="text-ember">synthetic demo</b> ledger entries.</div>}
+          {s.contains_demo_data && <div className="mb-4 rounded-md border border-violet-dim bg-violet/5 px-3 py-2 text-[12.5px] text-ink-2">Includes <b className="text-violet">synthetic demo</b> ledger entries.</div>}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
             <Stat label="Revenue" value={sek(s.revenue)} />
             <Stat label="Gross profit" value={sek(s.gross_profit)} />

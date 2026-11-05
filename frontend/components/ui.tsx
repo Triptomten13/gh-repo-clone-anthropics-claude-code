@@ -6,8 +6,8 @@ export function PageHeader({ title, kicker, children }: { title: string; kicker?
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        {kicker && <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.2em] text-ember">{kicker}</div>}
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        {kicker && <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.2em] text-violet">{kicker}</div>}
+        <h1 className="font-serif text-[28px] font-semibold leading-tight tracking-tight">{title}</h1>
       </div>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>
@@ -32,7 +32,7 @@ export function Stat({ label, value, sub, accent = false }: { label: string; val
   return (
     <div className="rounded-lg border border-line bg-surface px-4 py-3">
       <div className="font-mono text-[10.5px] uppercase tracking-[0.16em] text-ink-3">{label}</div>
-      <div className={`num mt-1 text-2xl font-semibold tracking-tight ${accent ? "text-ember" : ""}`}>{value}</div>
+      <div className={`num mt-1 text-2xl font-semibold tracking-tight ${accent ? "text-violet" : ""}`}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-ink-3">{sub}</div>}
     </div>
   );
@@ -41,7 +41,7 @@ export function Stat({ label, value, sub, accent = false }: { label: string; val
 type BtnProps = { children: ReactNode; onClick?: () => void; variant?: "primary" | "ghost" | "danger"; disabled?: boolean; busy?: boolean; type?: "button" | "submit"; title?: string };
 export function Button({ children, onClick, variant = "ghost", disabled, busy, type = "button", title }: BtnProps) {
   const styles = {
-    primary: "bg-ember text-black hover:brightness-110 font-semibold",
+    primary: "bg-violet text-black hover:brightness-110 font-semibold",
     ghost: "border border-line-strong text-ink-2 hover:bg-surface-2 hover:text-ink",
     danger: "border border-critical/60 text-[#f08a8a] hover:bg-critical/15",
   }[variant];
@@ -56,7 +56,7 @@ export function Button({ children, onClick, variant = "ghost", disabled, busy, t
 
 export function DemoBadge({ show }: { show?: boolean }) {
   if (!show) return null;
-  return <span className="ml-1.5 rounded border border-ember-dim px-1 py-px font-mono text-[9.5px] tracking-wider text-ember" title="Synthetic sample data, not market data">DEMO</span>;
+  return <span className="ml-1.5 rounded border border-violet-dim px-1 py-px font-mono text-[9.5px] tracking-wider text-violet" title="Synthetic sample data, not market data">DEMO</span>;
 }
 
 const STATUS: Record<string, { cls: string; icon: ReactNode; label?: string }> = {
@@ -101,7 +101,7 @@ export function ScoreBar({ score, confidence }: { score: number | null; confiden
   return (
     <div className="flex items-center gap-2" title={`score ${score} · data coverage ${confidence ?? "?"}`}>
       <div className="h-1.5 w-20 overflow-hidden rounded-full bg-surface-2">
-        <div className="h-full rounded-full bg-ember" style={{ width: `${score}%`, opacity: 0.45 + 0.55 * (confidence ?? 0.5) }} />
+        <div className="h-full rounded-full bg-violet" style={{ width: `${score}%`, opacity: 0.45 + 0.55 * (confidence ?? 0.5) }} />
       </div>
       <span className="num w-9 text-right text-[13px] font-medium">{score.toFixed(0)}</span>
       {confidence !== undefined && confidence !== null && <span className="num text-[11px] text-ink-3">c{(confidence * 100).toFixed(0)}</span>}
@@ -149,4 +149,22 @@ export function Field({ label, children }: { label: string; children: ReactNode 
       {children}
     </label>
   );
+}
+
+const EVIDENCE: Record<string, { label: string; glyph: string; cls: string }> = {
+  historical_fact: { label: "historical fact", glyph: "◆", cls: "border-good/50 text-[#5fd35f]" },
+  primary_source: { label: "primary source", glyph: "❦", cls: "border-gold/60 text-gold" },
+  religious_interpretation: { label: "religious interpretation", glyph: "✧", cls: "border-violet/60 text-violet" },
+  philosophical_theory: { label: "philosophical theory", glyph: "∴", cls: "border-cyan/50 text-cyan" },
+  scholarly_hypothesis: { label: "scholarly hypothesis", glyph: "?", cls: "border-series-1/60 text-series-1" },
+  speculative: { label: "speculative claim", glyph: "≈", cls: "border-warning/50 text-warning" },
+  fiction_canon: { label: "fictional canon", glyph: "✶", cls: "border-[#e879f9]/50 text-[#f0abfc]" },
+  unclassified: { label: "unclassified", glyph: "·", cls: "border-line-strong text-ink-3" },
+};
+export const EVIDENCE_CLASSES = Object.keys(EVIDENCE);
+
+/** Evidentiary status chip — glyph + words, never colour alone. */
+export function EvidenceBadge({ kind }: { kind: string }) {
+  const e = EVIDENCE[kind] ?? EVIDENCE.unclassified;
+  return <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded border px-1.5 py-px text-[11px] ${e.cls}`} title="evidentiary status"><span aria-hidden>{e.glyph}</span>{e.label}</span>;
 }
