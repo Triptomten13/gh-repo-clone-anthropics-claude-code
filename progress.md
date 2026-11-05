@@ -15,8 +15,9 @@
 | Backup / restore | round-trip + tamper refusal tested (docs/BACKUP_RECOVERY.md) |
 | Docs restructure | docs/ holds architecture, AI system, knowledge, agents, security, design system, decisions, testing, roadmap, DAEMON, cost, install, backup |
 
-Totals: 155 backend tests pass; ruff clean; frontend type-checks and builds (28 routes); migrations 0001–0004 verified
-upgrade/downgrade/upgrade on SQLite and PostgreSQL.
+Totals: 155 backend tests pass; ruff clean; frontend type-checks and builds (30 routes); migrations 0001–0005 verified
+upgrade/downgrade/upgrade on SQLite and PostgreSQL; PostgreSQL smoke passes; Independence Tests A–G pass
+(2026-11-05T20:27Z, after the HYPERINTELLIGENCE changes).
 
 ## Measured facts worth remembering
 
@@ -37,8 +38,13 @@ upgrade/downgrade/upgrade on SQLite and PostgreSQL.
   live (no credentials here).
 * Anthropic models — adapter tested with fakes only; no key in this environment.
 * Docker images were never built here (no Docker daemon); compose file validated only.
-* Multimodal (speech, vision, OCR), semantic response cache, rate-limit header parsing, research connector for provider
-  verification, LoRA/fine-tuning (needs GPU + training stack), multi-worker task queue.
+* Multimodal (speech, vision, OCR) — the orchestrator classifies image/audio requests and answers "unavailable" honestly.
+* General web search — Brave adapter exists but is off (no key); research uses the 10 official keyless APIs only.
+* Provider-verification research connector, LoRA/fine-tuning (needs GPU + training stack), multi-worker task queue
+  (one process; background work runs in threads), vector index for the Archive (linear scan, measured 433 ms on the
+  1.6 MB benchmark document).
+* Wikipedia rate-limits this host's shared egress IP intermittently (429/403 measured); research falls back to other
+  sources and reports the failure instead of hiding it.
 * Archivum canon content — none exists in the repository; nothing is invented.
 
 ## Next sensible steps
