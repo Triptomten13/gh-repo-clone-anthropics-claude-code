@@ -72,7 +72,8 @@ def complete(db: Session, *, system: str, prompt: str, tier: str = "standard", s
     db.commit()
     return {"text": r.text, "data": r.data, "provider": getattr(r, "provider", ""), "model": r.model, "served_from_cache": False,
             "input_tokens": r.input_tokens, "output_tokens": r.output_tokens, "cost_usd": r.cost_usd,
-            "latency_ms": getattr(r, "latency_ms", 0), "attempts": attempts}
+            "latency_ms": getattr(r, "latency_ms", 0), "attempts": attempts, "reasoning": getattr(r, "reasoning", "") or "",
+            "reasoning_truncated": bool(getattr(r, "reasoning_truncated", False))}
 
 
 def purge_cache(db: Session) -> int:

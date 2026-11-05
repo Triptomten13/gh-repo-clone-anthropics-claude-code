@@ -51,7 +51,8 @@ agents, G-sus, the internal AI API, uploads; **viewer** — read only.
 In the app: **DAEMON CORE → Models → Install** for each model you want (downloads come only from huggingface.co; the
 licence and sha256 are re-checked against the Hub before the download and the file is verified after), then
 **Use as chat / eco / embedding**. Recommended on a CPU-only 16 GB machine: Qwen2.5 1.5B (chat), Qwen2.5 0.5B (eco),
-nomic-embed-text v1.5 (embedding). After activating an embedding model, re-embed the Archive
+**Qwen3 4B (deep — reasoning)**, nomic-embed-text v1.5 (embedding). Qwen3 8B is stronger but about half as fast; choose
+it on machines with more cores or a GPU. The thinking budget for deep reasoning is on the DAEMON CORE status tab. After activating an embedding model, re-embed the Archive
 (`POST /api/archive/reembed`, admin).
 
 Air-gapped machines: copy the `.gguf` files over and `POST /api/daemon/library/<key>/import-file {"path": "..."}` —

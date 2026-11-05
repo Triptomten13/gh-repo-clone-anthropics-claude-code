@@ -398,3 +398,142 @@ def test_activation_history_is_audited(client, fresh_db):
     assert s.scalars(select(AuditLog).where(AuditLog.action == "daemon.settings")).first() is not None
     s.close()
     assert datetime.now(UTC)  # keep import used
+
+
+# ------------------------------------------------------------------ deep reasoning
+def test_split_thinking_keeps_reasoning_apart_and_detects_unfinished_thought():
+    from app.daemon.runtime import split_thinking
+
+    assert split_thinking("<think>200*0.15=30; 200-30-10-80</think>\n80") == ("80", "200*0.15=30; 200-30-10-80", True)
+    ans, why, done = split_thinking("<think>still working on it")
+    assert ans == "" and "still working" in why and done is False
+    assert split_thinking("plain answer") == ("plain answer", "", True)
+
+
+class FakeLlama:
+    """Stands in for llama_cpp.Llama: chat completions for normal calls, raw completions for the two-phase reasoning."""
+
+    def __init__(self, content="", phases=(), chatml=True):
+        self.content, self.phases, self.calls = content, list(phases), []
+        self.metadata = {"tokenizer.chat_template": "<|im_start|>{{ messages }}" if chatml else "{{ messages }}"}
+
+    def create_chat_completion(self, **kw):
+        self.calls.append(("chat", kw))
+        return {"choices": [{"message": {"content": self.content}}], "usage": {"prompt_tokens": 40, "completion_tokens": 300}}
+
+    def create_completion(self, **kw):
+        self.calls.append(("completion", kw))
+        text, finish = self.phases.pop(0)
+        return {"choices": [{"text": text, "finish_reason": finish}], "usage": {"prompt_tokens": 40, "completion_tokens": 200}}
+
+
+def _thinking_provider(monkeypatch, fake):
+    import threading
+    from types import SimpleNamespace
+
+    from app.daemon import runtime
+
+    p = runtime.LocalLlamaProvider()
+    m = SimpleNamespace(key="qwen3-test", file_path="/dev/null", capabilities=["text", "reasoning", "thinking"])
+    monkeypatch.setattr(p, "_resolve", lambda model: m)
+    monkeypatch.setattr(p, "_load", lambda *a, **k: fake)
+    p._locks["qwen3-test|gen"] = threading.Lock()
+    return p
+
+
+def test_deep_slot_thinks_within_budget_and_keeps_reasoning_apart(monkeypatch, fresh_db):
+    monkeypatch.setenv("DAEMON_THINKING_TOKENS", "2000")
+    fake = FakeLlama(content="hello", phases=[("15% of 200 is 30; 200-30-10-80 = 80", "stop"), ("80", "stop")])
+    p = _thinking_provider(monkeypatch, fake)
+    c = p.complete(model="deep", system="s", prompt="profit?", schema=None, effort="high", max_tokens=96)
+    assert c.text == "80" and "200-30-10-80" in c.reasoning and c.reasoning_truncated is False
+    (k1, think), (k2, answer) = fake.calls
+    assert k1 == k2 == "completion" and think["max_tokens"] == 2000 and think["stop"] == ["</think>"]
+    assert think["prompt"].endswith("<|im_start|>assistant\n<think>\n") and answer["max_tokens"] == 96
+    assert answer["prompt"].endswith("</think>\n\n")
+    p.complete(model="chat", system="s", prompt="hi", schema=None, effort="low", max_tokens=50)
+    kind, kw = fake.calls[2]
+    assert kind == "chat" and kw["messages"][1]["content"].endswith("/no_think") and kw["max_tokens"] == 50  # fast outside the deep slot
+
+
+def test_exhausted_thinking_budget_is_concluded_and_flagged(monkeypatch, fresh_db):
+    fake = FakeLlama(phases=[("let me consider every possibility in turn and", "length"), ("Mixed", "stop")])
+    p = _thinking_provider(monkeypatch, fake)
+    c = p.complete(model="deep", system="s", prompt="hard question", schema=None, effort="high", max_tokens=96)
+    assert c.text == "Mixed" and c.reasoning_truncated is True
+    assert "give the solution based on the thinking directly now" in fake.calls[1][1]["prompt"]
+
+
+def test_unfinished_thought_without_budget_control_is_never_an_answer(monkeypatch, fresh_db):
+    p = _thinking_provider(monkeypatch, FakeLlama(content="<think>still going", chatml=False))
+    with pytest.raises(ProviderUnavailable, match="thinking budget"):
+        p.complete(model="deep", system="s", prompt="hard question", schema=None, effort="high", max_tokens=96)
+
+
+def test_deep_tier_routes_to_the_reasoning_slot_first(fresh_db, monkeypatch):
+    monkeypatch.delenv("MODEL_CHAIN_DEEP", raising=False)
+    s = fresh_db.SessionLocal()
+    state.update(s, offline_mode=True)
+    s.commit()
+    s.close()
+    cands, _ = policy.plan("deep", {"local": Stub("local"), "anthropic": Stub("anthropic", locality="external")})
+    assert [(c.provider, c.model) for c in cands][:2] == [("local", "deep"), ("local", "chat")]
+
+
+def test_deep_agents_get_a_longer_task_timeout(fresh_db):
+    from app.agents.catalog import build_orchestrator
+    from app.config import get_settings
+
+    s = fresh_db.SessionLocal()
+    orch = build_orchestrator()
+    deep_task = orch.submit(s, "ceo.weekly_review", {"t": 1})
+    fast_task = orch.submit(s, "system.self_evaluate", {"t": 1})
+    assert deep_task.timeout_s == max(get_settings().default_task_timeout_s, get_settings().deep_task_timeout_s)
+    assert fast_task.timeout_s == get_settings().default_task_timeout_s
+    s.close()
+
+
+def test_benchmark_has_deep_reasoning_and_no_language_specific_tasks():
+    skills = {t["skill"] for t in bench.TASKS}
+    assert "deep_reasoning" in skills and "swedish" not in skills
+    checks = {t["id"]: t["check"] for t in bench.TASKS}
+    assert checks["vat"]("The price excluding VAT is 192 SEK.") and not checks["vat"]("240")
+    assert checks["boxes-labels"]("Mixed") and not checks["boxes-labels"]("oranges")
+
+
+def test_answer_cut_off_by_the_token_limit_is_marked(monkeypatch, fresh_db):
+    p = _thinking_provider(monkeypatch, FakeLlama(phases=[("short thought", "stop"), ("The profit is 200 - 40", "length")]))
+    c = p.complete(model="deep", system="s", prompt="q", schema=None, effort="high", max_tokens=10)
+    assert c.text.endswith("[answer cut off at the token limit]")
+
+
+def test_self_consistency_votes_on_final_answers():
+    from app.daemon import consistency
+
+    a = "Revenue 160.\n**Answer**: 80"
+    b = "Profit: 160 - 80 = 80 SEK.\nAnswer: 80 SEK."
+    c = "Profit = 40 - 80 = -40\n**Answer**: -40"
+    assert consistency.final_answer(a) == consistency.final_answer(b) == "num:80"
+    v = consistency.vote([c, a, b])
+    assert v["winner"] == "num:80" and v["agreement"] == "2/3" and v["majority"] and v["index"] == 1
+    assert consistency.settled([a, b], 3) and not consistency.settled([a, c], 3)
+    assert consistency.vote(["Answer: mixed", "Answer: Mixed.", "Answer: oranges"])["winner"] == "txt:mixed"
+
+
+def test_reason_endpoint_self_consistency_stops_early_and_reports(client):
+    answers = iter(["Fees 40, so -40.\nAnswer: -40", "200-30-10-80\nAnswer: 80", "Answer: 80", "Answer: 80", "Answer: 80", "Answer: 80"])
+    calls = []
+
+    class Seq(CountingProvider):
+        def complete(self, **kw):
+            r = super().complete(**kw)
+            r.text = next(answers)
+            calls.append(r.text)
+            return r
+
+    llm.set_provider(Seq())
+    out = client.post("/api/ai/reason", json={"question": "profit?", "samples": 3}).json()
+    sc = out["self_consistency"]
+    assert out["answer"].endswith("80") and sc["agreement"] == "2/3" and sc["majority"] and len(calls) == 3
+    out = client.post("/api/ai/reason", json={"question": "profit again?", "samples": 3}).json()
+    assert out["self_consistency"]["samples"] == 2 and len(calls) == 5  # two agreeing samples already form a majority of 3

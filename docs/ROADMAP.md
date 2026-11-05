@@ -82,11 +82,13 @@ Legend: ✅ complete & tested · 🟡 partial · ⛔ blocked (external dependenc
   benchmarks with cost per success, cost dashboard, optimisation proposals
 - ✅ Crash recovery, backup/restore scripts, admin CLI and user management
 - ✅ Independence Tests A–G passed on CPU-only hardware (INDEPENDENCE_TESTS.md)
+- ✅ Local deep reasoning: Qwen3 4B reasoning model in a `deep` slot, thinking budget, flagged incomplete reasoning,
+  Chamber → Deep reasoning; benchmark 17/17 (deep reasoning 7/7). Swedish dropped as a requirement (D-014)
 - ⏳ Stronger local models (needs more RAM/GPU), multimodal (local STT/TTS/vision), semantic response cache,
   rate-limit header parsing, research connector for provider verification, LoRA (needs GPU + training stack)
 
 ## Known limitations
-- Local models (0.5B–1.5B on CPU) are much weaker than frontier models; measured 0/2 on Swedish tasks.
+- Local models are much weaker than frontier models; deep reasoning on CPU takes ~1–5 minutes per problem (Qwen3 4B).
 - Single in-process task worker; long LLM tasks run sequentially.
 - The compliance engine is keyword-based decision support; it is conservative and must be reviewed by a human.
 - Advertising benchmarks are planning assumptions until real campaign data is ingested.

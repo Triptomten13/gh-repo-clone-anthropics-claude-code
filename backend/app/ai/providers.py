@@ -41,6 +41,8 @@ class Completion:
     cost_usd: float
     latency_ms: int
     cached_input_tokens: int = 0
+    reasoning: str = ""  # a local reasoning model's thinking, kept apart from the answer
+    reasoning_truncated: bool = False  # the thinking budget ran out; the answer was concluded from partial reasoning
 
 
 class Provider(Protocol):

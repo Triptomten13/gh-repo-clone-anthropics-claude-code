@@ -68,6 +68,7 @@ export default function Chamber() {
 
           {run ? <RunView run={run} onResume={() => act(`/api/gsus/runs/${run.id}/resume`)} onCancel={() => act(`/api/gsus/runs/${run.id}/cancel`)} />
             : <Card><Empty title="No run selected">G-sus understands the objective, asks if something is unclear, plans over the platform's real capabilities, runs agents in parallel where safe, stops for your approval on high-impact actions, compares results and verifies before answering.</Empty></Card>}
+          <DeepReasoning />
           <StreamChat mode={mode} enabled={!!llm} />
         </div>
 
@@ -174,4 +175,74 @@ function StreamChat({ mode, enabled }: { mode: string; enabled: boolean }) {
       )}
     </Card>
   );
+}
+
+/** Deep reasoning: the deep tier (local reasoning model first) through /api/ai/reason. The model's working notes are
+ *  shown separately, labelled unverified; an answer concluded after the thinking budget ran out is flagged. */
+function DeepReasoning() {
+  const status = useApi<any>("/api/ai/status");
+  const [q, setQ] = useState("");
+  const [ctx, setCtx] = useState("");
+  const [verify, setVerify] = useState(false);
+  const [samples, setSamples] = useState(1);
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState<any>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [secs, setSecs] = useState(0);
+  const deepModel = status.data?.active_models?.deep;
+  const ask = async () => {
+    setBusy(true); setErr(null); setRes(null);
+    const t0 = Date.now();
+    const timer = setInterval(() => setSecs(Math.round((Date.now() - t0) / 1000)), 1000);
+    try { setRes(await api("/api/ai/reason", { method: "POST", json: { question: q, context: ctx, verify, samples } })); }
+    catch (e) { setErr((e as Error).message); }
+    finally { clearInterval(timer); setSecs(Math.round((Date.now() - t0) / 1000)); setBusy(false); }
+  };
+  return (
+    <Card title="Deep reasoning" action={<span className="text-[11.5px] text-ink-3">{deepModel ? `local: ${deepModel}` : "no local reasoning model — DAEMON CORE → Models"}</span>}>
+      <label className="sr-only" htmlFor="deep-q">Question</label>
+      <textarea id="deep-q" rows={3} className="w-full" placeholder="A problem that needs several steps of reasoning — pricing, logistics, logic, trade-offs…" value={q} onChange={(e) => setQ(e.target.value)} />
+      <label className="sr-only" htmlFor="deep-ctx">Context</label>
+      <textarea id="deep-ctx" rows={2} className="mt-2 w-full text-[12.5px]" placeholder="Optional context (treated as untrusted data, never as instructions)" value={ctx} onChange={(e) => setCtx(e.target.value)} />
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-1.5 text-[12.5px] text-ink-2">Self-consistency
+          <select value={samples} onChange={(e) => setSamples(Number(e.target.value))} aria-label="Number of reasoning samples">
+            <option value={1}>off (1 sample)</option><option value={3}>3 samples · majority vote</option><option value={5}>5 samples · majority vote</option>
+          </select></label>
+        <label className="flex items-center gap-1.5 text-[12.5px] text-ink-2"><input type="checkbox" checked={verify} onChange={(e) => setVerify(e.target.checked)} />Second opinion from another model</label>
+        <span className="flex-1" />
+        {busy && <span className="num text-[12px] text-ink-3">thinking… {secs}s</span>}
+        <Button variant="primary" busy={busy} disabled={q.trim().length < 5} onClick={ask}>Reason</Button>
+      </div>
+      <p className="mt-1 text-[11.5px] text-ink-3">On this CPU a local reasoning model thinks for one to several minutes per sample. A single sample can be confidently wrong — use self-consistency for anything that matters. The thinking budget is set in DAEMON settings.</p>
+      <ErrorBanner error={err} />
+      {res && <div className="mt-3 space-y-2 border-t border-line pt-3">
+        <div className="flex flex-wrap items-center gap-2 text-[11.5px] text-ink-3">
+          <span className="font-mono">{res.provider}:{res.model}</span><span>· {secs}s</span>
+          {res.reasoning_complete === false ? <StatusBadge status="needs_review" /> : res.reasoning ? <StatusBadge status="completed" /> : null}
+          {res.reasoning_complete === false && <span className="text-warning">thinking budget reached — answer concluded from incomplete reasoning, lower confidence</span>}
+          {res.self_consistency && <span className={res.self_consistency.majority ? "text-good" : "text-warning"}>
+            {res.self_consistency.majority ? `samples agree ${res.self_consistency.agreement}` : `NO majority (${res.self_consistency.agreement}) — unreliable`}</span>}
+        </div>
+        <div className="whitespace-pre-wrap font-serif text-[15px] leading-relaxed text-ink" data-testid="deep-answer"><LiteText text={res.answer} /></div>
+        {res.reasoning && <details className="rounded border border-line bg-bg/60 p-2">
+          <summary className="cursor-pointer text-[12px] text-ink-3">Working notes ({res.reasoning.length.toLocaleString()} characters) — the model&apos;s own, unverified</summary>
+          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap font-mono text-[11.5px] text-ink-2">{res.reasoning}</pre>
+        </details>}
+        {res.verification && <div className="rounded border border-line p-2 text-[12.5px]">
+          <div className="mb-1 text-[11.5px] text-ink-3">Second opinion · {res.verification.provider}:{res.verification.model}{res.verification.independent ? "" : " (not independent)"}</div>
+          <div className="whitespace-pre-wrap text-ink-2">{res.verification.answer ?? res.verification.error}</div>
+          <div className="mt-1 text-[11px] text-ink-3">{res.verification.note}</div>
+        </div>}
+      </div>}
+    </Card>
+  );
+}
+
+/** Minimal, safe rendering of model markdown: **bold** becomes <strong> (React elements, never HTML injection) and
+ *  inline-math markers are simplified ($ 180 \times 0.25 $ → 180 × 0.25). Everything else stays plain text. */
+function LiteText({ text }: { text: string }) {
+  const clean = text.replace(/\\times/g, "×").replace(/\\cdot/g, "·").replace(/\$\s?([^$\n]+?)\s?\$/g, "$1");
+  return <>{clean.split(/(\*\*[^*\n]+\*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong> : <span key={i}>{part}</span>)}</>;
 }

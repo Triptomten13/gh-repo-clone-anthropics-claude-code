@@ -36,6 +36,8 @@ class Settings:
     # Governance
     max_task_depth: int = field(default_factory=lambda: int(os.getenv("MAX_TASK_DEPTH", "3")))
     default_task_timeout_s: int = field(default_factory=lambda: int(os.getenv("TASK_TIMEOUT_S", "120")))
+    # deep-tier agents may be served by a local reasoning model that thinks for minutes on CPU
+    deep_task_timeout_s: int = field(default_factory=lambda: int(os.getenv("DEEP_TASK_TIMEOUT_S", "900")))
     default_max_attempts: int = field(default_factory=lambda: int(os.getenv("TASK_MAX_ATTEMPTS", "3")))
     daily_cost_limit_usd: float = field(default_factory=lambda: float(os.getenv("DAILY_COST_LIMIT_USD", "20")))
     dedupe_window_hours: int = field(default_factory=lambda: int(os.getenv("DEDUPE_WINDOW_HOURS", "24")))

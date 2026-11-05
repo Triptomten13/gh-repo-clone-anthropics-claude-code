@@ -2,9 +2,31 @@
 
 Short records of decisions that shape the system. Newest first.
 
+### D-015 · 2026-11-05 · Self-consistency for deep answers that matter
+**Context:** in the Independence Test environment a single sample of Qwen3 4B answered a margin problem with −40
+instead of 80 (it counted the marketplace's cut as income) — reproducibly, because each fresh process starts from the
+same sampling seed. **Decision:** `POST /api/ai/reason` takes `samples` (1–5): independent samples, majority vote on the
+final answer, early stop once a majority is certain, agreement reported, "no majority" flagged as unreliable. Default 1
+(it multiplies the time); recommended for anything consequential, alongside human review.
+
+### D-014 · 2026-11-05 · Swedish is not a requirement; deep reasoning is
+The owner decided Swedish-language quality is not needed and deep reasoning is. Swedish tasks were removed from the
+benchmark; seven multi-step reasoning problems were added; a local reasoning model serves the deep tier.
+
+### D-013 · 2026-11-05 · Local deep reasoning: Qwen3 4B in a `deep` slot, two-phase thinking with a hard budget
+**Context:** 0.5B/1.5B models fail most multi-step problems; the host has no GPU (4B ≈ 4–5 tokens/s, 8B about half).
+**Decision:** a separate `deep` slot (deep tier: local deep → local chat; external Opus first only in BALANCED/DEEP when
+authorised) served by Qwen3 4B in thinking mode. Thinking runs as phase 1 up to `local.thinking_tokens` (default 1,536);
+if the budget is hit the model is told to conclude and phase 2 produces the answer — the thinking-budget technique
+described in the Qwen3 technical report. The answer is flagged `reasoning_complete: false` in that case. Working notes are returned separately and
+labelled unverified; they are never mixed into the answer. Outside the deep slot Qwen3's `/no_think` switch keeps it
+fast; JSON-schema calls never think. Deep-tier agent tasks get `DEEP_TASK_TIMEOUT_S` (900 s).
+**Consequences:** real multi-step reasoning offline, at minutes per answer on this CPU; Qwen3 8B is catalogued for
+better hardware.
+
 ### D-012 · 2026-11-05 · llama.cpp in-process as the default local runtime
 **Context:** the host has 4 vCPU, 16.9 GB RAM, no GPU; independence requires local generation. **Decision:**
-llama-cpp-python (MIT, prebuilt CPU wheel) inside the API process; GGUF Q4/Q8 models ≤ 1.5B; Ollama and
+llama-cpp-python (MIT, prebuilt CPU wheel) inside the API process; GGUF Q4/Q8 models ≤ 4B; Ollama and
 OpenAI-compatible servers supported as workers. **Consequences:** no extra daemon or port, simple deployment; one
 process does inference (serialised per model, max two models loaded); scale-out by registering workers. vLLM/Kubernetes
 rejected — no GPU, single host.

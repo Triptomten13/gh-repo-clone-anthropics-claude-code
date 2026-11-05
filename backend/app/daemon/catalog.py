@@ -33,7 +33,7 @@ class CatalogEntry:
     context_length: int
     languages: tuple[str, ...]
     capabilities: tuple[str, ...]
-    suggested_slot: str  # chat | eco | embedding
+    suggested_slot: str  # chat | eco | deep | embedding
     notes: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -57,7 +57,7 @@ CATALOG: list[CatalogEntry] = [
                  "Qwen/Qwen2.5-1.5B-Instruct-GGUF", "qwen2.5-1.5b-instruct-q4_k_m.gguf", "apache-2.0",
                  "6a1a2eb6d15622bf3c96857206351ba97e1af16c30d7a74ee38970e434e9407e", 1117320736, 32768,
                  ("multilingual", "en", "sv"), ("text", "structured_output", "streaming"), "chat",
-                 "Primary CPU chat model. Multilingual (Swedish quality is modest — measure with the benchmark)."),
+                 "Primary CPU chat model for standard-tier work."),
     CatalogEntry("qwen2.5-0.5b-instruct-q4_k_m", "Qwen2.5 0.5B Instruct (Q4_K_M)", "qwen2.5", "chat", "0.5B", "Q4_K_M",
                  "Qwen/Qwen2.5-0.5B-Instruct-GGUF", "qwen2.5-0.5b-instruct-q4_k_m.gguf", "apache-2.0",
                  "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db", 491400032, 32768,
@@ -72,6 +72,18 @@ CATALOG: list[CatalogEntry] = [
                  "HuggingFaceTB/SmolLM2-1.7B-Instruct-GGUF", "smollm2-1.7b-instruct-q4_k_m.gguf", "apache-2.0",
                  "decd2598bc2c8ed08c19adc3c8fdd461ee19ed5708679d1c54ef54a5a30d4f33", 1055609536, 8192,
                  ("en",), ("text", "streaming"), "chat", "Alternative English chat model."),
+    CatalogEntry("qwen3-4b-q4_k_m", "Qwen3 4B (Q4_K_M) — reasoning", "qwen3", "chat", "4B", "Q4_K_M",
+                 "Qwen/Qwen3-4B-GGUF", "Qwen3-4B-Q4_K_M.gguf", "apache-2.0",
+                 "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5", 2497280256, 32768,
+                 ("multilingual", "en"), ("text", "reasoning", "thinking", "structured_output"), "deep",
+                 "Reasoning model with a thinking phase (<think>…</think>, stripped from answers). Deep tier on CPU-only hosts.",
+                 {"thinking": True}),
+    CatalogEntry("qwen3-8b-q4_k_m", "Qwen3 8B (Q4_K_M) — reasoning", "qwen3", "chat", "8B", "Q4_K_M",
+                 "Qwen/Qwen3-8B-GGUF", "Qwen3-8B-Q4_K_M.gguf", "apache-2.0",
+                 "d98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785", 5027783488, 32768,
+                 ("multilingual", "en"), ("text", "reasoning", "thinking", "structured_output"), "deep",
+                 "Stronger reasoning model; slow on CPU (measure before choosing). Needs ~6.5 GB RAM.",
+                 {"thinking": True}),
     CatalogEntry("nomic-embed-text-v1.5-q8_0", "nomic-embed-text v1.5 (Q8_0)", "nomic-bert", "embedding", "137M", "Q8_0",
                  "nomic-ai/nomic-embed-text-v1.5-GGUF", "nomic-embed-text-v1.5.Q8_0.gguf", "apache-2.0",
                  "3e24342164b3d94991ba9692fdc0dd08e3fd7362e0aacc396a9a5c54a544c3b7", 146146432, 2048,

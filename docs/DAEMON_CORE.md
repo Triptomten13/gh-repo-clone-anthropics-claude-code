@@ -33,8 +33,9 @@ Conclusion: the platform was **not independent** — the only path to generated 
 
 | Slot | Model | Size | Measured here |
 |---|---|---|---|
-| chat | Qwen2.5 1.5B Instruct Q4_K_M | 1.1 GB | ~0.8 s for a one-word classification, ~6–10 s for a short chat answer; benchmark 9/12 |
-| eco | Qwen2.5 0.5B Instruct Q4_K_M | 0.5 GB | ~0.5 s classification; benchmark 10/12 |
+| chat | Qwen2.5 1.5B Instruct Q4_K_M | 1.1 GB | ~0.8 s for a one-word classification, ~6–10 s for a short chat answer; benchmark 11/17, deep reasoning 2/7 |
+| eco | Qwen2.5 0.5B Instruct Q4_K_M | 0.5 GB | ~0.4 s per short task; benchmark 11/17, deep reasoning 1/7 |
+| **deep** | **Qwen3 4B Q4_K_M (reasoning, thinks first)** | 2.5 GB | ~4–5 tokens/s; 90 s–4 min per multi-step problem; benchmark **17/17, deep reasoning 7/7** |
 | embedding | nomic-embed-text v1.5 Q8_0 | 0.15 GB | 768-d; related text cos ≈ 0.68–0.90, unrelated ≈ 0.28–0.32 |
 | replacement (Test C) | SmolLM2 360M Instruct Q8_0 | 0.4 GB | different model family, English only |
 
@@ -62,6 +63,13 @@ is what the hardware and workload justify. Workers scale out when another machin
 * **G-SUS identity layer** (`daemon/prompts.py`, prompt `gsus.identity`, versioned): the same identity, facts about
   itself and non-negotiable rules whichever model serves the request. Verified in Test C: the replacement model answers
   through the same `/api/ai/chat` as G-SUS.
+* **Deep reasoning** — the `deep` slot holds a reasoning model (Qwen3 4B; 8B catalogued for stronger hardware). The
+  deep tier tries it before the chat model. It thinks in a first phase up to `local.thinking_tokens` (default 1,536,
+  set on the status tab); if the budget runs out it is made to conclude and the answer is flagged
+  `reasoning_complete: false`. Working notes are returned separately (labelled unverified), never mixed into the answer.
+  Outside the deep slot and for JSON-schema calls the model does not think. Deep-tier agent tasks get a 900 s timeout.
+  UI: G-sus Chamber → Deep reasoning; API: `POST /api/ai/reason` (`samples: 3` = self-consistency with majority vote;
+  `verify: true` adds a second model's answer). A single sample can be confidently wrong — measured, see §7.
 * **Execution profiles** — ECO, BALANCED, DEEP, SPECIALIST, OFFLINE, EMERGENCY (`daemon/policy.py`). BALANCED: local
   for fast/standard tiers, strongest available for deep. OFFLINE: local/LAN only. EMERGENCY: smallest local model,
   256-token outputs, nothing external.
@@ -97,7 +105,7 @@ is what the hardware and workload justify. Workers scale out when another machin
 | `POST /api/ai/generate` | operator | raw prompt or a versioned `prompt_name` + variables; optional `json_schema`; `cache: true` |
 | `POST /api/ai/embeddings` | operator | `kind: document|query`; always local |
 | `POST /api/ai/classify` | operator | fast tier; rejects labels outside the given set (502) instead of inventing one |
-| `POST /api/ai/reason` | operator | deep tier; `verify: true` asks a different model independently |
+| `POST /api/ai/reason` | operator | deep tier (local reasoning model); returns answer, working notes, `reasoning_complete`; `samples` 1–5 = self-consistency (majority vote, agreement reported); `verify: true` asks a different model independently |
 | `POST /api/ai/agents/execute` | operator | runs an agent task through the orchestrator (budgets, approvals, kill switch apply) |
 | `GET /api/ai/health`, `/api/ai/status` | any user | providers, breakers, quota; profile, chains, active models, independence verdict |
 
@@ -114,6 +122,7 @@ every change is audited.
 | 3 Sovereign routing | profiles, offline mode, privacy routing, workers | OFFLINE chain contains no external provider; no silent fallback | ✅ Test B |
 | 4 Internal AI API + identity | chat/generate/embeddings/classify/reason/agents/health/status | same calls work after model swap | ✅ Test C |
 | 5 Local memory & embeddings | GGUF embeddings, reindex | semantic search without external API | ✅ Test D |
+| 5b Deep reasoning | reasoning model in a `deep` slot, thinking budget, flags | multi-step problems solved locally, offline | ✅ 7/7 on the benchmark; Tests A & B |
 | 6 Cost intelligence | registry, credentials, limits, cache, benchmarks, proposals | no paid call beyond limits; cost per success measured | ✅ (see COST_INTELLIGENCE.md) |
 | 7 Recovery & backup | requeue on restart, backup/restore scripts | crash + restart recovers config, models, memory, tasks | ✅ Test F; backup/restore round-trip verified |
 | 8 Security | auth on every local service, no extra listeners | anonymous 401, role 403, only the API listens | ✅ Test G |
@@ -135,12 +144,18 @@ benchmarks) · 16 installation → [INSTALL.md](INSTALL.md) · 17 backup → [BA
 
 ## 7. Limits, stated plainly
 
-* **Quality.** 0.5B–1.5B models are far weaker than frontier models. Measured: both Qwen models scored **0/2 on the
-  Swedish tasks**, the 1.5B model failed a ceiling-division word problem, and when asked "what is Demonkoncernen AB?"
-  offline the 1.5B model once invented that the company "develops games" (the identity prompt now states the only
-  facts it may claim; the next run answered vaguely but did not invent). Deep, Swedish-heavy or high-stakes work should
-  go to a stronger model — a larger local model on better hardware, or an authorised external provider where policy
-  allows — and critical decisions should use `/api/ai/reason` with `verify: true` plus human review.
+* **Quality.** Local models are far weaker than frontier models. The small chat/eco models solve only 1–2 of 7
+  multi-step problems, which is why the deep tier goes to the reasoning model (7/7 in its benchmark run). It samples,
+  so single runs can be wrong: it once answered the mislabelled-boxes puzzle wrongly after its thinking budget ran out
+  (flagged), and in the Independence Test environment it answered a margin problem with −40 instead of 80 — twice, since
+  a fresh process starts from the same seed. With self-consistency (3 samples) the same problem came out 80 (2/2 agreeing
+  samples, early stop). Use `samples` and human review for anything that matters. When asked "what is Demonkoncernen AB?" offline, the 1.5B model once invented that the company
+  "develops games"; the identity prompt now states the only facts it may claim. Critical decisions should use
+  `/api/ai/reason` with `verify: true` plus human review. Swedish-language quality is not a requirement (owner decision,
+  D-014) and is no longer benchmarked.
+* **Deep reasoning is slow on this CPU:** ~1 minute on average per problem, up to ~4–5 minutes when the model uses its
+  whole thinking budget. Qwen3 8B is stronger but about half as fast here; it is catalogued for machines with more cores
+  or a GPU.
 * **Speed.** CPU inference: seconds per short answer, about a minute for a long G-sus synthesis.
   `DAEMON_LOCAL_MAX_TOKENS` (default 1024) caps local outputs.
 * **Energy cost** is an estimate (configured watts × inference time × tariff), not a meter reading.

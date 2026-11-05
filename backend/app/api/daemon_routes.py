@@ -19,8 +19,8 @@ from sqlalchemy.orm import Session
 
 from ..ai.llm import get_router
 from ..ai.router import LLMRefused, LLMUnavailable
-from ..daemon import (bench, catalog, costs, credentials, finetune, gateway, hardware, library, optimizer, policy, prompts, quota,
-                      registry_seed, selftest, state, tools, workers)
+from ..daemon import (bench, catalog, consistency, costs, credentials, finetune, gateway, hardware, library, optimizer, policy, prompts,
+                      quota, registry_seed, selftest, state, tools, workers)
 from ..db import SessionLocal, get_db
 from ..governance import core as gov
 from ..models import (BenchmarkRun, ModelWorker, OptimizationProposal, PromptVersion, ProviderCredential, ProviderRecord, Task,
@@ -154,12 +154,14 @@ class ReasonIn(BaseModel):
     question: str = Field(max_length=20_000)
     context: str = Field("", max_length=60_000)
     verify: bool = False
+    samples: int = Field(1, ge=1, le=5)  # >1 = self-consistency: majority vote over independent reasoning samples
     sensitivity: Sensitivity = "normal"
 
 
 @router.post("/ai/reason")
 def ai_reason(r: ReasonIn, db: Session = Depends(get_db), _: User = Depends(operator)):
-    """Deep tier. verify=true asks a second, different model for an independent answer (critical decisions)."""
+    """Deep tier. samples>1 = self-consistency (majority vote, early stop once a majority is reached);
+    verify=true asks a second, different model for an independent answer (critical decisions)."""
     ctx = wrap(r.context, source_id="reason-context") if r.context else "(none)"
     prompt = prompts.render(db, "ai.reason", question=r.question, context=ctx)
     system = prompts.active(db, "gsus.identity").text
@@ -168,9 +170,30 @@ def ai_reason(r: ReasonIn, db: Session = Depends(get_db), _: User = Depends(oper
                                  purpose="ai.reason", workflow="reason")
     except Exception as e:
         raise _ai_error(e) from e
-    out: dict[str, Any] = {"answer": first["text"], "model": first["model"], "provider": first["provider"], "attempts": first["attempts"]}
+    runs = [first]
+    while r.samples > 1 and len(runs) < r.samples and not consistency.settled([x["text"] for x in runs], r.samples):
+        try:
+            runs.append(gateway.complete(db, system=system, prompt=prompt, tier="deep", max_tokens=1500, sensitivity=r.sensitivity,
+                                         purpose="ai.reason.sample", workflow="reason"))
+        except Exception as e:  # a failed extra sample is reported; the vote uses what exists
+            runs.append({"text": "", "error": str(e)[:200], "model": "", "provider": ""})
+    sc = None
+    if r.samples > 1:
+        v = consistency.vote([x["text"] for x in runs])
+        first = runs[v["index"]]
+        sc = {"samples": len(runs), "planned": r.samples, "finals": v["finals"], "agreement": v["agreement"], "majority": v["majority"],
+              "note": "majority of independent samples of the same model — raises confidence, does not prove correctness"
+                      + ("" if v["majority"] else "; NO majority: treat the answer as unreliable")}
+    out: dict[str, Any] = {"answer": first["text"], "model": first["model"], "provider": first["provider"], "attempts": first.get("attempts", []),
+                           "reasoning": (first.get("reasoning") or "")[:8000], "reasoning_complete": not first.get("reasoning_truncated"),
+                           "reasoning_note": ("the model's own working notes — unverified, shown for transparency"
+                                              + (". The thinking budget ran out: the answer was concluded from incomplete reasoning — treat it "
+                                                 "as lower confidence (raise local.thinking_tokens or use verify=true)" if first.get("reasoning_truncated") else ""))
+                           if first.get("reasoning") else ""}
+    if sc:
+        out["self_consistency"] = sc
     if r.verify:
-        second_tier = "standard" if first["provider"] != "local" else "fast"
+        second_tier = "standard"  # a different model from the deep one (local chat model, or the standard external tier)
         try:
             second = gateway.complete(db, system=system, prompt=prompt + "\n\nAnswer independently and briefly.", tier=second_tier,
                                       max_tokens=800, sensitivity=r.sensitivity, purpose="ai.reason.verify", workflow="reason")
@@ -228,10 +251,11 @@ def ai_status(db: Session = Depends(get_db), _: User = Depends(current_user)):
         chains[tier] = {"order": [f"{x.provider}:{x.model} ({x.locality}{'' if provs.get(x.provider) is not None and provs[x.provider].configured() else ' · not configured'})"
                                   for x in c],
                         "excluded": [f"{e['provider']}:{e['model']} — {e['status']}" for e in ex]}
-    chat, eco, emb = (library.resolve(db, s) for s in ("chat", "eco", "embedding"))
+    chat, eco, deep, emb = (library.resolve(db, s) for s in ("chat", "eco", "deep", "embedding"))
     return {
         "offline_mode": st["offline_mode"], "profile": st["profile"], "profiles": policy.PROFILE_INFO, "external_allowed": st["external_allowed"],
-        "active_models": {"chat": chat.key if chat else None, "eco": eco.key if eco else None, "embedding": emb.key if emb else None},
+        "active_models": {"chat": chat.key if chat else None, "eco": eco.key if eco else None, "deep": deep.key if deep else None,
+                          "embedding": emb.key if emb else None},
         "chains": chains, "hardware": {"cpu": snap["cpu"]["model"], "cores": snap["cpu"]["usable_cores"],
                                        "ram_total_gb": round(snap["ram_total_bytes"] / 1e9, 1), "accelerator": snap["accelerator"],
                                        "runtime": snap["runtime"]},
@@ -268,6 +292,9 @@ def d_settings_patch(p: SettingsPatch, db: Session = Depends(get_db), user: User
         v = (changes.get("limits") or {}).get(k)
         if v is not None and (not isinstance(v, (int, float)) or v < 0):
             raise HTTPException(422, f"limits.{k} must be a non-negative number or null")
+    tt = (changes.get("local") or {}).get("thinking_tokens")
+    if tt is not None and (not isinstance(tt, int) or not 128 <= tt <= 32768):
+        raise HTTPException(422, "local.thinking_tokens must be an integer between 128 and 32768")
     new = state.update(db, **changes)
     gov.audit(db, user.email, "daemon.settings", "daemon", **changes)
     db.commit()
@@ -323,7 +350,7 @@ def d_import(key: str, i: ImportIn, db: Session = Depends(get_db), user: User = 
 
 
 class ActivateIn(BaseModel):
-    slot: Literal["chat", "eco", "embedding"]
+    slot: Literal["chat", "eco", "deep", "embedding"]
     key: str | None
 
 
@@ -336,7 +363,7 @@ def d_activate(a: ActivateIn, db: Session = Depends(get_db), user: User = Depend
 
 
 class SlotIn(BaseModel):
-    slot: Literal["chat", "eco", "embedding"]
+    slot: Literal["chat", "eco", "deep", "embedding"]
 
 
 @router.post("/daemon/library/rollback")
@@ -555,11 +582,11 @@ class BenchIn(BaseModel):
     allow_spend: bool = False
 
 
-def _bench_bg(provider_id: str, model: str, actor: str) -> None:
+def _bench_bg(provider_id: str, model: str, actor: str, call_model: str) -> None:
     s = SessionLocal()
     try:
         prov = get_router()._all_providers()[provider_id]
-        bench.run(s, provider=prov, provider_id=provider_id, model=model, actor=actor)
+        bench.run(s, provider=prov, provider_id=provider_id, model=model, actor=actor, call_model=call_model)
     finally:
         s.close()
 
@@ -579,15 +606,15 @@ def d_bench_run(b: BenchIn, db: Session = Depends(get_db), user: User = Depends(
         blocked = quota.spend_check(b.provider, len(bench.TASKS) * policy.estimate_cost(b.provider, b.model, bench.SYSTEM, "x" * 400, 96))
         if blocked:
             raise HTTPException(409, f"spend limit: {blocked}")
-    model = b.model
-    if b.provider == "local" and b.model in ("chat", "eco"):
+    model, call_model = b.model, b.model
+    if b.provider == "local" and b.model in ("chat", "eco", "deep"):
         m = library.resolve(db, b.model)
         if not m:
             raise HTTPException(409, f"no local {b.model} model active")
         model = m.key
     gov.audit(db, user.email, "benchmark.run", f"{b.provider}:{model}", allow_spend=b.allow_spend)
     db.commit()
-    threading.Thread(target=_bench_bg, args=(b.provider, model, user.email), daemon=True).start()
+    threading.Thread(target=_bench_bg, args=(b.provider, model, user.email, call_model), daemon=True).start()
     return {"started": True, "provider": b.provider, "model": model, "tasks": len(bench.TASKS)}
 
 

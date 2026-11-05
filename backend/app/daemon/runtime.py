@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import re
 import threading
 import time
 from collections import OrderedDict
@@ -21,6 +22,26 @@ import httpx
 
 from ..ai.providers import Completion, ProviderUnavailable, _parse_json
 from . import catalog, hardware, state
+
+THINK = re.compile(r"<think>(.*?)</think>", re.S)
+
+
+def split_thinking(text: str) -> tuple[str, str, bool]:
+    """(answer, reasoning, finished). `finished` is False when the model was still thinking when output stopped."""
+    reasoning = "\n".join(m.strip() for m in THINK.findall(text))
+    answer = THINK.sub("", text)
+    if "<think>" in answer:  # opened but never closed: the budget ran out mid-thought
+        head, _, tail = answer.partition("<think>")
+        return head.strip(), (reasoning + "\n" + tail).strip(), False
+    return answer.strip(), reasoning, True
+
+
+def thinking_budget() -> int:
+    """Max tokens a reasoning model may think before it must answer (DAEMON settings → local.thinking_tokens)."""
+    env = os.getenv("DAEMON_THINKING_TOKENS")
+    if env:
+        return int(env)
+    return int(state.load()["local"].get("thinking_tokens") or 1536)
 
 
 def locality_of_url(url: str) -> str:
@@ -67,7 +88,7 @@ class LocalLlamaProvider:
                 "embedding_model": emb.key if emb else None, "network_listener": False, "last_error": self.last_error}
 
     # -- model management
-    def _load(self, key: str, path: str, *, embedding: bool = False, n_ctx: int | None = None) -> Any:
+    def _load(self, key: str, path: str, *, embedding: bool = False, n_ctx: int | None = None, thinking: bool = False) -> Any:
         cache_key = f"{key}|{'emb' if embedding else 'gen'}"
         with self._glock:
             if cache_key in self._models:
@@ -79,7 +100,7 @@ class LocalLlamaProvider:
             raise ProviderUnavailable(f"llama-cpp-python not installed: {e}") from e
         st = state.load()
         threads = st["local"]["n_threads"] or max(1, (hardware.snapshot()["cpu"]["usable_cores"]))
-        ctx = n_ctx or (512 if embedding else st["local"]["n_ctx"])
+        ctx = n_ctx or (512 if embedding else (max(st["local"]["n_ctx"], 8192) if thinking else st["local"]["n_ctx"]))
         try:
             llm = Llama(model_path=path, n_ctx=ctx, n_threads=threads, embedding=embedding, verbose=False)
         except Exception as e:
@@ -101,7 +122,7 @@ class LocalLlamaProvider:
     def _resolve(self, model: str):
         from . import library
 
-        if model in ("chat", "eco"):
+        if model in ("chat", "eco", "deep"):
             m = library.resolve(None, model)
         else:
             from .. import db as dbmod
@@ -119,36 +140,94 @@ class LocalLlamaProvider:
         return m
 
     # -- inference
+    def _messages(self, m: Any, model: str, system: str, prompt: str, schema: dict | None) -> tuple[list[dict], bool]:
+        """Thinking models reason only when serving the deep slot without a JSON schema; elsewhere Qwen3's
+        documented '/no_think' switch keeps them fast."""
+        from .library import is_thinking
+
+        thinking_model = is_thinking(m)
+        think = thinking_model and model == "deep" and schema is None
+        user = prompt + (" /no_think" if thinking_model and not think else "")
+        return [{"role": "system", "content": system}, {"role": "user", "content": user}], think
+
+    @staticmethod
+    def _chatml(llm: Any) -> bool:
+        return "<|im_start|>" in str((getattr(llm, "metadata", None) or {}).get("tokenizer.chat_template", ""))
+
+    def _think(self, llm: Any, m: Any, system: str, prompt: str, answer_tokens: int) -> tuple[str, str, bool, int, int]:
+        """Two-phase reasoning with a hard thinking budget (the thinking-budget technique from the Qwen3 technical report):
+        phase 1 thinks until </think> or the budget; if the budget is hit, the model is told to conclude and the
+        answer is generated from the reasoning so far — flagged as incomplete, never presented as finished."""
+        head = (f"<|im_start|>system\n{system}<|im_end|>\n<|im_start|>user\n{prompt}<|im_end|>\n"
+                f"<|im_start|>assistant\n<think>\n")
+        r1 = llm.create_completion(prompt=head, max_tokens=thinking_budget(), temperature=0.6, top_p=0.95, stop=["</think>"])
+        thought = r1["choices"][0]["text"]
+        complete = r1["choices"][0].get("finish_reason") == "stop"
+        if not complete:
+            thought = thought.rstrip() + ("\n\nConsidering the limited time, I have to give the solution based on the "
+                                          "thinking directly now.\n")
+        r2 = llm.create_completion(prompt=head + thought + "</think>\n\n", max_tokens=answer_tokens, temperature=0.6, top_p=0.95,
+                                   stop=["<|im_end|>", "<|endoftext|>"])
+        answer = THINK.sub("", r2["choices"][0]["text"]).strip()
+        if r2["choices"][0].get("finish_reason") == "length" and answer:
+            answer += "\n\n[answer cut off at the token limit]"  # visible, never silently truncated
+        u1, u2 = r1.get("usage") or {}, r2.get("usage") or {}
+        return answer, thought.strip(), complete, int(u1.get("prompt_tokens", 0)), int(u1.get("completion_tokens", 0)) + int(u2.get("completion_tokens", 0))
+
     def complete(self, *, model: str, system: str, prompt: str, schema: dict | None, effort: str, max_tokens: int) -> Completion:
+        from .library import is_thinking
+
         m = self._resolve(model)
-        llm = self._load(m.key, m.file_path)
-        kwargs: dict[str, Any] = {"messages": [{"role": "system", "content": system}, {"role": "user", "content": prompt}],
-                                  "max_tokens": min(max_tokens, int(os.getenv("DAEMON_LOCAL_MAX_TOKENS", "1024"))),
-                                  "temperature": 0.2}
+        llm = self._load(m.key, m.file_path, thinking=is_thinking(m))
+        messages, think = self._messages(m, model, system, prompt, schema)
+        cap = int(os.getenv("DAEMON_LOCAL_MAX_TOKENS", "1024"))
+        answer_tokens = min(max_tokens, cap)  # max_tokens is the caller's budget for the ANSWER
+        t0 = time.monotonic()
+        if think and self._chatml(llm):
+            with self._locks[f"{m.key}|gen"]:
+                try:
+                    text, reasoning, complete, p_tok, c_tok = self._think(llm, m, system, prompt, answer_tokens)
+                except Exception as e:
+                    self.last_error = str(e)[:300]
+                    raise ProviderUnavailable(f"local reasoning failed: {e}") from e
+            if not text:
+                raise ProviderUnavailable(f"{m.key}: no answer after reasoning")
+            return Completion(text, None, "local", m.key, p_tok, c_tok, 0.0, int((time.monotonic() - t0) * 1000), 0, reasoning,
+                              not complete)
+        kwargs: dict[str, Any] = {"messages": messages, "max_tokens": answer_tokens + (thinking_budget() if think else 0),
+                                  "temperature": 0.6 if think else 0.2}
         if schema is not None:
             kwargs["response_format"] = {"type": "json_object", "schema": schema}
-        t0 = time.monotonic()
         with self._locks[f"{m.key}|gen"]:
             try:
                 r = llm.create_chat_completion(**kwargs)
             except Exception as e:
                 self.last_error = str(e)[:300]
                 raise ProviderUnavailable(f"local inference failed: {e}") from e
-        text = r["choices"][0]["message"].get("content") or ""
+        raw = r["choices"][0]["message"].get("content") or ""
+        text, reasoning, finished = split_thinking(raw)
         u = r.get("usage") or {}
+        if not finished or (think and not text):
+            # never hand back half a thought as an answer; the router falls through to the next candidate
+            raise ProviderUnavailable(f"{m.key}: thinking budget exhausted before an answer")
         return Completion(text, _parse_json(text, schema), "local", m.key, int(u.get("prompt_tokens", 0)),
-                          int(u.get("completion_tokens", 0)), 0.0, int((time.monotonic() - t0) * 1000))
+                          int(u.get("completion_tokens", 0)), 0.0, int((time.monotonic() - t0) * 1000), 0, reasoning)
 
     def stream(self, *, model: str, system: str, prompt: str, effort: str, max_tokens: int) -> Iterator[str]:
+        from .library import is_thinking
+
         m = self._resolve(model)
-        llm = self._load(m.key, m.file_path)
+        messages, think = self._messages(m, model, system, prompt, None)
+        if think:  # reasoning is not streamed; the answer arrives once the model has finished thinking
+            yield self.complete(model=model, system=system, prompt=prompt, schema=None, effort=effort, max_tokens=max_tokens).text
+            return
+        llm = self._load(m.key, m.file_path, thinking=is_thinking(m))
         with self._locks[f"{m.key}|gen"]:
-            for chunk in llm.create_chat_completion(messages=[{"role": "system", "content": system}, {"role": "user", "content": prompt}],
-                                                    max_tokens=min(max_tokens, int(os.getenv("DAEMON_LOCAL_MAX_TOKENS", "1024"))),
+            for chunk in llm.create_chat_completion(messages=messages, max_tokens=min(max_tokens, int(os.getenv("DAEMON_LOCAL_MAX_TOKENS", "1024"))),
                                                     temperature=0.2, stream=True):
                 delta = chunk["choices"][0].get("delta", {}).get("content")
                 if delta:
-                    yield delta
+                    yield THINK.sub("", delta) if "</think>" in delta else delta.replace("<think>", "")
 
     def embed(self, texts: list[str], kind: str = "document") -> tuple[str, list[list[float]]]:
         m = self._resolve_embedding()

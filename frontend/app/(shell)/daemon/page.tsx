@@ -66,8 +66,9 @@ function StatusTab({ s, act }: { s: any; act: Act }) {
           <div className="mt-1 text-[11.5px] text-ink-3">Install-time only: {ind.install_time_external.join(" · ")}</div>
         </div>
       </div>
-      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Stat label="Chat model" value={<span className="text-[14px]">{s.active_models.chat ?? "none"}</span>} sub="slot: chat" accent />
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <Stat label="Chat model" value={<span className="text-[14px]">{s.active_models.chat ?? "none"}</span>} sub="standard tier" accent />
+        <Stat label="Deep reasoning" value={<span className="text-[14px]">{s.active_models.deep ?? "none — falls back to chat"}</span>} sub="deep tier · thinks before answering" />
         <Stat label="Eco model" value={<span className="text-[14px]">{s.active_models.eco ?? "none"}</span>} sub="fast / classification" />
         <Stat label="Embeddings" value={<span className="text-[14px]">{s.active_models.embedding ?? "lexical hash (fallback)"}</span>} sub="Archive search" />
         <Stat label="Hardware" value={<span className="text-[14px]">{s.hardware.cores} cores · {s.hardware.ram_total_gb} GB</span>} sub={`${s.hardware.accelerator.toUpperCase()} · llama.cpp ${s.hardware.runtime.llama_cpp ? s.hardware.runtime.llama_cpp_version : "not installed"}`} />
@@ -92,6 +93,11 @@ function StatusTab({ s, act }: { s: any; act: Act }) {
             <Field label="Execution profile">
               <select className={input} value={settings.data.profile} onChange={(e) => patch({ profile: e.target.value })}>
                 {Object.keys(s.profiles).map((p) => <option key={p} value={p}>{p} — {s.profiles[p].summary}</option>)}
+              </select>
+            </Field>
+            <Field label="Deep reasoning: thinking budget (tokens) — more = slower but fewer unfinished thoughts">
+              <select className={input} value={settings.data.local.thinking_tokens ?? 1536} onChange={(e) => patch({ local: { thinking_tokens: Number(e.target.value) } })}>
+                {[512, 1024, 1536, 2048, 3072, 4096, 8192].map((n) => <option key={n} value={n}>{n.toLocaleString()} tokens{n === 1536 ? " (default)" : ""}</option>)}
               </select>
             </Field>
           </div>}
@@ -122,7 +128,7 @@ function ModelsTab({ act }: { act: Act }) {
     const t = setInterval(lib.reload, 2500);
     return () => clearInterval(t);
   }, [lib.data, lib.reload]);
-  const slotFor = (m: any) => (m.kind === "embedding" ? ["embedding"] : ["chat", "eco"]);
+  const slotFor = (m: any) => (m.kind === "embedding" ? ["embedding"] : m.capabilities?.includes("thinking") ? ["deep", "chat"] : ["chat", "eco"]);
   return (
     <Card title="Model library" pad={false} action={<span className="text-[11px] text-ink-3">catalog verified {lib.data?.catalog_verified_at}</span>}>
       {!lib.data ? <div className="p-4"><Empty title="Loading…" /></div> : (
@@ -151,7 +157,7 @@ function ModelsTab({ act }: { act: Act }) {
       )}
       <div className="flex flex-wrap items-center gap-2 border-t border-line p-3 text-[11.5px] text-ink-3">
         <span>Roll back a slot to its previous model:</span>
-        {["chat", "eco", "embedding"].map((sl) => <Button key={sl} onClick={() => act(() => api("/api/daemon/library/rollback", { method: "POST", json: { slot: sl } }), lib.reload)}>{sl}</Button>)}
+        {["chat", "deep", "eco", "embedding"].map((sl) => <Button key={sl} onClick={() => act(() => api("/api/daemon/library/rollback", { method: "POST", json: { slot: sl } }), lib.reload)}>{sl}</Button>)}
         <span className="basis-full">Licences come from each repository&apos;s own model-card metadata; open weights are not automatically unrestricted. Downloads come only from huggingface.co and are refused on any checksum or licence mismatch. Offline installs: <code>POST /api/daemon/library/&lt;key&gt;/import-file</code> with a checksum-matching file. After changing the embedding model, re-embed the Archive.</span>
       </div>
     </Card>
@@ -269,14 +275,14 @@ function BenchTab({ act }: { act: Act }) {
   useEffect(() => { if (!running) return; const t = setInterval(b.reload, 3000); return () => clearInterval(t); }, [running, b.reload]);
   const start = (model: string) => act(() => api("/api/daemon/benchmarks/run", { method: "POST", json: { provider: "local", model } }), b.reload);
   return (
-    <Card title="Model benchmark — cost per successful task" action={<span className="flex gap-2"><Button busy={running} onClick={() => start("chat")}>Run on local chat</Button><Button busy={running} onClick={() => start("eco")}>Run on local eco</Button></span>} pad={false}>
+    <Card title="Model benchmark — cost per successful task" action={<span className="flex flex-wrap gap-2"><Button busy={running} onClick={() => start("deep")}>Run on local deep</Button><Button busy={running} onClick={() => start("chat")}>Run on local chat</Button><Button busy={running} onClick={() => start("eco")}>Run on local eco</Button></span>} pad={false}>
       {b.data?.runs?.length ? <Table head={["Model", "Status", "Accuracy", "By skill", "Avg latency", "API cost", "Energy (est.)", "Cost / success", "When"]}>
         {b.data.runs.map((r: any) => <tr key={r.id} className="align-top"><td><div className="whitespace-nowrap font-mono text-[12px]">{r.model}</div><div className="text-[11px] text-ink-3">{r.provider}</div></td>
           <td><StatusBadge status={r.status} /></td><td className="num">{r.summary?.accuracy !== undefined ? `${Math.round(r.summary.accuracy * 100)}% (${r.summary.passed}/${r.summary.tasks})` : "—"}</td>
           <td className="min-w-[14rem] max-w-[24rem] whitespace-normal text-[11px] text-ink-3">{r.summary?.by_skill && Object.entries(r.summary.by_skill).map(([k, v]: any) => <span key={k} className={`mr-2 inline-block whitespace-nowrap ${v < 0.5 ? "text-warning" : ""}`}>{k.replaceAll("_", " ")} {Math.round(v * 100)}%</span>)}</td>
           <td className="num">{r.summary?.avg_latency_ms ?? "—"} ms</td><td className="num">{usd(r.summary?.api_cost_usd)}</td><td className="num">{r.summary?.energy_wh_estimate ?? "—"} Wh</td>
           <td className="num">{usd(r.summary?.cost_per_success_usd, 6)}</td><td className="text-ink-3">{ago(r.started_at)}</td></tr>)}
-      </Table> : <div className="p-4"><Empty title="No benchmark runs yet">Twelve graded tasks: classification, Swedish, structured output, instruction adherence, reasoning, abstention, context, coding (static check — generated code is never run), tool-call format.</Empty></div>}
+      </Table> : <div className="p-4"><Empty title="No benchmark runs yet">Seventeen graded tasks: classification, structured output, instruction adherence, reasoning, seven multi-step deep-reasoning problems, abstention, context, coding (static check — generated code is never run), tool-call format.</Empty></div>}
       <p className="p-3 text-[11.5px] text-ink-3">A cheap model that fails is not cheap: cost per success = (API cost + estimated electricity) ÷ passed tasks. External models can be benchmarked via the API with explicit spend authorisation.</p>
     </Card>
   );

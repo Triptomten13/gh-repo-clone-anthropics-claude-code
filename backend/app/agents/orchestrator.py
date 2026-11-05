@@ -125,7 +125,9 @@ class Orchestrator:
         t = Task(type=task_type, agent_id=agent_id, parent_id=parent.id if parent else None, depth=depth,
                  payload=payload, dedupe_key=key, priority=priority, requested_by=requested_by,
                  depends_on=list(depends_on or []),
-                 max_attempts=s.default_max_attempts, timeout_s=s.default_task_timeout_s)
+                 max_attempts=s.default_max_attempts,
+                 timeout_s=max(s.default_task_timeout_s, s.deep_task_timeout_s) if getattr(self.agents.get(agent_id), "tier", "") == "deep"
+                 else s.default_task_timeout_s)
         db.add(t)
         db.flush()
         gov.bus.publish({"type": "task", "id": t.id, "task_type": task_type, "agent": agent_id, "status": t.status})

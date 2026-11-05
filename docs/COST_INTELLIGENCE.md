@@ -14,17 +14,24 @@
 | Quota intelligence | Requests/tokens per provider, rate-limit events, exponential backoff (5 s → 15 min, or the server's retry-after), admin pause/resume; a limited provider is skipped, never worked around | `daemon/quota.py` |
 | Spending limits | Daily (default `DAILY_COST_LIMIT_USD`), monthly (default $50) and per-provider caps checked **before** every paid call with a conservative estimate; if spend cannot be verified the call is not made; blocked attempts are recorded as `spend_blocked` | `quota.spend_check` |
 | Token reduction | Response cache (exact request hash, TTL, actual saving recorded), provider-side prompt caching (`cache_control` on Anthropic calls; cache reads/writes priced at 0.1×/1.25× input), retrieval instead of whole documents, budgeted context assembly with dedupe, structured outputs, local preprocessing/classification, versioned reusable system prompts | `daemon/gateway.py`, `ai/providers.py`, `daemon/prompts.py` |
-| Model quality evaluation | 12 graded tasks (classification, Swedish ×2, structured output, instruction adherence ×2, reasoning ×2, abstention, context retention, coding — static check only, tool-call format); accuracy by skill, latency, API cost, estimated energy, **cost per successful task** | `daemon/bench.py` |
+| Model quality evaluation | 17 graded tasks: classification, structured output, instruction adherence ×2, reasoning ×2, **7 multi-step deep-reasoning problems** (VAT, margin, time arithmetic, ordering, letter counting, the mislabelled-boxes puzzle, fraction ordering), abstention, context retention, coding (static check only), tool-call format; accuracy by skill, latency, API cost, estimated energy, **cost per successful task**, how often the thinking budget ran out | `daemon/bench.py` |
 | Fallback & resilience | Local → alternative local → LAN workers → authorised external; circuit breakers; refusals never re-routed; no permitted resource ⇒ the task is **blocked with the reason** (never silently charged) | router + orchestrator |
 | Dashboard | Total external cost, local share, local energy (estimate), tokens, cached tokens, failed requests, actual vs estimated savings, monthly forecast, cost per agent / workflow / project / model, calls per day local vs external, quality from benchmarks | DAEMON CORE → Costs |
 | Autonomous optimisation | Proposals: premium tier for short answers, repeated paid prompts (enable cache), work a benchmarked local model can do, rate-limit trouble, oversized contexts, missing local model, stale provider facts. Deduplicated. **Approval records the decision; nothing changes spending, credentials, accounts or terms automatically** | `daemon/optimizer.py` |
 
-## Measured on this machine (2026-11-05)
+## Measured on this machine (2026-11-05, 17-task suite)
 
-| Model | Accuracy | Avg latency | API cost | Cost per success (energy estimate, 65 W, $0.20/kWh) | Failed |
+| Model (slot) | Accuracy | Deep reasoning | Avg latency | API cost | Cost per success (energy estimate, 65 W, $0.20/kWh) |
 |---|---|---|---|---|---|
-| qwen2.5-0.5b-instruct-q4_k_m (local) | 10/12 (83 %) | 0.70 s | $0 | ≈ $0.000003 | both Swedish tasks |
-| qwen2.5-1.5b-instruct-q4_k_m (local) | 9/12 (75 %) | 1.27 s | $0 | ≈ $0.000006 | both Swedish tasks, ceiling-division word problem |
+| qwen2.5-0.5b-instruct-q4_k_m (eco) | 11/17 (65 %) | 1/7 | 0.4 s | $0 | ≈ $0.000002 |
+| qwen2.5-1.5b-instruct-q4_k_m (chat) | 11/17 (65 %) | 2/7 | 0.9 s | $0 | ≈ $0.000005 |
+| **qwen3-4b-q4_k_m (deep, thinking)** | **17/17 (100 %)** | **7/7** | 58 s | $0 | ≈ $0.00021 |
+
+The routing follows from this: fast/standard work stays on the small models (they pass every non-reasoning task in well
+under a second); multi-step problems go to the reasoning model, which is ~60× slower but the only one that solves them.
+The reasoning model samples at temperature 0.6, so results vary between runs — in a separate one-off run it answered
+the mislabelled-boxes puzzle wrongly after hitting its thinking budget (and flagged that). One benchmark run is a sample,
+not a guarantee.
 
 No external model was benchmarked: that spends money and needs an explicit `allow_spend: true` from an operator, and no
 key is configured in this environment. The energy figure is an estimate, not a measurement — set your own wattage and

@@ -58,6 +58,8 @@ class RouterResult:
     provider: str = ""
     latency_ms: int = 0
     attempts: list[dict] = field(default_factory=list)
+    reasoning: str = ""
+    reasoning_truncated: bool = False
 
 
 def default_providers() -> dict[str, Provider]:
@@ -140,7 +142,8 @@ class LLMRouter:
             quota.note_success(prov_id, c.input_tokens + c.output_tokens)
             attempts.append({**rec, "status": "ok", "model": c.model, "input_tokens": c.input_tokens, "output_tokens": c.output_tokens,
                              "cost_usd": c.cost_usd, "latency_ms": c.latency_ms})
-            return RouterResult(c.text, c.data, c.model, c.input_tokens, c.output_tokens, c.cost_usd, c.provider, c.latency_ms, attempts)
+            return RouterResult(c.text, c.data, c.model, c.input_tokens, c.output_tokens, c.cost_usd, c.provider, c.latency_ms, attempts,
+                                getattr(c, "reasoning", ""), getattr(c, "reasoning_truncated", False))
         raise LLMUnavailable(f"no provider could serve tier '{tier}' "
                              f"({'; '.join(a['provider'] + ':' + a['status'] for a in attempts) or 'none configured'})", attempts)
 

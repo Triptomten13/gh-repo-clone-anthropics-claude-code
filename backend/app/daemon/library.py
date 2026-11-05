@@ -17,7 +17,8 @@ from ..governance import core as gov
 from ..models import LocalModel
 from . import catalog, hardware, state
 
-SLOTS = {"chat": "chat", "eco": "chat", "embedding": "embedding"}
+SLOTS = {"chat": "chat", "eco": "chat", "deep": "chat", "embedding": "embedding"}
+THINKING_CTX = 8192  # thinking models need room for their reasoning
 
 
 class LibraryError(RuntimeError):
@@ -53,14 +54,21 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
+def is_thinking(m: Any) -> bool:
+    return "thinking" in (getattr(m, "capabilities", None) or [])
+
+
+def ctx_for(m: Any, st: dict[str, Any]) -> int:
+    return max(st["local"]["n_ctx"], THINKING_CTX) if is_thinking(m) else st["local"]["n_ctx"]
+
+
 def listing(db: Session) -> list[dict[str, Any]]:
     ensure_rows(db)
     snap = hardware.snapshot()
     st = state.load(db)
-    n_ctx = st["local"]["n_ctx"]
     out = []
     for m in db.scalars(select(LocalModel).order_by(LocalModel.kind, LocalModel.size_bytes)).all():
-        f = hardware.fit(m.size_bytes, n_ctx, snap)
+        f = hardware.fit(m.size_bytes, ctx_for(m, st), snap)
         slots = [s for s, k in st["active"].items() if k == m.key]
         out.append({c.key: getattr(m, c.key) for c in m.__table__.columns} | {
             "fit": f, "active_slots": slots,
@@ -97,7 +105,7 @@ def install(db: Session, key: str, actor: str, *, client: httpx.Client | None = 
         raise LibraryError("only catalogued models can be downloaded; register other files with import-file")
     ensure_rows(db)
     m = get(db, key)
-    f = hardware.fit(entry.size_bytes, st["local"]["n_ctx"])
+    f = hardware.fit(entry.size_bytes, ctx_for(entry, st))
     if f["verdict"] == "does_not_fit" or not f["disk_ok"]:
         raise LibraryError(f"model does not fit this machine ({f})")
     m.status, m.error, m.progress_bytes = "downloading", "", 0
@@ -169,7 +177,7 @@ def import_file(db: Session, key: str, path: str, actor: str) -> LocalModel:
 
 def activate(db: Session, slot: str, key: str | None, actor: str) -> dict[str, Any]:
     if slot not in SLOTS:
-        raise LibraryError(f"unknown slot {slot!r} (chat | eco | embedding)")
+        raise LibraryError(f"unknown slot {slot!r} (chat | eco | deep | embedding)")
     st = state.load(db)
     if key is not None:
         m = get(db, key)
@@ -177,7 +185,7 @@ def activate(db: Session, slot: str, key: str | None, actor: str) -> dict[str, A
             raise LibraryError(f"{key} is not installed")
         if m.kind != SLOTS[slot]:
             raise LibraryError(f"{key} is a {m.kind} model; slot {slot} needs {SLOTS[slot]}")
-        f = hardware.fit(m.size_bytes, st["local"]["n_ctx"])
+        f = hardware.fit(m.size_bytes, ctx_for(m, st))
         if f["verdict"] not in ("fits", "tight"):
             raise LibraryError(f"{key} cannot run on this hardware ({f['verdict']})")
     prev = st["active"].get(slot)
@@ -219,7 +227,7 @@ def resolve(db: Session | None, slot: str) -> LocalModel | None:
     from .. import db as dbmod
 
     st = state.load(db)
-    order = {"chat": ["chat", "eco"], "eco": ["eco", "chat"], "embedding": ["embedding"]}[slot]
+    order = {"chat": ["chat", "eco"], "eco": ["eco", "chat"], "deep": ["deep"], "embedding": ["embedding"]}[slot]
     s = db or dbmod.SessionLocal()
     try:
         for sl in order:

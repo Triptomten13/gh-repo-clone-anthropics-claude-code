@@ -23,7 +23,7 @@ PROFILE_INFO: dict[str, dict[str, Any]] = {
     "OFFLINE": {"summary": "local and LAN workers only — external providers are never called", "max_tokens": None},
     "EMERGENCY": {"summary": "smallest local model, short outputs, nothing external — for degraded hardware or incidents", "max_tokens": 256},
 }
-LOCAL_TIER_SLOTS = {"fast": ["eco", "chat"], "standard": ["chat", "eco"], "deep": ["chat"], "local": ["chat", "eco"]}
+LOCAL_TIER_SLOTS = {"fast": ["eco", "chat"], "standard": ["chat", "eco"], "deep": ["deep", "chat"], "local": ["chat", "eco"]}
 PRIVATE = {"private", "sensitive", "personal"}
 
 

@@ -30,8 +30,26 @@ import httpx
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
-MODELS = {"chat": "qwen2.5-1.5b-instruct-q4_k_m", "eco": "qwen2.5-0.5b-instruct-q4_k_m", "embedding": "nomic-embed-text-v1.5-q8_0",
-          "replacement": "smollm2-360m-instruct-q8_0"}
+MODELS = {"chat": "qwen2.5-1.5b-instruct-q4_k_m", "eco": "qwen2.5-0.5b-instruct-q4_k_m", "deep": os.getenv("DEEP_MODEL", "qwen3-4b-q4_k_m"),
+          "embedding": "nomic-embed-text-v1.5-q8_0", "replacement": "smollm2-360m-instruct-q8_0"}
+
+
+def last_number(text: str) -> float | None:
+    import re
+
+    nums = re.findall(r"-?\d+(?:\.\d+)?", (text or "").replace(",", ""))
+    return float(nums[-1]) if nums else None
+
+
+def deep_check(rec: Recorder, c: httpx.Client, label: str, question: str, expected: float, samples: int = 1) -> None:
+    t = time.time()
+    r = c.post("/api/ai/reason", json={"question": question, "samples": samples}).json()
+    rec.check(label, r.get("provider") == "local" and r.get("model") == MODELS["deep"] and last_number(r.get("answer", "")) == expected
+              and bool(r.get("reasoning")),
+              {"model": r.get("model"), "answer": r.get("answer") or "", "expected": expected, "found": last_number(r.get("answer", "")),
+               "reasoning_complete": r.get("reasoning_complete"), "reasoning_tail": (r.get("reasoning") or "")[-400:],
+               "self_consistency": r.get("self_consistency"),
+               "seconds": round(time.time() - t, 1)})
 ADMIN = ("admin@independence.test", "independence-admin-pw")
 OPERATOR = ("operator@independence.test", "independence-operator-pw")
 VIEWER = ("viewer@independence.test", "independence-viewer-pw")
@@ -161,7 +179,7 @@ def setup(work: Path) -> None:
             path = models_dir / lib[key]["source_file"]
             r = c.post(f"/api/daemon/library/{key}/import-file", json={"path": str(path)})
             r.raise_for_status()
-        for slot in ("chat", "eco", "embedding"):
+        for slot in ("chat", "eco", "deep", "embedding"):
             c.post("/api/daemon/library/activate", json={"slot": slot, "key": MODELS[slot]}).raise_for_status()
         c.post("/api/demo").raise_for_status()  # synthetic, labelled sample commerce data so agents have something to work on
     finally:
@@ -188,6 +206,11 @@ def test_a(work: Path) -> dict[str, Any]:
                                             "json_schema": {"type": "object", "properties": {"product": {"type": "string"}, "price": {"type": "number"}},
                                                             "required": ["product", "price"]}, "max_tokens": 60}).json()
         rec.check("structured generation served locally", r.get("provider") == "local" and isinstance(r.get("data"), dict), r.get("data"))
+        # self-consistency (the recommended mode for answers that matter): a single sample of this problem answered -40 in
+        # two earlier runs — see docs/independence_runs/ and docs/INDEPENDENCE_TESTS.md
+        deep_check(rec, c, "deep reasoning on the local reasoning model, self-consistency ×3 (multi-step margin problem)",
+                   "A product costs 80 SEK to make and sells for 200 SEK. The marketplace takes 15% of the sale price plus a fixed fee of "
+                   "10 SEK per order. What is the profit per unit in SEK? End your answer with the number.", 80, samples=3)
         run = c.post("/api/gsus/runs", json={"objective": "Create brand concepts for the winter commuter pannier", "mode": "creative"}).json()
         rec.check("G-sus orchestrated run completed using the local model", run.get("status") == "completed" and run.get("ai_calls", 0) > 0,
                   {"status": run.get("status"), "ai_calls": run.get("ai_calls"), "ai_cost_usd": run.get("ai_cost_usd")})
@@ -215,9 +238,11 @@ def tests_offline(work: Path) -> list[dict[str, Any]]:
         rec.check("offline mode on: no external provider in any routing chain", st["offline_mode"] and not ext_in_chain,
                   {t: ch["excluded"] for t, ch in st["chains"].items()})
         t = time.time()
-        r = admin.post("/api/ai/chat", json={"messages": [{"role": "user", "content": "Vad är Demonkoncernen AB? Svara kort."}], "max_tokens": 80}).json()
+        r = admin.post("/api/ai/chat", json={"messages": [{"role": "user", "content": "What is Demonkoncernen AB? Answer briefly."}], "max_tokens": 80}).json()
         rec.check("local model processes prompts offline", r.get("provider") == "local" and bool(r.get("reply")),
                   {"model": r.get("model"), "reply": (r.get("reply") or "")[:160], "seconds": round(time.time() - t, 1)})
+        deep_check(rec, admin, "deep reasoning works offline (multi-step VAT problem)",
+                   "A lantern costs 240 SEK including 25% VAT. What is the price excluding VAT, in SEK? End your answer with the number.", 192)
         r = admin.post("/api/ai/agents/execute", json={"type": "system.self_evaluate", "payload": {}}).json()
         rec.check("an agent executes a local task offline", r.get("status") in ("succeeded",), {"agent": r.get("agent_id"), "status": r.get("status"), "error": r.get("error")})
         m = admin.post("/api/memory", json={"key": "offline-note", "content": "The offline test ran inside a network namespace.", "scope": "long_term"})
@@ -339,7 +364,7 @@ def test_f(work: Path) -> dict[str, Any]:
         c = client(*ADMIN)
         st = c.get("/api/ai/status").json()
         rec.check("configuration recovered (offline mode, profile)", st["offline_mode"] and st["profile"] == "ECO", {"offline": st["offline_mode"], "profile": st["profile"]})
-        rec.check("active models recovered", st["active_models"]["chat"] == MODELS["chat"] and st["active_models"]["embedding"] == MODELS["embedding"], st["active_models"])
+        rec.check("active models recovered", all(st["active_models"][k] == MODELS[k] for k in ("chat", "eco", "deep", "embedding")), st["active_models"])
         r = c.post("/api/ai/chat", json={"messages": [{"role": "user", "content": "Say OK."}], "max_tokens": 10}).json()
         rec.check("local model reloads and answers after restart", r.get("provider") == "local", {"model": r.get("model"), "reply": r.get("reply")})
         mem = c.get("/api/memory").json()

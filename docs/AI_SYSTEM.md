@@ -33,11 +33,21 @@ How models are chosen, called, traced and evaluated. Sovereign/local operation i
 |---|---|
 | fast | local eco → local chat → (Ollama/workers) → Claude Haiku 5.5 |
 | standard | local chat → local eco → (Ollama/workers) → Claude Sonnet 5.5 |
-| deep | Claude Opus 5.5 → workers → local chat |
+| deep | Claude Opus 5.5 (only if authorised) → workers → **local deep (reasoning model, thinks first)** → local chat |
 
 External entries are dropped in offline mode, for `private`/`sensitive` requests, when external providers are switched
 off, when a provider is paused/backing off, or when a spend limit would be exceeded. `MODEL_CHAIN_<TIER>` overrides the
 order (still subject to the same filters). Live chains: `GET /api/ai/status`.
+
+## Deep reasoning
+
+The deep tier is served locally by a reasoning model in the `deep` slot (Qwen3 4B by default on CPU-only hosts). It
+thinks before answering, within a hard budget (`local.thinking_tokens`, DAEMON settings); if the budget runs out it is
+made to conclude, and the result is flagged `reasoning_complete: false`. `POST /api/ai/reason` returns the answer, the
+model's working notes (separately, labelled unverified), with `samples: 3` a self-consistency vote over independent
+reasoning samples (agreement reported; no majority ⇒ flagged unreliable) and, with `verify: true`, an independent
+answer from a second model. In the UI: G-sus Chamber → Deep reasoning. In OFFLINE and ECO profiles the deep tier never leaves the machine;
+in BALANCED/DEEP an authorised Claude Opus 5.5 key is tried first.
 
 ## Evaluations
 

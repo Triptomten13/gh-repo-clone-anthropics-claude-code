@@ -15,13 +15,13 @@ DEFAULTS: dict[str, Any] = {
     "offline_mode": False,          # True ⇒ no external provider is ever called, not even as a fallback
     "profile": "BALANCED",
     "external_allowed": True,       # master switch for paid/external providers (offline_mode overrides)
-    "active": {"chat": None, "eco": None, "embedding": None},   # LocalModel.key per slot
+    "active": {"chat": None, "eco": None, "deep": None, "embedding": None},   # LocalModel.key per slot
     "history": [],                  # activation history for rollback: {slot, previous, new, at, by}
     "limits": {"daily_usd": None, "monthly_usd": 50.0, "per_provider": {}},  # None daily ⇒ use DAILY_COST_LIMIT_USD
     "paused_providers": [],
     "cache": {"enabled": True, "ttl_s": 86400},
     "energy": {"watts": 65.0, "usd_per_kwh": 0.20},  # ESTIMATE inputs for local inference cost; edit to match your hardware/tariff
-    "local": {"n_threads": None, "n_ctx": 4096},
+    "local": {"n_threads": None, "n_ctx": 4096, "thinking_tokens": 1536},  # thinking budget for reasoning models
 }
 
 _lock = threading.Lock()

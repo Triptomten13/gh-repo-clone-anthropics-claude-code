@@ -1,7 +1,7 @@
 {
-  "ran_at": "2026-11-05T14:55:54Z",
+  "ran_at": "2026-11-05T17:26:04Z",
   "hardware": {
-    "cpu": "x86_64",
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
     "cores": 4,
     "ram_gb": 16.9,
     "gpu": "none",
@@ -13,6 +13,7 @@
   "models": {
     "chat": "qwen2.5-1.5b-instruct-q4_k_m",
     "eco": "qwen2.5-0.5b-instruct-q4_k_m",
+    "deep": "qwen3-4b-q4_k_m",
     "embedding": "nomic-embed-text-v1.5-q8_0",
     "replacement": "smollm2-360m-instruct-q8_0"
   },
@@ -48,7 +49,7 @@
           "evidence": {
             "model": "qwen2.5-1.5b-instruct-q4_k_m",
             "reply": "I am G-SUS, the intelligence orchestrator of Demonkoncernen AB.",
-            "seconds": 9.6
+            "seconds": 6.5
           }
         },
         {
@@ -63,8 +64,33 @@
           "check": "structured generation served locally",
           "ok": true,
           "evidence": {
-            "product": "The Aurora lamp",
+            "product": "Aurora lamp",
             "price": 49.0
+          }
+        },
+        {
+          "check": "deep reasoning on the local reasoning model, self-consistency \u00d73 (multi-step margin problem)",
+          "ok": true,
+          "evidence": {
+            "model": "qwen3-4b-q4_k_m",
+            "answer": "The profit per unit is calculated as follows:  \n\n1. **Revenue per unit**: Sale price = 200 SEK.  \n2. **Marketplace fees**:  \n   - 15% of 200 SEK = 30 SEK.  \n   - Fixed fee = 10 SEK.  \n   - Total fees = 30 + 10 = **40 SEK**.  \n3. **Cost to produce**: 80 SEK.  \n4. **Profit per unit**:  \n   $ 200 \\text{ SEK (sale price)} - 40 \\text{ SEK (fees)} - 80 \\text{ SEK (cost)} = 80 \\text{ SEK} $.  \n\n**Answer**: 80 SEK.",
+            "expected": 80,
+            "found": 80.0,
+            "reasoning_complete": true,
+            "reasoning_tail": " per unit is 200 - (15% of 200) - 10 = 200 - 30 -10 = 160? Wait, no, wait. Wait, the total revenue is the sale price, which is 200 SEK, but the marketplace takes 15% of that, so the seller gets 85% of 200, which is 170 SEK. Then subtract the fixed fee of 10 SEK. So 170 -10 = 160. Then subtract the production cost of 80 SEK. So 160 -80 = 80. So yes, that's correct. So the profit per unit is 80 SEK.",
+            "self_consistency": {
+              "samples": 3,
+              "planned": 3,
+              "finals": [
+                "num:-40",
+                "num:80",
+                "num:80"
+              ],
+              "agreement": "2/3",
+              "majority": true,
+              "note": "majority of independent samples of the same model \u2014 raises confidence, does not prove correctness"
+            },
+            "seconds": 303.3
           }
         },
         {
@@ -82,7 +108,7 @@
           "evidence": []
         }
       ],
-      "duration_s": 41.5
+      "duration_s": 337.9
     },
     {
       "test": "B",
@@ -117,8 +143,22 @@
           "ok": true,
           "evidence": {
             "model": "qwen2.5-1.5b-instruct-q4_k_m",
-            "reply": "Demonkoncernen AB \u00e4r en teknologisk firm.",
-            "seconds": 6.0
+            "reply": "Demonkoncernen AB is an entity that hosts a system known as G-SUS, which is an intelligence. The Archive is the memory of G-SUS, and the agents are the workforc",
+            "seconds": 8.5
+          }
+        },
+        {
+          "check": "deep reasoning works offline (multi-step VAT problem)",
+          "ok": true,
+          "evidence": {
+            "model": "qwen3-4b-q4_k_m",
+            "answer": "The total price of 240 SEK includes 25% VAT. To find the pre-VAT price, divide the total by 1.25 (since VAT is 25% of the original price).  \n\n**Calculation**:  \n240 SEK \u00f7 1.25 = **192 SEK**.  \n\nAssumption: The VAT rate is 25%, and no other taxes are involved.  \n\n**Answer**: 192",
+            "expected": 192,
+            "found": 192.0,
+            "reasoning_complete": true,
+            "reasoning_tail": "ed by 1.25 equals 192. So the price excluding VAT should be 192 SEK.\n\nWait, but I should make sure that the VAT is indeed 25% and that there's no other taxes involved. The problem states that the total is 240 SEK including 25% VAT, so that's the only tax considered here. The context is empty, so there's no additional information. Therefore, the calculation should be correct. The answer is 192 SEK.",
+            "self_consistency": null,
+            "seconds": 79.7
           }
         },
         {
@@ -148,7 +188,7 @@
           "evidence": []
         }
       ],
-      "duration_s": 6.5
+      "duration_s": 88.6
     },
     {
       "test": "C",
@@ -179,7 +219,7 @@
               "input_tokens": 87,
               "output_tokens": 30,
               "cost_usd": 0.0,
-              "latency_ms": 1558,
+              "latency_ms": 1369,
               "attempts": [
                 {
                   "provider": "anthropic",
@@ -197,9 +237,11 @@
                   "input_tokens": 87,
                   "output_tokens": 30,
                   "cost_usd": 0.0,
-                  "latency_ms": 1558
+                  "latency_ms": 1369
                 }
-              ]
+              ],
+              "reasoning": "",
+              "reasoning_truncated": false
             },
             "note": "502 = the small model returned a label outside the allowed set; the API refuses to invent one"
           }
@@ -218,11 +260,12 @@
           "evidence": {
             "chat": "qwen2.5-1.5b-instruct-q4_k_m",
             "eco": "qwen2.5-0.5b-instruct-q4_k_m",
+            "deep": "qwen3-4b-q4_k_m",
             "embedding": "nomic-embed-text-v1.5-q8_0"
           }
         }
       ],
-      "duration_s": 23.3
+      "duration_s": 21.3
     },
     {
       "test": "D",
@@ -315,7 +358,7 @@
           "evidence": []
         }
       ],
-      "duration_s": 30.2
+      "duration_s": 21.9
     },
     {
       "test": "F",
@@ -336,6 +379,7 @@
           "evidence": {
             "chat": "qwen2.5-1.5b-instruct-q4_k_m",
             "eco": "qwen2.5-0.5b-instruct-q4_k_m",
+            "deep": "qwen3-4b-q4_k_m",
             "embedding": "nomic-embed-text-v1.5-q8_0"
           }
         },
@@ -366,7 +410,7 @@
           }
         }
       ],
-      "duration_s": 11.8
+      "duration_s": 9.9
     },
     {
       "test": "G",
