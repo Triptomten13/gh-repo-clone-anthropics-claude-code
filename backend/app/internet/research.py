@@ -84,6 +84,10 @@ def _package_name(objective: str) -> str | None:
 
 
 def _fetch(src: str, q: str, k: int, objective: str) -> list[dict[str, Any]]:
+    return S.sanitize(_fetch_raw(src, q, k, objective))
+
+
+def _fetch_raw(src: str, q: str, k: int, objective: str) -> list[dict[str, Any]]:
     fn = S.REGISTRY[src]
     if src in ("pypi", "osv"):
         name = _package_name(objective)
@@ -144,7 +148,7 @@ def _synthesize(db: Session, objective: str, items: list[dict[str, Any]]) -> tup
     """Local-model synthesis citing [n] — only sources that exist may be cited; otherwise fall back to extractive."""
     from ..ai.llm import get_provider
     from ..daemon import gateway
-    from ..security.untrusted import wrap
+    from ..security.untrusted import GUARD, wrap
 
     if getattr(get_provider(), "name", "none") == "none":
         return None
@@ -153,7 +157,7 @@ def _synthesize(db: Session, objective: str, items: list[dict[str, Any]]) -> tup
               "sources. Put the source number in brackets after each claim, e.g. [2]. If the sources do not answer the question, say "
               "exactly what is missing. Do not add facts that are not in the sources.")
     try:
-        r = gateway.complete(db, system="You write grounded research summaries. Never invent facts or citations.", prompt=prompt,
+        r = gateway.complete(db, system="You write grounded research summaries. Never invent facts or citations. " + GUARD, prompt=prompt,
                              tier="standard", max_tokens=600, purpose="research.synthesis", workflow="research")
     except Exception:
         return None

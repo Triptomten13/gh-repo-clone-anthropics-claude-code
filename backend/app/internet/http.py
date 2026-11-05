@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import hashlib
+import ipaddress
+import os
+import socket
 import threading
 import time
 import urllib.robotparser
@@ -36,12 +39,54 @@ _paused_until: dict[str, float] = {}  # host → time; set from Retry-After so n
 INLINE_WAIT_S = 5.0
 
 
+_resolve = socket.getaddrinfo  # injectable for tests
+
+
+def _host_ok(host: str) -> str | None:
+    """None if every address the host resolves to is public; otherwise the reason it is refused."""
+    if host in ("localhost", "") or host.endswith((".localhost", ".local", ".internal")):
+        return "local host name"
+    try:
+        addrs = [ipaddress.ip_address(host)]
+    except ValueError:
+        try:
+            addrs = [ipaddress.ip_address(a[4][0].split("%")[0]) for a in _resolve(host, None)]
+        except (socket.gaierror, UnicodeError):
+            # cannot resolve here: behind an egress proxy the proxy resolves (and enforces its own policy); without one the
+            # connection would fail anyway
+            return None if (os.getenv("HTTPS_PROXY") or os.getenv("https_proxy")) else "host does not resolve"
+    bad = [str(a) for a in addrs if not a.is_global or a.is_multicast]
+    return f"resolves to a non-public address ({', '.join(bad[:3])})" if bad else None
+
+
+def guard_url(url: str) -> None:
+    """SSRF guard for EVERY research request and every redirect hop: http(s) only, public addresses only.
+
+    Research traffic must never reach this host, the LAN or cloud metadata endpoints (169.254.169.254), whoever configured
+    the URL and whatever a remote server redirects to. Residual risk: DNS re-binding between this check and the connect.
+    """
+    u = urlparse(url)
+    if u.scheme not in ("http", "https"):
+        raise FetchError(f"refused: scheme '{u.scheme}' (only http/https)")
+    host = (u.hostname or "").lower()
+    why = cache.get("ssrf-guard", 60, maxsize=1024).get_or_set(host, lambda: _host_ok(host) or "")
+    if why:
+        telemetry.event("request_refused", host=host[:100], reason=why)
+        raise FetchError(f"refused: {host} {why}")
+
+
+def _make_client(transport: httpx.BaseTransport | None = None) -> httpx.Client:
+    return httpx.Client(timeout=httpx.Timeout(15, connect=8), follow_redirects=True, max_redirects=5, transport=transport,
+                        headers={"User-Agent": USER_AGENT, "Accept-Encoding": "gzip"},
+                        limits=httpx.Limits(max_connections=16, max_keepalive_connections=8),
+                        event_hooks={"request": [lambda req: guard_url(str(req.url))]})  # runs again on each redirect hop
+
+
 def client() -> httpx.Client:
     global _client
     with _lock:
         if _client is None:
-            _client = httpx.Client(timeout=httpx.Timeout(15, connect=8), follow_redirects=True, headers={"User-Agent": USER_AGENT, "Accept-Encoding": "gzip"},
-                                   limits=httpx.Limits(max_connections=16, max_keepalive_connections=8))
+            _client = _make_client()
         return _client
 
 

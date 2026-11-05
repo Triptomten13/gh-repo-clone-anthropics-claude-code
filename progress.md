@@ -15,7 +15,7 @@
 | Backup / restore | round-trip + tamper refusal tested (docs/BACKUP_RECOVERY.md) |
 | Docs restructure | docs/ holds architecture, AI system, knowledge, agents, security, design system, decisions, testing, roadmap, DAEMON, cost, install, backup |
 
-Totals: 155 backend tests pass; ruff clean; frontend type-checks and builds (30 routes); migrations 0001–0005 verified
+Totals: 169 backend tests pass; ruff clean; frontend type-checks and builds (30 routes); migrations 0001–0005 verified
 upgrade/downgrade/upgrade on SQLite and PostgreSQL; PostgreSQL smoke passes; Independence Tests A–G pass
 (2026-11-05T20:27Z, after the HYPERINTELLIGENCE changes).
 

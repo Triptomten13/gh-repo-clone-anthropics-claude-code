@@ -221,7 +221,10 @@ def archive_patch(did: int, body: DocPatch, db: Session = Depends(get_db), user:
         raise HTTPException(422, "invalid evidence_class")
     for k, v in ch.items():
         setattr(d, k, v)
-    gov.audit(db, user.email, "archive.update", f"document:{did}", fields=sorted(ch))
+    from ..daemon import semantic_cache
+
+    purged = semantic_cache.purge_document(db, did)  # cached answers carry the old title / evidence class
+    gov.audit(db, user.email, "archive.update", f"document:{did}", fields=sorted(ch), cache_purged=purged)
     db.commit()
     return _doc_out(d, db)
 
@@ -237,9 +240,12 @@ def archive_delete(did: int, confirm: bool = False, db: Session = Depends(get_db
     db.query(DocumentRelation).filter((DocumentRelation.source_id == did) | (DocumentRelation.target_id == did)).delete(synchronize_session=False)
     if d.file_path:
         Path(d.file_path).unlink(missing_ok=True)
+    from ..daemon import semantic_cache
+
+    purged = semantic_cache.purge_document(db, did)  # quoted chunks must not survive deletion inside cached answers
     title = d.title
     db.delete(d)
-    gov.audit(db, user.email, "archive.delete", f"document:{did}", title=title)
+    gov.audit(db, user.email, "archive.delete", f"document:{did}", title=title, cache_purged=purged)
     db.commit()
     return {"deleted": did}
 

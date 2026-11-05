@@ -25,6 +25,19 @@ def _clean(s: str | None, n: int = 1500) -> str:
     return re.sub(r"\s+", " ", s).strip()[:n]
 
 
+def safe_url(u: Any) -> str:
+    """Links shown to users and stored as provenance: absolute http(s) only (no javascript:, data:, file: …)."""
+    u = str(u or "").strip()
+    return u if re.match(r"^https?://[^\s/]+", u, re.I) and not re.search(r"[\s<>\"]", u) else ""
+
+
+def sanitize(items: list[Item]) -> list[Item]:
+    """Applied to every connector's output before anything is stored, ranked or rendered."""
+    for it in items:
+        it["url"] = safe_url(it.get("url"))
+    return items
+
+
 def wikipedia(q: str, k: int = 3) -> list[Item]:
     api = "https://en.wikipedia.org/w/api.php"
     hits = get_json(api, params={"action": "query", "list": "search", "srsearch": q, "srlimit": k, "format": "json"})["query"]["search"]

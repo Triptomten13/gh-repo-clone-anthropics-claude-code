@@ -141,9 +141,17 @@ class MonitorIn(BaseModel):
     name: str = Field(min_length=2, max_length=128)
     purpose: str = Field(min_length=3, max_length=500)
     query: str = Field(min_length=2, max_length=512)
-    sources: list[Literal["wikipedia", "arxiv", "crossref", "github", "hn", "pypi", "osv", "nvd", "hf", "rss"]] = ["hn"]
+    sources: list[Literal["wikipedia", "arxiv", "crossref", "github", "hn", "pypi", "osv", "nvd", "hf", "rss"]] = Field(["hn"], min_length=1, max_length=10)
     every_minutes: int = Field(1440, ge=60, le=60 * 24 * 30)
     max_requests: int = Field(4, ge=1, le=10)
+
+
+class MonitorPatch(BaseModel):
+    """Same bounds as creation — a PATCH must not lift a monitor's request budget or frequency past them."""
+    enabled: bool | None = None
+    every_minutes: int | None = Field(None, ge=60, le=60 * 24 * 30)
+    max_requests: int | None = Field(None, ge=1, le=10)
+    purpose: str | None = Field(None, min_length=3, max_length=500)
 
 
 @router.get("/monitors")
@@ -155,7 +163,7 @@ def monitors(db: Session = Depends(get_db), _: User = Depends(current_user)):
 
 @router.post("/monitors")
 def monitor_add(m: MonitorIn, db: Session = Depends(get_db), user: User = Depends(operator)):
-    row = Monitor(**m.model_dump(), created_by=user.email)
+    row = Monitor(**(m.model_dump() | {"sources": list(dict.fromkeys(m.sources))}), created_by=user.email)
     db.add(row)
     db.flush()
     gov.audit(db, user.email, "monitor.create", f"monitor:{row.id}", query=m.query, every_minutes=m.every_minutes)
@@ -164,14 +172,14 @@ def monitor_add(m: MonitorIn, db: Session = Depends(get_db), user: User = Depend
 
 
 @router.patch("/monitors/{mid}")
-def monitor_patch(mid: int, body: dict[str, Any], db: Session = Depends(get_db), user: User = Depends(operator)):
+def monitor_patch(mid: int, p: MonitorPatch, db: Session = Depends(get_db), user: User = Depends(operator)):
     m = db.get(Monitor, mid)
     if not m:
         raise HTTPException(404)
-    for k in ("enabled", "every_minutes", "max_requests", "purpose"):
-        if k in body:
-            setattr(m, k, body[k])
-    gov.audit(db, user.email, "monitor.update", f"monitor:{mid}", **{k: body[k] for k in body if k in ("enabled", "every_minutes", "max_requests")})
+    ch = p.model_dump(exclude_none=True)
+    for k, v in ch.items():
+        setattr(m, k, v)
+    gov.audit(db, user.email, "monitor.update", f"monitor:{mid}", **{k: v for k, v in ch.items() if k != "purpose"})
     db.commit()
     return _cols(m)
 
@@ -189,13 +197,16 @@ def monitor_delete(mid: int, db: Session = Depends(get_db), user: User = Depends
 
 
 @router.post("/monitors/{mid}/run")
-def monitor_run(mid: int, db: Session = Depends(get_db), _: User = Depends(operator)):
+def monitor_run(mid: int, db: Session = Depends(get_db), user: User = Depends(operator)):
     from ..internet import monitor
 
     m = db.get(Monitor, mid)
     if not m:
         raise HTTPException(404)
-    return monitor.run_one(db, m)
+    out = monitor.run_one(db, m)
+    gov.audit(db, user.email, "monitor.run", f"monitor:{mid}", new=out["new"], errors=len(out["errors"]))
+    db.commit()
+    return out
 
 
 @router.get("/monitors/events")
@@ -204,11 +215,12 @@ def monitor_events(limit: int = Query(50, le=200), db: Session = Depends(get_db)
 
 
 @router.post("/monitors/events/{eid}/ack")
-def monitor_ack(eid: int, db: Session = Depends(get_db), _: User = Depends(operator)):
+def monitor_ack(eid: int, db: Session = Depends(get_db), user: User = Depends(operator)):
     e = db.get(MonitorEvent, eid)
     if not e:
         raise HTTPException(404)
     e.acknowledged = True
+    gov.audit(db, user.email, "monitor.ack", f"monitor_event:{eid}")
     db.commit()
     return {"ok": True}
 
@@ -292,10 +304,13 @@ def control_retention(db: Session = Depends(get_db), user: User = Depends(admin)
 
 
 @router.post("/control/unload/{cache_key:path}")
-def control_unload(cache_key: str, user: User = Depends(admin)):
+def control_unload(cache_key: str, db: Session = Depends(get_db), user: User = Depends(admin)):
     from ..daemon.runtime import get_local
 
-    return {"unloaded": get_local().unload(cache_key, reason=f"manual by {user.email}")}
+    ok = get_local().unload(cache_key, reason=f"manual by {user.email}")
+    gov.audit(db, user.email, "model.unload", f"model:{cache_key[:200]}", unloaded=ok)
+    db.commit()
+    return {"unloaded": ok}
 
 
 # ------------------------------------------------------------------ agent efficiency (delegation cost / benefit)

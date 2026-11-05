@@ -319,3 +319,82 @@ def test_large_document_is_searchable_at_once_and_upgraded_in_background(client,
             break
         time.sleep(0.1)
     assert models == {"gguf:fake"}  # semantic vectors arrived in the background
+
+
+# ------------------------------------------------------------------ security regressions (audit 2026-11-05)
+@pytest.mark.parametrize("url,why", [("http://127.0.0.1:8000/api/auth/users", "non-public"), ("http://169.254.169.254/latest/meta-data/", "non-public"),
+                                     ("http://[::1]/", "non-public"), ("http://10.0.0.5/feed.xml", "non-public"),
+                                     ("http://localhost:5432/", "local host"), ("http://db.internal/", "local host"),
+                                     ("file:///etc/passwd", "scheme"), ("gopher://example.org/", "scheme"),
+                                     ("https://evil.example/", "non-public")])
+def test_research_http_refuses_internal_targets(url, why, monkeypatch):
+    from app.internet import http
+
+    cache.invalidate("ssrf-guard")
+    # evil.example resolves to a private address (DNS pointing inwards) — the guard checks what the name RESOLVES to
+    monkeypatch.setattr(http, "_resolve", lambda host, port: [(2, 1, 6, "", ("192.168.1.10", 0))])
+    with pytest.raises(http.FetchError, match=why):
+        http.guard_url(url)
+
+
+def test_research_http_guard_checks_every_redirect_hop(monkeypatch):
+    from app.internet import http
+
+    cache.invalidate("ssrf-guard")
+    monkeypatch.setattr(http, "_resolve", lambda host, port: [(2, 1, 6, "", ("93.184.215.14", 0))])  # a public address
+    sent = []
+
+    def handler(req):
+        sent.append(str(req.url))
+        if req.url.host == "feeds.example.org":
+            return httpx.Response(302, headers={"location": "http://169.254.169.254/latest/meta-data/iam"})
+        return httpx.Response(200, text="SECRET")
+
+    c = http._make_client(httpx.MockTransport(handler))
+    assert c.get("https://ok.example.org/").status_code == 200  # public targets still work
+    with pytest.raises(http.FetchError, match="non-public"):
+        c.get("https://feeds.example.org/rss.xml")
+    assert not any("169.254" in u for u in sent)  # the metadata endpoint was never contacted
+
+
+def test_connector_links_are_http_only():
+    from app.internet import sources as S
+
+    items = S.sanitize([{"url": "javascript:alert(document.cookie)"}, {"url": "data:text/html,<script>x</script>"}, {"url": " https://arxiv.org/abs/1 "},
+                        {"url": "https://x.org/\"onmouseover=1"}, {"url": None}])
+    assert [i["url"] for i in items] == ["", "", "https://arxiv.org/abs/1", "", ""]
+
+
+def test_monitor_patch_is_validated_and_audited(client):
+    m = client.post("/api/monitors", json={"name": "bounded monitor", "purpose": "test", "query": "llama", "sources": ["hn", "hn"]}).json()
+    assert m["sources"] == ["hn"]  # duplicates cannot multiply a monitor's requests
+    for bad in ({"max_requests": 10_000}, {"every_minutes": 0}, {"enabled": "maybe"}, {"purpose": "x" * 600}):
+        assert client.patch(f"/api/monitors/{m['id']}", json=bad).status_code == 422, bad
+    ok = client.patch(f"/api/monitors/{m['id']}", json={"enabled": False, "max_requests": 2})
+    assert ok.status_code == 200 and ok.json()["enabled"] is False and ok.json()["max_requests"] == 2
+    assert client.post("/api/monitors", json={"name": "too many", "purpose": "test", "query": "q", "sources": ["hn"] * 11}).status_code == 422
+    log = client.get("/api/audit").json()
+    rows = log if isinstance(log, list) else log.get("entries", log.get("items", []))
+    assert any(r.get("action") == "monitor.update" for r in rows)
+
+
+def test_deleting_a_document_purges_cached_answers_quoting_it(client):
+    d = client.post("/api/archive/text", json={"title": "Private note", "text": "The vault code for the Uppsala office is kept by Ingrid Berg.",
+                                               "evidence_class": "primary_source"}).json()
+    q = "What does our archive say about the Uppsala office vault?"
+    first = client.post("/api/ai/ask", json={"question": q}).json()
+    assert first["sources"] and not first.get("cached")
+    assert client.post("/api/ai/ask", json={"question": q}).json().get("cached")
+    assert client.delete(f"/api/archive/documents/{d['id']}?confirm=true").status_code == 200
+    after = client.post("/api/ai/ask", json={"question": q}).json()
+    assert not after.get("cached") and "Ingrid" not in str(after.get("answer"))  # the deleted text does not live on in the cache
+
+
+def test_no_pickle_backed_disk_cache_is_used():
+    """Accepted risk PYSEC-2026-2447 (diskcache ≤5.6.3 unpickles its cache directory; no fix released): it is only safe
+    while nothing in the app opens a diskcache (llama-cpp-python's LlamaDiskCache). Revisit the audit if this fails."""
+    from pathlib import Path
+
+    app = Path(__file__).resolve().parents[1] / "app"
+    hits = [str(p) for p in app.rglob("*.py") if any(s in p.read_text(encoding="utf-8") for s in ("LlamaDiskCache", "import diskcache"))]
+    assert hits == []

@@ -36,7 +36,7 @@ def _items(m: Monitor) -> tuple[list[dict[str, Any]], list[str]]:
             errors.append(f"{src}: unknown source")
             continue
         try:
-            items += fn(m.query, 10) if src not in ("rss",) else fn(["https://feeds.bbci.co.uk/news/technology/rss.xml"], m.query, 10)
+            items += S.sanitize(fn(m.query, 10) if src not in ("rss",) else fn(["https://feeds.bbci.co.uk/news/technology/rss.xml"], m.query, 10))
         except (FetchError, OfflineError, KeyError, ValueError) as e:
             errors.append(f"{src}: {e}"[:160])
     return items, errors

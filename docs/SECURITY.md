@@ -85,6 +85,32 @@ agent to `PATCH /api/agents/*`; `sync_agents()` never overwrites a level set by 
 - The research User-Agent identifies the software, not the owner; no personal data is sent to sources.
 - Offline mode stops every outbound research request at the client (tested).
 - Raw web excerpts expire (retention job); only a human "Save to Archive" keeps one, with URL, retrieval time and licence.
+- SSRF guard (`internet/http.guard_url`): every research request AND every redirect hop (httpx request hook) must be
+  http(s) to a host that resolves only to public addresses — loopback, LAN, link-local/cloud metadata (169.254.169.254),
+  `localhost`/`.internal`/`.local` names are refused, whoever configured the URL. Residual risk: DNS re-binding between
+  the check and the connect (no IP pinning). Behind an egress proxy that resolves names itself, unresolvable names are
+  left to the proxy's policy.
+- Links from connectors are reduced to absolute http(s) URLs (`sources.sanitize`) before they are stored or rendered —
+  no `javascript:`/`data:` links reach the UI.
+
+### Audit 2026-11-05 — HYPERINTELLIGENCE additions
+
+| Severity | Finding | Fix | Regression test |
+|---|---|---|---|
+| Medium | Research HTTP client followed redirects to, and could be configured for, internal addresses (SSRF) — `fetch_page` and admin-set `research_feeds` had no address check | `guard_url` on every request and redirect hop | `test_research_http_refuses_internal_targets`, `test_research_http_guard_checks_every_redirect_hop` |
+| Medium | Deleting (or editing) an Archive document left its quoted text in the L2/L3 answer cache for up to 7 days | `semantic_cache.purge_document` on delete and patch (count in the audit entry) | `test_deleting_a_document_purges_cached_answers_quoting_it` |
+| Low | `PATCH /api/monitors/{id}` accepted an unvalidated dict (budget/frequency could exceed creation limits; bad types → 500); duplicate sources multiplied requests | `MonitorPatch` with the creation bounds; sources de-duplicated, ≤10 | `test_monitor_patch_is_validated_and_audited` |
+| Low | Connector URLs rendered as links without a scheme check | `sources.sanitize` | `test_connector_links_are_http_only` |
+| Low | Research synthesis wrapped sources but its system prompt lacked `untrusted.GUARD` | GUARD appended | covered by existing research tests |
+| Low | Monitor run/ack and manual model unload were not audited | audit entries `monitor.run`, `monitor.ack`, `model.unload` | `test_monitor_patch_is_validated_and_audited` (audit log) |
+| Accepted | `diskcache` 5.6.3 (dependency of llama-cpp-python): PYSEC-2026-2447, pickle cache directory → code execution for anyone who can write it; no fixed release | not exploitable here: the app never opens a diskcache | `test_no_pickle_backed_disk_cache_is_used` |
+
+Checked and fine: every new state-changing route has `require_role` (operator/admin; retention and unload admin-only);
+no new path changes agent permission levels or approvals; answer caches never cross users (Archive answers have the
+Archive's own org-wide visibility, private/sensitive questions skip the cache, model responses are keyed by the full
+prompt); `pip-audit -r backend/requirements.txt` and `npm audit --omit=dev`: no known vulnerabilities. Research runs and
+monitor alerts are visible to every signed-in user (team-shared, like the Archive) — do not put private data in research
+queries.
 
 ## Data protection (GDPR)
 

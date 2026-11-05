@@ -98,6 +98,16 @@ def store(db: Session, question: str, answer: str, *, category: str, sources: li
     db.commit()
 
 
+def purge_document(db: Session, document_id: int) -> int:
+    """A deleted or edited Archive document must not live on in cached answers (privacy erasure, corrected metadata).
+    Counted in Python: PostgreSQL's json type has no containment/equality operator usable portably."""
+    ids = [e.id for e in db.scalars(select(SemanticCacheEntry))
+           if any(isinstance(s, dict) and s.get("document_id") == document_id for s in (e.sources or []))]
+    if ids:
+        db.query(SemanticCacheEntry).filter(SemanticCacheEntry.id.in_(ids)).delete(synchronize_session=False)
+    return len(ids)
+
+
 def purge_expired(db: Session) -> int:
     n = db.query(SemanticCacheEntry).filter(SemanticCacheEntry.expires_at <= datetime.now(UTC)).delete(synchronize_session=False)
     db.commit()
