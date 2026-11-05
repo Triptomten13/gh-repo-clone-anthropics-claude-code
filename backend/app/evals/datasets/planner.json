@@ -1,0 +1,14 @@
+[
+  {"objective": "Evaluate the roll-top stem bag and tell me if it is profitable", "expect": ["product_evaluation"]},
+  {"objective": "Create brand concepts for the winter pannier", "expect": ["brand_creation"]},
+  {"objective": "Convene a council on the emergency radio", "expect": ["council"]},
+  {"objective": "What else could we do with the ferro rod set?", "expect": ["think_sideways"]},
+  {"objective": "Draft ad campaigns for the EDC pouch", "expect": ["campaign"]},
+  {"objective": "Scan the market for new trends", "expect": ["market_scan"]},
+  {"objective": "Check the Archivum canon for contradictions", "expect": ["canon_check"]},
+  {"objective": "What do the sources say about the Babylonian exile?", "expect": ["archive_question"]},
+  {"objective": "Launch the pannier brand next week", "expect": ["approval_action"]},
+  {"objective": "Utvärdera nödradion och skapa varumärkeskoncept", "expect": ["product_evaluation", "brand_creation"]},
+  {"objective": "Vad säger arkivet om Nebukadnessar?", "expect": ["archive_question"]},
+  {"objective": "Diskutera stem bag med agenterna", "expect": ["discussion"]}
+]

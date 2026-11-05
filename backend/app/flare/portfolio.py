@@ -4,7 +4,7 @@ and overlap detection ("don't create a brand for products that belong together")
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 OVERLAP_THRESHOLD = 0.55
@@ -33,14 +33,14 @@ def overlap_check(candidate: dict[str, set[str]], brands: list[Any]) -> list[dic
 
 def metrics(brand: Any, products: list[Any], ledger: list[Any], campaigns: list[Any], performance: list[Any], observations: list[Any],
             suppliers: set[int], now: datetime | None = None) -> dict[str, Any]:
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     pids = {p.id for p in products if p.brand_id == brand.id}
     rows = [e for e in ledger if e.brand_id == brand.id or (e.product_id in pids)]
 
     def total(kind: str, since: datetime | None = None, until: datetime | None = None) -> float:
         s = 0.0
         for e in rows:
-            at = e.occurred_at if e.occurred_at.tzinfo else e.occurred_at.replace(tzinfo=timezone.utc)
+            at = e.occurred_at if e.occurred_at.tzinfo else e.occurred_at.replace(tzinfo=UTC)
             if e.kind == kind and (since is None or at >= since) and (until is None or at < until):
                 s += e.amount
         return s

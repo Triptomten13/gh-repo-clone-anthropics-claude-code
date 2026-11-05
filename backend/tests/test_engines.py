@@ -1,6 +1,5 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
-import pytest
 
 from app.engines import business_models, compliance, economics, experiments, finance, pricing, scoring, transformation, trends
 
@@ -59,7 +58,7 @@ def test_pricing_scenarios_and_omnibus_rule():
     assert sc["scenarios"]["standard"]["price"] == 449  # market price when above the floor
     assert sc["scenarios"]["standard"]["price"] >= sc["scenarios"]["margin_floor"]["price"]
     assert sc["scenarios"]["promotional"]["price"] is None  # no history -> no reference price
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     hist = [(now - timedelta(days=40), 199.0), (now - timedelta(days=10), 349.0), (now - timedelta(days=2), 399.0)]
     sc2 = pricing.scenarios(c, [399], price_history=hist)
     assert sc2["scenarios"]["promotional"]["reference_price"] == 349.0  # 40-day-old 199 is ignored
@@ -71,7 +70,7 @@ def test_psychological_round():
 
 
 def test_trend_classification():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     grow = [trends.Obs(p, 100 * (1.4 ** w), now - timedelta(weeks=10 - w)) for p in ("a", "b") for w in range(10)]
     a = trends.analyze("x", grow)
     assert a.stage == "exploding" and a.cross_platform_growth == 2 and a.velocity_score > 80
@@ -83,7 +82,7 @@ def test_trend_classification():
 
 
 def test_seasonal_detection():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     obs = []
     for d in range(0, 430, 7):
         at = now - timedelta(days=430 - d)
@@ -141,7 +140,7 @@ def test_finance_forecast_requires_data():
         def __init__(s, k, a, d):
             s.kind, s.amount, s.occurred_at, s.product_id, s.store_id, s.channel = k, a, d, 1, None, "x"
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     rows = [E("revenue", 100 + i, now - timedelta(days=30 - i)) for i in range(30)] + [E("ad_spend", 20, now - timedelta(days=i)) for i in range(30)]
     s = finance.summarize(rows)
     assert s["revenue"] > 0 and s["roas"] is not None

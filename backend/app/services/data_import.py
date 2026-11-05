@@ -10,7 +10,7 @@ import io
 import json
 import math
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -70,7 +70,7 @@ def import_observations(db: Session, rows: list[dict[str, Any]], is_demo: bool =
         at = r.get("observed_at") or r.get("date")
         dt = datetime.fromisoformat(str(at))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
         db.add(TrendObservation(keyword=r["keyword"], platform=r.get("platform", "import"), metric=r.get("metric", "value"),
                                 value=float(r["value"]), region=r.get("region", "SE"), observed_at=dt,
                                 source_ref=r.get("source_ref", "manual_import"), is_demo=is_demo))
@@ -84,7 +84,7 @@ def import_ledger(db: Session, rows: list[dict[str, Any]], is_demo: bool = False
     for r in rows:
         dt = datetime.fromisoformat(str(r["occurred_at"]))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=UTC)
         db.add(LedgerEntry(kind=r["kind"], amount=float(r["amount"]), occurred_at=dt, channel=r.get("channel", "direct"),
                            product_id=int(r["product_id"]) if r.get("product_id") else None,
                            store_id=int(r["store_id"]) if r.get("store_id") else None,
@@ -100,7 +100,7 @@ def load_demo(db: Session, seed: int = 7) -> dict[str, int]:
     connector is configured. Every row has is_demo=True and is badged DEMO in the UI.
     It is NOT market data. Remove with DELETE /api/demo."""
     rng = random.Random(seed)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     sup_cn = Supplier(name="Demo Supplier Shenzhen", platform="alibaba", country="CN", rating=4.6, years_active=6, moq=100,
                       avg_delivery_days=12, response_rate=0.92, dispute_rate=0.01, offers_private_label=True,
                       offers_custom_packaging=True, has_product_documentation=True, is_demo=True)

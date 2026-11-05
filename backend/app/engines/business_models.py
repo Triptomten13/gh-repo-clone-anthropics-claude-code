@@ -111,13 +111,13 @@ def _fit_adjustments(m: str, t: ProductTraits) -> tuple[float, list[str]]:
 def evaluate(t: ProductTraits) -> dict[str, Any]:
     ranked = []
     for m, attrs in _BASE.items():
-        base = sum(w * (a if d > 0 else 6 - a) for a, d, w in zip(attrs, _DIRECTION, _WEIGHT))  # 1..5
+        base = sum(w * (a if d > 0 else 6 - a) for a, d, w in zip(attrs, _DIRECTION, _WEIGHT, strict=True))  # 1..5
         adj, why = _fit_adjustments(m, t)
         score = max(0.0, min(100.0, (base + adj - 1) / 4 * 100))
         ranked.append({
             "model": m,
             "score": round(score, 1),
-            "attributes": dict(zip(ATTRS, attrs)),
+            "attributes": dict(zip(ATTRS, attrs, strict=True)),
             "fit_reasons": why,
         })
     ranked.sort(key=lambda r: r["score"], reverse=True)

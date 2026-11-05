@@ -3,7 +3,7 @@ import json
 import httpx
 import pytest
 
-from app.agents.base import AgentOutput, BaseAgent
+from app.agents.base import BaseAgent
 from app.agents.catalog import build_orchestrator
 from app.agents.orchestrator import GovernanceError
 from app.ai import llm

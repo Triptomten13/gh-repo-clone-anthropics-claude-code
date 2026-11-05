@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timezone
-from typing import Any
+from datetime import datetime, UTC
 
 from sqlalchemy import select
 
@@ -95,7 +94,7 @@ class ChiefIntelligenceAgent(BaseAgent):
             spawned, skipped = [], []
             for c in connectors.research_connectors():
                 if c.configured():
-                    spawned.append(ctx.spawn(f"research.collect", {"connector": c.id, "keywords": keywords}, priority=20).id)
+                    spawned.append(ctx.spawn("research.collect", {"connector": c.id, "keywords": keywords}, priority=20).id)
                 else:
                     skipped.append({"connector": c.id, "state": c.status()["state"]})
             ctx.spawn("trend.analyze", {"keywords": keywords}, priority=60)
@@ -114,7 +113,7 @@ class ChiefIntelligenceAgent(BaseAgent):
         demo: dict[str, bool] = defaultdict(bool)
         for r in rows:
             # one series per platform+metric so units are never mixed
-            grouped[r.keyword].append(trends.Obs(f"{r.platform}:{r.metric}", r.value, r.observed_at if r.observed_at.tzinfo else r.observed_at.replace(tzinfo=timezone.utc)))
+            grouped[r.keyword].append(trends.Obs(f"{r.platform}:{r.metric}", r.value, r.observed_at if r.observed_at.tzinfo else r.observed_at.replace(tzinfo=UTC)))
             demo[r.keyword] |= r.is_demo
         results = []
         for kw, obs in grouped.items():
@@ -502,7 +501,7 @@ class ExperimentAgent(BaseAgent):
         if d["decision"] in ("scale", "abandon", "iterate"):
             e.decision = d["decision"]
             e.status = "completed" if d["decision"] != "abandon" else "abandoned"
-            e.completed_at = datetime.now(timezone.utc)
+            e.completed_at = datetime.now(UTC)
             lesson = f"Experiment '{e.name}': {d['decision']} — {'; '.join(d['reasons'])}. Prediction MAPE: {err['mape']}"
             e.lessons = lesson
             ctx.db.add(Lesson(source=f"experiment:{e.id}", text=lesson, tags=[d["decision"]]))

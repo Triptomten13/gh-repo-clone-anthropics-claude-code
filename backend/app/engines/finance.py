@@ -6,8 +6,9 @@ says so instead of returning invented numbers.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, datetime, timedelta
-from typing import Any, Iterable
+from datetime import date
+from typing import Any
+from collections.abc import Iterable
 
 COST_KINDS = {"cogs", "shipping", "fees", "ad_spend", "refund", "chargeback", "opex", "tax"}
 VARIABLE_KINDS = {"cogs", "shipping", "fees", "ad_spend", "refund", "chargeback"}
@@ -84,9 +85,9 @@ def forecast(series: list[dict[str, Any]], horizons: tuple[int, ...] = (7, 30, 9
         n = len(xs)
         mx, my = sum(xs) / n, sum(ys) / n
         den = sum((x - mx) ** 2 for x in xs) or 1.0
-        b = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / den
+        b = sum((x - mx) * (y - my) for x, y in zip(xs, ys, strict=True)) / den
         a = my - b * mx
-        resid = (sum((y - (a + b * x)) ** 2 for x, y in zip(xs, ys)) / max(1, n - 2)) ** 0.5
+        resid = (sum((y - (a + b * x)) ** 2 for x, y in zip(xs, ys, strict=True)) / max(1, n - 2)) ** 0.5
         return a, b, resid
 
     out: dict[str, Any] = {"available": True, "method": "ordinary least squares on daily totals", "epistemic": "estimate", "horizons": {}}

@@ -1,10 +1,10 @@
 """REST API for the command center."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -57,12 +57,27 @@ def setup(c: Credentials, db: Session = Depends(get_db)):
 
 
 @router.post("/auth/login")
-def login(c: Credentials, db: Session = Depends(get_db)):
+def login(c: Credentials, request: Request, db: Session = Depends(get_db)):
+    from ..config import get_settings
+    from ..security.ratelimit import login_failures
+
+    s = get_settings()
+    ip = request.client.host if request.client else "unknown"
+    keys = (f"acct:{c.email.lower()}", f"ip:{ip}")
+    if any(login_failures.count(k, s.login_window_s) >= s.login_max_attempts * (4 if k.startswith("ip:") else 1) for k in keys):
+        gov.audit(db, c.email, "auth.login_locked", ip=ip)
+        db.commit()
+        raise HTTPException(429, "too many failed attempts — try again later", headers={"Retry-After": str(s.login_window_s)})
     u = db.scalars(select(User).where(User.email == c.email.lower())).first()
     if not u or not verify_password(c.password, u.password_hash):
-        gov.audit(db, c.email, "auth.login_failed")
+        for k in keys:
+            login_failures.hit(k, 10_000, s.login_window_s)
+        gov.audit(db, c.email, "auth.login_failed", ip=ip)
         db.commit()
         raise HTTPException(401, "invalid credentials")
+    login_failures.reset(keys[0])
+    gov.audit(db, u.email, "auth.login", ip=ip)
+    db.commit()
     return {"token": issue_token(u), "user": {"email": u.email, "role": u.role}}
 
 
@@ -97,7 +112,7 @@ def overview(db: Session = Depends(get_db), _: User = Depends(current_user)):
     fin = finance.summarize(entries)
     top = db.scalars(select(Product).where(Product.opportunity_score.is_not(None)).order_by(Product.opportunity_score.desc()).limit(5)).all()
     trends_ = db.scalars(select(Trend).where(Trend.stage.in_(("emerging", "exploding"))).order_by(Trend.velocity_score.desc()).limit(6)).all()
-    since = datetime.now(timezone.utc) - timedelta(days=1)
+    since = datetime.now(UTC) - timedelta(days=1)
     alerts = db.scalars(select(AgentMessage).where(AgentMessage.kind.in_(("error", "blocked")), AgentMessage.created_at >= since)
                         .order_by(AgentMessage.id.desc()).limit(10)).all()
     count = lambda q: db.scalar(select(func.count()).select_from(q.subquery()))  # noqa: E731
@@ -299,7 +314,7 @@ def patch_product(pid: int, body: dict[str, Any], db: Session = Depends(get_db),
 def evaluate_product(pid: int, bg: BackgroundTasks, db: Session = Depends(get_db), user: User = Depends(operator)):
     if not db.get(Product, pid):
         raise HTTPException(404)
-    t = orch.submit(db, "ceo.evaluate_product", {"product_id": pid, "refresh": datetime.now(timezone.utc).isoformat()},
+    t = orch.submit(db, "ceo.evaluate_product", {"product_id": pid, "refresh": datetime.now(UTC).isoformat()},
                     requested_by=f"user:{user.email}", priority=5, force=True)
     db.commit()
     bg.add_task(orch.drain, 50)
@@ -321,7 +336,7 @@ def compliance_decision(pid: int, d: ComplianceDecision, db: Session = Depends(g
         raise HTTPException(400, "confirm that every checklist item has been verified")
     p.compliance_status = "approved" if d.approve else "blocked"
     p.compliance_report = {**(p.compliance_report or {}), "human_decision": {"by": user.email, "note": d.note,
-                                                                              "at": datetime.now(timezone.utc).isoformat()}}
+                                                                              "at": datetime.now(UTC).isoformat()}}
     gov.audit(db, user.email, "compliance.human_decision", f"product:{pid}", approve=d.approve, note=d.note)
     db.commit()
     return {"compliance_status": p.compliance_status}
@@ -476,7 +491,7 @@ def weights(_: User = Depends(current_user)):
 def fin_summary(days: int | None = None, db: Session = Depends(get_db), _: User = Depends(current_user)):
     q = select(LedgerEntry)
     if days:
-        q = q.where(LedgerEntry.occurred_at >= datetime.now(timezone.utc) - timedelta(days=days))
+        q = q.where(LedgerEntry.occurred_at >= datetime.now(UTC) - timedelta(days=days))
     entries = db.scalars(q).all()
     return {**finance.summarize(entries), "daily": finance.daily_series(entries)}
 
@@ -585,7 +600,7 @@ def record_results(eid: int, actual: dict[str, Any], bg: BackgroundTasks, db: Se
     if not e:
         raise HTTPException(404)
     e.actual = actual
-    t = orch.submit(db, "experiment.evaluate", {"experiment_id": eid, "rev": datetime.now(timezone.utc).isoformat()},
+    t = orch.submit(db, "experiment.evaluate", {"experiment_id": eid, "rev": datetime.now(UTC).isoformat()},
                     requested_by=f"user:{user.email}", priority=5)
     db.commit()
     bg.add_task(orch.drain, 10)
@@ -598,7 +613,7 @@ def system_status(db: Session = Depends(get_db), _: User = Depends(current_user)
     from ..config import get_settings
 
     s = get_settings()
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     spent = db.scalar(select(func.coalesce(func.sum(Task.cost_usd), 0.0)).where(Task.created_at >= start))
     return {
         "company_name": s.company_name,

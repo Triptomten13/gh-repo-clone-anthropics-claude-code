@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 from .economics import CostInputs, compute
 
@@ -45,7 +45,7 @@ def price_for_target_margin(c: CostInputs, target_contribution_pct: float, curre
 
 
 def lowest_price_last_30_days(history: list[tuple[datetime, float]], now: datetime | None = None) -> float | None:
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     window = [p for t, p in history if now - timedelta(days=30) <= t <= now]
     return min(window) if window else None
 

@@ -14,7 +14,7 @@ def _bool(name: str, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     env: str = field(default_factory=lambda: os.getenv("APP_ENV", "development"))
-    company_name: str = field(default_factory=lambda: os.getenv("COMPANY_NAME", "Demonkoncernen AB"))
+    company_name: str = field(default_factory=lambda: os.getenv("COMPANY_NAME", "G-SUS & Demonkoncernen AB"))
     platform_name: str = field(default_factory=lambda: os.getenv("PLATFORM_NAME", "Rocky"))
     database_url: str = field(default_factory=lambda: os.getenv("DATABASE_URL", "sqlite:///./rocky.db"))
     redis_url: str | None = field(default_factory=lambda: os.getenv("REDIS_URL") or None)
@@ -47,6 +47,11 @@ class Settings:
     # Market defaults (Sweden / EU)
     default_currency: str = field(default_factory=lambda: os.getenv("DEFAULT_CURRENCY", "SEK"))
     default_vat_rate: float = field(default_factory=lambda: float(os.getenv("DEFAULT_VAT_RATE", "0.25")))
+
+    # Security
+    login_max_attempts: int = field(default_factory=lambda: int(os.getenv("LOGIN_MAX_ATTEMPTS", "5")))
+    login_window_s: int = field(default_factory=lambda: int(os.getenv("LOGIN_WINDOW_S", "900")))
+    api_rate_per_min: int = field(default_factory=lambda: int(os.getenv("API_RATE_PER_MIN", "600")))
 
 
 @lru_cache

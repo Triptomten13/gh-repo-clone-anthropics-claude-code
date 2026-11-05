@@ -8,7 +8,7 @@ Conventions:
 from __future__ import annotations
 
 import enum
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
@@ -18,7 +18,7 @@ from .db import Base
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class TaskStatus(str, enum.Enum):
@@ -574,3 +574,246 @@ class CompatibilityRecord(Base):
     evidence: Mapped[str] = mapped_column(Text, default="")
     verified_by: Mapped[str] = mapped_column(String(255), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# =====================================================================================
+# AI CORE — call tracing
+# =====================================================================================
+class LLMCall(Base):
+    """One row per provider attempt (including failed/fallback attempts). Source of truth for AI cost and latency."""
+
+    __tablename__ = "llm_calls"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    task_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    agent_id: Mapped[str] = mapped_column(String(64), default="", index=True)
+    purpose: Mapped[str] = mapped_column(String(64), default="")
+    provider: Mapped[str] = mapped_column(String(32), index=True)
+    model: Mapped[str] = mapped_column(String(96))
+    tier: Mapped[str] = mapped_column(String(16), default="")
+    status: Mapped[str] = mapped_column(String(24))  # ok | refused | unavailable | error | not_configured | circuit_open
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str] = mapped_column(Text, default="")
+
+
+# =====================================================================================
+# THE ARCHIVE — knowledge, provenance, memory
+# =====================================================================================
+EVIDENCE_CLASSES = ("historical_fact", "primary_source", "religious_interpretation", "philosophical_theory", "scholarly_hypothesis",
+                    "speculative", "fiction_canon", "unclassified")
+
+
+class Document(Base):
+    __tablename__ = "documents"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    uid: Mapped[str] = mapped_column(String(36), unique=True, index=True)
+    title: Mapped[str] = mapped_column(String(512))
+    description: Mapped[str] = mapped_column(Text, default="")
+    source: Mapped[str] = mapped_column(String(512), default="")
+    source_url: Mapped[str] = mapped_column(String(1024), default="")
+    author: Mapped[str] = mapped_column(String(255), default="")
+    created_date: Mapped[str] = mapped_column(String(64), default="")  # free text: historical dates ("c. 600 BCE") are not ISO dates
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    doc_type: Mapped[str] = mapped_column(String(24), index=True)
+    mime: Mapped[str] = mapped_column(String(128), default="")
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    categories: Mapped[list[str]] = mapped_column(JSON, default=list)
+    evidence_class: Mapped[str] = mapped_column(String(32), default="unclassified", index=True)
+    status: Mapped[str] = mapped_column(String(16), default="processing", index=True)  # processing | ready | failed | duplicate
+    error: Mapped[str] = mapped_column(Text, default="")
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    simhash: Mapped[str] = mapped_column(String(16), default="")
+    duplicate_of: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    lineage_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    parent_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    file_path: Mapped[str] = mapped_column(String(512), default="")
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    char_count: Mapped[int] = mapped_column(Integer, default=0)
+    injection_flags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class DocumentChunk(Base):
+    __tablename__ = "document_chunks"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), index=True)
+    ordinal: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    start_char: Mapped[int] = mapped_column(Integer, default=0)
+    end_char: Mapped[int] = mapped_column(Integer, default=0)
+    page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    embedding: Mapped[list[float]] = mapped_column(JSON, default=list)
+    embedding_model: Mapped[str] = mapped_column(String(64), default="")
+    injection_risk: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class DocumentRelation(Base):
+    __tablename__ = "document_relations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), index=True)
+    target_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), index=True)
+    relation: Mapped[str] = mapped_column(String(32))  # cites | interprets | compares | duplicates | version_of | related | contradicts
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[str] = mapped_column(String(255), default="")
+
+
+class Entity(Base):
+    __tablename__ = "entities"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    kind: Mapped[str] = mapped_column(String(32), default="concept")  # person | place | text | symbol | event | concept | organization | civilization
+    aliases: Mapped[list[str]] = mapped_column(JSON, default=list)
+    description: Mapped[str] = mapped_column(Text, default="")
+
+
+class EntityMention(Base):
+    __tablename__ = "entity_mentions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    entity_id: Mapped[int] = mapped_column(ForeignKey("entities.id"), index=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), index=True)
+    count: Mapped[int] = mapped_column(Integer, default=1)
+
+
+class Annotation(Base):
+    """Interpretations live here, separate from the source text they interpret."""
+
+    __tablename__ = "annotations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    document_id: Mapped[int] = mapped_column(ForeignKey("documents.id"), index=True)
+    chunk_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    author: Mapped[str] = mapped_column(String(255))
+    kind: Mapped[str] = mapped_column(String(32), default="note")  # note | interpretation | source_comparison | correction
+    text: Mapped[str] = mapped_column(Text)
+    evidence_class: Mapped[str] = mapped_column(String(32), default="unclassified")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+MEMORY_SCOPES = ("user_preference", "project", "long_term", "session", "agent_working", "creative_canon", "external_retrieved")
+
+
+class MemoryItem(Base):
+    __tablename__ = "memory_items"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    scope: Mapped[str] = mapped_column(String(32), index=True)
+    key: Mapped[str] = mapped_column(String(255))
+    content: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(255), default="user")
+    agent_id: Mapped[str] = mapped_column(String(64), default="")
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+# =====================================================================================
+# ARCHIVUM SCIENTIAE VETITAE — canon tools (structure only; content is imported, never invented)
+# =====================================================================================
+class CanonWork(Base):
+    __tablename__ = "canon_works"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    number: Mapped[int] = mapped_column(Integer, index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    description: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(16), default="draft")  # draft | canon | retired
+
+
+class CanonChapter(Base):
+    __tablename__ = "canon_chapters"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    work_id: Mapped[int] = mapped_column(ForeignKey("canon_works.id"), index=True)
+    number: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(255))
+    summary: Mapped[str] = mapped_column(Text, default="")
+    body: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(16), default="draft")
+    document_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class CanonAssertion(Base):
+    """A structured statement (subject — predicate — object) with its evidentiary class.
+    Lore is 'fiction_canon'; it is never mixed with historical claims."""
+
+    __tablename__ = "canon_assertions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    subject: Mapped[str] = mapped_column(String(255), index=True)
+    predicate: Mapped[str] = mapped_column(String(128), index=True)
+    object: Mapped[str] = mapped_column(Text)
+    evidence_class: Mapped[str] = mapped_column(String(32), default="fiction_canon")
+    chapter_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    document_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_note: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(16), default="active")  # active | retired
+    created_by: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CanonVersion(Base):
+    __tablename__ = "canon_versions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    version: Mapped[int] = mapped_column(Integer, index=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_by: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class TimelineEvent(Base):
+    __tablename__ = "timeline_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    label: Mapped[str] = mapped_column(String(255))
+    date_text: Mapped[str] = mapped_column(String(64))  # as stated by the source, e.g. "c. 587 BCE"
+    sort_year: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # negative = BCE; None = undated
+    evidence_class: Mapped[str] = mapped_column(String(32), default="unclassified")
+    description: Mapped[str] = mapped_column(Text, default="")
+    document_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    chapter_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_note: Mapped[str] = mapped_column(Text, default="")
+
+
+# =====================================================================================
+# G-SUS — head orchestrator runs
+# =====================================================================================
+class GsusRun(Base):
+    __tablename__ = "gsus_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    objective: Mapped[str] = mapped_column(Text)
+    mode: Mapped[str] = mapped_column(String(24), default="gsus")
+    settings: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(24), default="planning", index=True)
+    # planning | running | waiting_for_approval | needs_clarification | completed | failed | cancelled
+    intent: Mapped[str] = mapped_column(String(48), default="")
+    plan_method: Mapped[str] = mapped_column(String(16), default="heuristic")
+    clarification: Mapped[str] = mapped_column(Text, default="")
+    answer: Mapped[str] = mapped_column(Text, default="")
+    answer_method: Mapped[str] = mapped_column(String(16), default="")
+    citations: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    contradictions: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    verification: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_by: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class GsusStep(Base):
+    __tablename__ = "gsus_steps"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("gsus_runs.id"), index=True)
+    ordinal: Mapped[int] = mapped_column(Integer)
+    title: Mapped[str] = mapped_column(String(255))
+    kind: Mapped[str] = mapped_column(String(24))  # task | retrieval | approval_gate | synthesis
+    task_type: Mapped[str] = mapped_column(String(64), default="")
+    agent_hint: Mapped[str] = mapped_column(String(64), default="")
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    depends_on: Mapped[list[int]] = mapped_column(JSON, default=list)  # step ordinals
+    status: Mapped[str] = mapped_column(String(24), default="pending")
+    # pending | running | waiting_for_approval | completed | failed | blocked | cancelled
+    task_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    approval_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    output: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)

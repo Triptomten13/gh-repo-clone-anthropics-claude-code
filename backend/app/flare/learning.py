@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import statistics
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 SHRINK_K = 3.0  # Bayesian shrinkage: n/(n+k) of the observed effect is trusted
@@ -61,7 +61,7 @@ def style_dna(campaigns: list[Any], performance: list[Any], concepts: list[Any],
 def genre_evolution(performance: list[Any], campaigns: list[Any], observations: list[Any], now: datetime | None = None,
                     window_days: int = 60) -> dict[str, Any]:
     """Emerging/declining aesthetics from evidence: campaign ROI by period and imported aesthetic-trend observations."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     mid = now - timedelta(days=window_days)
     camp = {c.id: c for c in campaigns}
     periods: dict[str, dict[str, list[float]]] = defaultdict(lambda: {"early": [], "late": []})
@@ -69,7 +69,7 @@ def genre_evolution(performance: list[Any], campaigns: list[Any], observations: 
         c = camp.get(r.campaign_id)
         if not c or not r.spend:
             continue
-        at = r.period_start if r.period_start.tzinfo else r.period_start.replace(tzinfo=timezone.utc)
+        at = r.period_start if r.period_start.tzinfo else r.period_start.replace(tzinfo=UTC)
         roi = ((r.contribution or 0) - r.spend) / r.spend
         for g in (c.genre or "").split("+"):
             if g:
@@ -85,7 +85,7 @@ def genre_evolution(performance: list[Any], campaigns: list[Any], observations: 
     obs_by: dict[str, list[T.Obs]] = defaultdict(list)
     for o in observations:
         if o.keyword.startswith("aesthetic:"):
-            at = o.observed_at if o.observed_at.tzinfo else o.observed_at.replace(tzinfo=timezone.utc)
+            at = o.observed_at if o.observed_at.tzinfo else o.observed_at.replace(tzinfo=UTC)
             obs_by[o.keyword.split(":", 1)[1]].append(T.Obs(f"{o.platform}:{o.metric}", o.value, at))
     cultural = []
     for g, obs in obs_by.items():

@@ -1,5 +1,5 @@
 """Rocky Flare engines: genres, fusion, originality, mutation, sideways, field, campaigns, learning, personas."""
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from types import SimpleNamespace as NS
 
 from app.engines import compliance
@@ -199,7 +199,7 @@ def test_campaign_matrix_and_analyst_ranks_contribution_not_likes():
 def test_style_dna_learns_from_results_and_feeds_matrix():
     camps = [NS(id=1, identity="technical_professional", genre="industrial", platform="youtube_shorts"),
              NS(id=2, identity="funny_self_aware", genre="pop_playful", platform="tiktok")]
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     perf = [NS(campaign_id=1, spend=1000, contribution=2500, engagements=10, period_start=now) for _ in range(4)] + \
            [NS(campaign_id=2, spend=1000, contribution=300, engagements=900, period_start=now) for _ in range(4)]
     dna = learning.style_dna(camps, perf, [])

@@ -129,10 +129,10 @@ def test_reevaluation_recomputes_children(client):
 
 def test_company_identity(client):
     st = client.get("/api/auth/status").json()
-    assert st["company_name"] == "Demonkoncernen AB" and st["platform_name"] == "Rocky"
-    assert client.get("/api/system/status").json()["company_name"] == "Demonkoncernen AB"
+    assert st["company_name"] == "G-SUS & Demonkoncernen AB" and st["platform_name"] == "Rocky"
+    assert client.get("/api/system/status").json()["company_name"] == "G-SUS & Demonkoncernen AB"
     sid = client.post("/api/suppliers", json={"name": "Nordic Bags AB", "country": "SE", "eu_based": True}).json()["id"]
     client.post("/api/tasks", json={"type": "supplier.inquiry_draft", "payload": {"supplier_id": sid}})
     draft = next(t for t in client.get("/api/tasks").json() if t["type"] == "supplier.inquiry_draft")
     body = client.get(f"/api/tasks/{draft['id']}").json()["result"]["draft"]
-    assert body.rstrip().endswith("Demonkoncernen AB")
+    assert body.rstrip().endswith("G-SUS & Demonkoncernen AB")

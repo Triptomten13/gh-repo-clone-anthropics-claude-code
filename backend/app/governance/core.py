@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy import select
@@ -48,7 +48,7 @@ class EventBus:
 
     def publish(self, event: dict[str, Any]) -> None:
         """Thread-safe: agents publish from worker threads."""
-        event = {**event, "ts": datetime.now(timezone.utc).isoformat()}
+        event = {**event, "ts": datetime.now(UTC).isoformat()}
         for q, loop in list(self._subs.items()):
             try:
                 loop.call_soon_threadsafe(self._put, q, event)
@@ -80,7 +80,7 @@ def kill_switch_engaged(db: Session) -> bool:
 
 def set_kill_switch(db: Session, engaged: bool, actor: str, reason: str = "") -> None:
     set_state(db, "kill_switch", {"engaged": engaged, "by": actor, "reason": reason,
-                                  "at": datetime.now(timezone.utc).isoformat()})
+                                  "at": datetime.now(UTC).isoformat()})
     audit(db, actor, "kill_switch.engage" if engaged else "kill_switch.release", "system", reason=reason)
     bus.publish({"type": "kill_switch", "engaged": engaged})
 
@@ -108,7 +108,7 @@ def decide_approval(db: Session, approval: Approval, approve: bool, actor: str, 
     approval.status = ApprovalStatus.approved.value if approve else ApprovalStatus.rejected.value
     approval.decided_by = actor
     approval.decision_note = note
-    approval.decided_at = datetime.now(timezone.utc)
+    approval.decided_at = datetime.now(UTC)
     audit(db, actor, "approval.approved" if approve else "approval.rejected", f"approval:{approval.id}", note=note)
     bus.publish({"type": "approval", "id": approval.id, "status": approval.status})
     return approval

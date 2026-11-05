@@ -19,8 +19,13 @@ def fresh_db(tmp_path):
     from app.ai import llm
     from app.integrations import registry
 
+    from app.security.ratelimit import api_requests, login_failures
+
     llm.set_provider(None)
     registry.reset()
+    api_requests.reset()
+    login_failures.reset()
+    os.environ["ARCHIVE_DIR"] = str(tmp_path / "archive")
     s = dbmod.SessionLocal()
     build_orchestrator().sync_agents(s)
     s.close()

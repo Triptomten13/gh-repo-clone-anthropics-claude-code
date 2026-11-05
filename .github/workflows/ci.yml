@@ -17,11 +17,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.13" }
-      - run: pip install -r requirements-dev.txt "psycopg[binary]"
+      - run: pip install -r requirements-dev.txt "psycopg[binary]" ruff
       - run: python -m pytest -q
-      - name: Migrations apply on PostgreSQL
-        run: alembic upgrade head
+      - run: ruff check .
+      - name: PostgreSQL smoke (migrations + main endpoints)
+        run: python ../scripts/pg_smoke.py
         env: { DATABASE_URL: "postgresql+psycopg://rocky:rocky@localhost/rocky" }
+      - name: Dependency audit
+        run: pip install pip-audit && pip-audit -r requirements.txt
 
   frontend:
     runs-on: ubuntu-latest
@@ -33,3 +36,4 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high

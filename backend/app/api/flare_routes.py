@@ -1,7 +1,7 @@
 """REST API for Rocky Flare (creative intelligence) and Field Operations."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -498,7 +498,7 @@ def add_performance(cid: int, rows_in: list[PerfIn], db: Session = Depends(get_d
         db.add(CampaignPerformance(campaign_id=cid, **r.model_dump()))
     gov.audit(db, user.email, "campaign.performance", f"campaign:{cid}", rows=len(rows_in))
     db.commit()
-    t = orch.submit(db, "flare.campaign_analysis", {"rev": datetime.now(timezone.utc).isoformat()}, requested_by=f"user:{user.email}", priority=5)
+    t = orch.submit(db, "flare.campaign_analysis", {"rev": datetime.now(UTC).isoformat()}, requested_by=f"user:{user.email}", priority=5)
     db.commit()
     orch.drain(20)
     return {"recorded": len(rows_in), "analysis_task": t.id}

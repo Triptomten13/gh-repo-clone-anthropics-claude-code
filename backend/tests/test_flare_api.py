@@ -249,7 +249,7 @@ def test_llm_persona_voice_and_sideways_enrichment(client, product):
         from app.db import SessionLocal
         orch = build_orchestrator()
         db = SessionLocal()
-        t = orch.submit(db, "persona.concept", {"session_id": sid, "persona_id": "the_visionary", "product_id": product, "use_llm": True},
+        orch.submit(db, "persona.concept", {"session_id": sid, "persona_id": "the_visionary", "product_id": product, "use_llm": True},
                         agent_id="transformation_lab", force=True)
         db.commit()
         orch.drain()

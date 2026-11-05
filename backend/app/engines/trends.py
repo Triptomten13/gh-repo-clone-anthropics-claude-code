@@ -11,7 +11,7 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import Iterable
+from collections.abc import Iterable
 
 STAGES = ("emerging", "exploding", "established", "saturated", "declining", "seasonal", "evergreen", "insufficient_data")
 
@@ -45,7 +45,7 @@ def _slope(xs: list[float], ys: list[float]) -> float:
     den = sum((x - mx) ** 2 for x in xs)
     if den == 0:
         return 0.0
-    return sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / den
+    return sum((x - mx) * (y - my) for x, y in zip(xs, ys, strict=True)) / den
 
 
 def _weekly_log_growth(points: list[tuple[datetime, float]]) -> float:

@@ -15,7 +15,7 @@ import os
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from typing import Any
 
 import httpx
@@ -40,7 +40,7 @@ class Signal:
     platform: str
     metric: str
     value: float
-    observed_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    observed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     source_ref: str = ""
     region: str = "SE"
 

@@ -18,7 +18,7 @@ import threading
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutTimeout
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 from typing import Any
 
 from sqlalchemy import func, select
@@ -40,11 +40,11 @@ class GovernanceError(Exception):
 
 
 def _today() -> str:
-    return datetime.now(timezone.utc).date().isoformat()
+    return datetime.now(UTC).date().isoformat()
 
 
 def _aware(dt: datetime) -> datetime:
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def dedupe_key(task_type: str, agent_id: str, payload: dict[str, Any]) -> str:
@@ -87,8 +87,9 @@ class Orchestrator:
             row.budget_day, row.tokens_today = _today(), 0
         if row.tokens_today >= row.daily_token_budget:
             raise Blocked(f"agent {row.id} exhausted its daily token budget ({row.daily_token_budget})")
-        start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-        spent = db.scalar(select(func.coalesce(func.sum(Task.cost_usd), 0.0)).where(Task.created_at >= start)) or 0.0
+        from ..ai.tracing import spent_today
+
+        spent = spent_today(db)  # every model call counts, inside or outside tasks
         if spent >= get_settings().daily_cost_limit_usd:
             raise Blocked(f"global daily AI cost limit reached (${spent:.2f})")
 
@@ -115,7 +116,7 @@ class Orchestrator:
                 raise GovernanceError("circular delegation detected")
             anc = db.get(Task, anc.parent_id) if anc.parent_id else None
         if not force:
-            since = datetime.now(timezone.utc) - timedelta(hours=s.dedupe_window_hours)
+            since = datetime.now(UTC) - timedelta(hours=s.dedupe_window_hours)
             dup = db.scalars(select(Task).where(Task.dedupe_key == key, Task.created_at >= since,
                                                 Task.status.in_(ACTIVE + (TaskStatus.succeeded.value,)))
                              .order_by(Task.id.desc())).first()
@@ -169,7 +170,7 @@ class Orchestrator:
             task = db.get(Task, task_id)
             if task is None or task.status not in ACTIVE:
                 return task
-            task.status, task.started_at = TaskStatus.running.value, datetime.now(timezone.utc)
+            task.status, task.started_at = TaskStatus.running.value, datetime.now(UTC)
             db.commit()
             gov.bus.publish({"type": "task", "id": task.id, "task_type": task.type, "agent": task.agent_id, "status": "running"})
 
@@ -191,7 +192,7 @@ class Orchestrator:
             task = db.get(Task, task_id)
             row = db.get(Agent, task.agent_id)
             task.status, task.error = status, err
-            task.finished_at = datetime.now(timezone.utc)
+            task.finished_at = datetime.now(UTC)
             task.tokens_used, task.cost_usd = tokens, cost
             if row.budget_day != _today():
                 row.budget_day, row.tokens_today = _today(), 0

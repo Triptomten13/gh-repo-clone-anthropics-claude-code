@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, UTC
 
 from ..agents.catalog import build_orchestrator
 from ..db import SessionLocal
@@ -25,7 +25,7 @@ JOBS: list[tuple[str, timedelta, list[tuple[str, dict]]]] = [
 
 
 def tick(now: datetime | None = None) -> dict[str, list]:
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     orch = build_orchestrator()
     ran: dict[str, list] = {}
     db = SessionLocal()

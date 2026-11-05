@@ -7,7 +7,7 @@ here invents market facts; every recommendation carries its reasoning.
 from __future__ import annotations
 
 import hashlib
-from typing import Iterable
+from collections.abc import Iterable
 
 from .schemas import BrandSystem, CreativeDirection, DirectionScores, GenreMatch, HybridGenre
 from .taxonomy import CLASHES, FAMILY_COMPLEMENT, GENRES, PRESET_HYBRIDS, Genre, ProductProfile

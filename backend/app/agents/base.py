@@ -34,7 +34,7 @@ class AgentOutput:
 
 
 class AgentContext:
-    def __init__(self, db: Session, task: Task, agent_row: Agent, orchestrator: "Orchestrator") -> None:
+    def __init__(self, db: Session, task: Task, agent_row: Agent, orchestrator: Orchestrator) -> None:
         self.db = db
         self.task = task
         self.agent_row = agent_row
@@ -61,14 +61,18 @@ class AgentContext:
                                 priority=priority, agent_id=agent_id, depends_on=depends_on)
 
     # --- LLM
-    def llm(self, system: str, prompt: str, schema: dict | None = None, tier: str | None = None) -> LLMResult:
+    def llm(self, system: str, prompt: str, schema: dict | None = None, tier: str | None = None, purpose: str = "") -> LLMResult:
+        from ..ai import tracing
         from ..ai.llm import LLMRefused, LLMUnavailable
 
         self.orch.check_token_budget(self.db, self.agent_row)
         try:
             res = get_provider().complete(system=system, prompt=prompt, schema=schema, tier=tier or self.agent_row.model_tier)
         except (LLMUnavailable, LLMRefused) as e:
+            tracing.record(self.db, getattr(e, "attempts", []), task_id=self.task.id, agent_id=self.agent_row.id, purpose=purpose or self.task.type)
             raise Blocked(str(e)) from e
+        tracing.record(self.db, getattr(res, "attempts", []), task_id=self.task.id, agent_id=self.agent_row.id,
+                       purpose=purpose or self.task.type, fallback_result=res)
         self.tokens += res.input_tokens + res.output_tokens
         self.cost_usd += res.cost_usd
         return res

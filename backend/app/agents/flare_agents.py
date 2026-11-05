@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import statistics
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from typing import Any
 
 from sqlalchemy import select
@@ -424,7 +424,7 @@ class CouncilAgent(BaseAgent):
                           "note": "All concepts are kept. Shortlisting is not approval — a human approves brands."}
             if s.kind == "council":
                 s.decision["council"] = self._council_outputs(ctx, s, turns, ranking)
-        s.status, s.concluded_at = "concluded", datetime.now(timezone.utc)
+        s.status, s.concluded_at = "concluded", datetime.now(UTC)
         return AgentOutput(summary=f"{s.kind.capitalize()} #{s.id} concluded", result={"session_id": s.id, "decision": s.decision},
                            epistemic="estimate", confidence=0.6,
                            risks=[f"split verdict on '{r['name']}'" for r in s.decision.get("ranking", []) if r["consensus"] == "split"])
@@ -725,12 +725,25 @@ class CommercialAgent(BaseAgent):
                            required_approvals=[{"action": "acquisition.offer", "note": "human approval before any offer"}] if self.module == "acquisition" and ops and ops[0].requires_approval else [])
 
 
+class GsusAgent(BaseAgent):
+    """Registry entry for the head orchestrator. G-sus plans and runs work through /api/gsus (it submits tasks
+    to the orchestrator as 'gsus'); it holds no task types of its own and cannot grant itself permissions."""
+
+    id, name, division = "gsus", "G-sus (head orchestrator)", "executive"
+    description = "Understands objectives, plans over registered capabilities, delegates, detects contradictions, verifies and answers."
+    level, tier = 3, "deep"
+    task_types = ()
+
+    def handle(self, ctx: AgentContext, task: Task) -> AgentOutput:
+        raise Blocked("G-sus runs are started through /api/gsus/runs")
+
+
 EXISTING_AGENT_PERSONA = {s["agent_id"]: s["id"] for s in personas.SEED if not s["agent_id"].startswith("p_")
-                          and s["agent_id"] not in ("flare_engine", "flare_council")}
+                          and s["agent_id"] not in ("flare_engine", "flare_council", "gsus")}
 
 
 def flare_agents() -> list[BaseAgent]:
     special = {"p_creative_analyst", *(personas.SEED_BY_ID[m]["agent_id"] for m in CM.MODULES)}
-    out: list[BaseAgent] = [FlareEngineAgent(), CouncilAgent(), CreativeAnalystAgent(), *(CommercialAgent(m) for m in CM.MODULES)]
+    out: list[BaseAgent] = [GsusAgent(), FlareEngineAgent(), CouncilAgent(), CreativeAnalystAgent(), *(CommercialAgent(m) for m in CM.MODULES)]
     out += [PersonaAgent(s) for s in personas.SEED if s["agent_id"].startswith("p_") and s["agent_id"] not in special]
     return out
