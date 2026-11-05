@@ -50,7 +50,8 @@ def _unb64(s: str) -> bytes:
 
 def issue_token(user: User) -> str:
     s = get_settings()
-    body = {"sub": user.id, "email": user.email, "role": user.role, "exp": int(time.time()) + s.token_ttl_hours * 3600}
+    body = {"sub": user.id, "email": user.email, "role": user.role, "tv": user.token_version or 0,
+            "exp": int(time.time()) + s.token_ttl_hours * 3600}
     payload = _b64(json.dumps(body, separators=(",", ":")).encode())
     sig = _b64(hmac.new(s.secret_key.encode(), payload.encode(), hashlib.sha256).digest())
     return f"{payload}.{sig}"
@@ -81,6 +82,10 @@ def current_user(creds: HTTPAuthorizationCredentials | None = Depends(bearer), d
     user = db.get(User, body["sub"])
     if not user:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "unknown user")
+    if user.disabled:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "account disabled")
+    if body.get("tv", 0) != (user.token_version or 0):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "token revoked — sign in again")
     return user
 
 

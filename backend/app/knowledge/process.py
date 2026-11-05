@@ -1,6 +1,8 @@
 """Document processing pipeline: provenance → dedupe/versioning → chunking → embeddings → entity links."""
 from __future__ import annotations
 
+import logging
+
 import hashlib
 import os
 import re
@@ -40,6 +42,8 @@ GAZETTEER: dict[str, tuple[str, tuple[str, ...]]] = {
     "Aramaic": ("language", ()), "Hebrew": ("language", ()), "Coptic": ("language", ()), "Latin": ("language", ()), "Sumerian": ("language", ()),
     "alchemy": ("concept", ("alchemical", "alchemist")), "astrolabe": ("symbol", ()), "Ouroboros": ("symbol", ()),
 }
+
+log = logging.getLogger(__name__)
 
 
 def normalize(text: str) -> str:
@@ -91,12 +95,22 @@ def chunk(text: str, pages: list[tuple[int, int, int]] | None = None) -> list[di
 
 
 def embedder() -> tuple[str, Any]:
+    """(model_id, embed(texts, kind="document"|"query")). Preference: the DAEMON's local GGUF embedding model,
+    then Ollama if configured, then the always-available lexical hash embedder. All three are local."""
+    try:
+        from ..daemon.runtime import local_embedder
+
+        loc = local_embedder()
+        if loc is not None:
+            return loc
+    except Exception as e:  # pragma: no cover - runtime problems fall back to the next local option
+        log.warning("local embedding model unavailable, falling back: %s", e)
     model = os.getenv("OLLAMA_EMBED_MODEL", "").strip()
     if model and os.getenv("OLLAMA_BASE_URL"):
         prov = OllamaProvider()
-        return f"ollama:{model}", lambda texts: prov.embed(model, texts)
+        return f"ollama:{model}", lambda texts, kind="document": prov.embed(model, texts)
     e = LocalHashEmbedder()
-    return e.id, e.embed
+    return e.id, lambda texts, kind="document": e.embed(texts)
 
 
 def find_entities(text: str) -> dict[str, int]:

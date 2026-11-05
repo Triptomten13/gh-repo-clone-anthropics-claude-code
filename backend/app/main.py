@@ -2,19 +2,24 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import threading
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import func, select
 
 from .agents.catalog import build_orchestrator
 from .api.core_routes import router as core_router
+from .api.daemon_routes import router as daemon_router
 from .api.flare_routes import router as flare_router
 from .api.routes import router
 from .config import get_settings
 from .db import SessionLocal, init_db
 from .governance.core import bus
+from .models import Task
 from .security.auth import decode_token
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -27,10 +32,22 @@ async def lifespan(app: FastAPI):
         raise RuntimeError("SECRET_KEY must be set in production")
     init_db()
     db = SessionLocal()
+    orch = build_orchestrator()
     try:
-        build_orchestrator().sync_agents(db)
+        orch.sync_agents(db)
+        from .daemon import library, prompts, registry_seed
+
+        library.ensure_rows(db)
+        prompts.seed(db)
+        registry_seed.seed(db)
+        db.commit()
+        rec = orch.recover_interrupted(db)
+        queued = db.scalar(select(func.count(Task.id)).where(Task.status == "queued"))
     finally:
         db.close()
+    if queued and os.getenv("RESUME_TASKS_ON_START", "true").lower() == "true":
+        logging.getLogger(__name__).info("resuming %s queued task(s) after start (recovered: %s)", queued, rec)
+        threading.Thread(target=orch.drain, args=(200,), daemon=True).start()
     loop_task = None
     if s.scheduler_enabled:
         from .services.scheduler import loop
@@ -47,6 +64,7 @@ app.add_middleware(CORSMiddleware, allow_origins=list(get_settings().cors_origin
 app.include_router(router)
 app.include_router(flare_router)
 app.include_router(core_router)
+app.include_router(daemon_router)
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",

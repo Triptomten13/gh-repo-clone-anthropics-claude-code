@@ -69,7 +69,7 @@ def login(c: Credentials, request: Request, db: Session = Depends(get_db)):
         db.commit()
         raise HTTPException(429, "too many failed attempts — try again later", headers={"Retry-After": str(s.login_window_s)})
     u = db.scalars(select(User).where(User.email == c.email.lower())).first()
-    if not u or not verify_password(c.password, u.password_hash):
+    if not u or u.disabled or not verify_password(c.password, u.password_hash):
         for k in keys:
             login_failures.hit(k, 10_000, s.login_window_s)
         gov.audit(db, c.email, "auth.login_failed", ip=ip)
@@ -103,6 +103,76 @@ def create_user(n: NewUser, db: Session = Depends(get_db), admin: User = Depends
 
 operator = require_role("admin", "operator")
 admin_only = require_role("admin")
+
+
+def _user_out(u: User) -> dict[str, Any]:
+    return {"id": u.id, "email": u.email, "role": u.role, "disabled": bool(u.disabled), "created_at": u.created_at}
+
+
+def _active_admins(db: Session) -> int:
+    return int(db.scalar(select(func.count(User.id)).where(User.role == "admin", User.disabled.is_(False))) or 0)
+
+
+@router.get("/auth/users")
+def list_users(db: Session = Depends(get_db), _: User = Depends(admin_only)):
+    return [_user_out(u) for u in db.scalars(select(User).order_by(User.id)).all()]
+
+
+class UserPatch(BaseModel):
+    role: str | None = Field(default=None, pattern="^(admin|operator|viewer)$")
+    disabled: bool | None = None
+
+
+@router.patch("/auth/users/{uid}")
+def patch_user(uid: int, p: UserPatch, db: Session = Depends(get_db), admin: User = Depends(admin_only)):
+    u = db.get(User, uid)
+    if not u:
+        raise HTTPException(404, "no such user")
+    if u.id == admin.id and (p.disabled or (p.role and p.role != "admin")):
+        raise HTTPException(409, "you cannot disable or demote your own account")
+    losing_admin = u.role == "admin" and not u.disabled and (p.disabled or (p.role and p.role != "admin"))
+    if losing_admin and _active_admins(db) <= 1:
+        raise HTTPException(409, "at least one active admin must remain")
+    changes = p.model_dump(exclude_none=True)
+    for k, v in changes.items():
+        setattr(u, k, v)
+    if changes:
+        u.token_version = (u.token_version or 0) + 1  # existing sessions must re-authenticate with the new rights
+    gov.audit(db, admin.email, "user.update", f"user:{u.id}", **changes)
+    db.commit()
+    return _user_out(u)
+
+
+class PasswordReset(BaseModel):
+    password: str = Field(min_length=10)
+
+
+@router.post("/auth/users/{uid}/password")
+def admin_reset_password(uid: int, p: PasswordReset, db: Session = Depends(get_db), admin: User = Depends(admin_only)):
+    u = db.get(User, uid)
+    if not u:
+        raise HTTPException(404, "no such user")
+    u.password_hash = hash_password(p.password)
+    u.token_version = (u.token_version or 0) + 1
+    gov.audit(db, admin.email, "user.password_reset", f"user:{u.id}")
+    db.commit()
+    return {"ok": True}
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=10)
+
+
+@router.post("/auth/password")
+def change_password(p: PasswordChange, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    if not verify_password(p.current_password, user.password_hash):
+        raise HTTPException(403, "current password is wrong")
+    user.password_hash = hash_password(p.new_password)
+    user.token_version = (user.token_version or 0) + 1
+    gov.audit(db, user.email, "user.password_change", f"user:{user.id}")
+    db.commit()
+    return {"token": issue_token(user)}
 
 
 # =================================================================== overview

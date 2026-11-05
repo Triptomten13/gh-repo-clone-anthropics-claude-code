@@ -16,7 +16,7 @@ from ..security import untrusted
 from .process import embedder
 
 RRF_K = 60
-MIN_COSINE = {"local-hash-256": 0.2, "ollama": 0.35}  # relevance floors per embedder family (tuned by evals/datasets/retrieval.json)
+MIN_COSINE = {"local-hash-256": 0.2, "ollama": 0.35, "gguf": 0.5}  # relevance floors per embedder family (tuned by evals/datasets/retrieval.json)
 EVIDENCE_LABEL = {"historical_fact": "historical fact", "primary_source": "primary source", "religious_interpretation": "religious interpretation",
                   "philosophical_theory": "philosophical theory", "scholarly_hypothesis": "scholarly hypothesis", "speculative": "speculative claim",
                   "fiction_canon": "fictional canon (internal worldbuilding)", "unclassified": "unclassified source"}
@@ -70,7 +70,7 @@ def search(db: Session, query: str, k: int = 8, mode: str = "hybrid", filters: d
             ranked[i] = ranked.get(i, 0) + 1 / (RRF_K + r + 1)
     if mode in ("hybrid", "semantic"):
         model_id, embed = embedder()
-        qv = embed([query])[0]
+        qv = embed([query], kind="query")[0]
         vs = [(cosine(qv, c.embedding) if c.embedding_model == model_id else 0.0, i) for i, (c, _) in enumerate(rows)]
         floor = MIN_COSINE.get(model_id.split(":")[0], 0.3)  # below this a match is noise, not relevance
         for r, (_s, i) in enumerate(sorted((x for x in vs if x[0] >= floor), reverse=True)[:50]):

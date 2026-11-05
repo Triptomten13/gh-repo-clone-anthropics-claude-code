@@ -1,0 +1,4 @@
+# Optional: in-process local inference for DAEMON CORE (llama.cpp via llama-cpp-python, MIT licence).
+# Prebuilt CPU wheels avoid a long C++ build. For CUDA/Metal builds see https://github.com/abetlen/llama-cpp-python
+--extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
+llama-cpp-python==0.3.36

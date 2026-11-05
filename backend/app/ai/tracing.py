@@ -11,8 +11,22 @@ from sqlalchemy.orm import Session
 from ..models import LLMCall
 
 
+def _energy_wh(a: dict) -> float:
+    """ESTIMATE of electricity used by a local inference: wall-clock latency × configured average draw."""
+    if a.get("status") != "ok" or a.get("locality") not in ("local", "lan"):
+        return 0.0
+    try:
+        from ..daemon import state
+
+        watts = float(state.load()["energy"]["watts"])
+    except Exception:
+        watts = 65.0
+    return round(a.get("latency_ms", 0) / 1000 / 3600 * watts, 6)
+
+
 def record(db: Session, attempts: list[dict], *, task_id: int | None = None, run_id: int | None = None, agent_id: str = "",
-           purpose: str = "", fallback_result: Any | None = None) -> None:
+           purpose: str = "", fallback_result: Any | None = None, workflow: str = "", project: str = "", profile: str = "",
+           prompt_hash: str = "") -> None:
     rows = attempts or ([] if fallback_result is None else [{
         "provider": getattr(fallback_result, "provider", "") or "custom", "model": fallback_result.model, "status": "ok",
         "input_tokens": fallback_result.input_tokens, "output_tokens": fallback_result.output_tokens, "cost_usd": fallback_result.cost_usd,
@@ -21,7 +35,10 @@ def record(db: Session, attempts: list[dict], *, task_id: int | None = None, run
         db.add(LLMCall(task_id=task_id, run_id=run_id, agent_id=agent_id, purpose=purpose, provider=a.get("provider", ""),
                        model=a.get("model", ""), tier=a.get("tier", ""), status=a.get("status", ""), input_tokens=a.get("input_tokens", 0),
                        output_tokens=a.get("output_tokens", 0), cost_usd=a.get("cost_usd", 0.0), latency_ms=a.get("latency_ms", 0),
-                       error=a.get("error", "")))
+                       error=a.get("error", ""), workflow=workflow or purpose, project=project, profile=profile,
+                       locality=a.get("locality", "local" if a.get("provider") in ("local", "ollama") else ("cache" if a.get("provider") == "cache" else "external")),
+                       cache_hit=bool(a.get("cache_hit")), saved_usd=a.get("saved_usd", 0.0), energy_wh=_energy_wh(a),
+                       prompt_hash=prompt_hash, cached_input_tokens=a.get("cached_input_tokens", 0)))
     db.flush()
 
 

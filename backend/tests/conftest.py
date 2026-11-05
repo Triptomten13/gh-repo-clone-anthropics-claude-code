@@ -21,10 +21,16 @@ def fresh_db(tmp_path):
 
     from app.security.ratelimit import api_requests, login_failures
 
+    from app.daemon import credentials, quota, state, workers
+
     llm.set_provider(None)
     registry.reset()
     api_requests.reset()
     login_failures.reset()
+    state.invalidate()
+    quota.reset()
+    credentials.invalidate()
+    workers.invalidate()
     os.environ["ARCHIVE_DIR"] = str(tmp_path / "archive")
     s = dbmod.SessionLocal()
     build_orchestrator().sync_agents(s)
@@ -32,6 +38,9 @@ def fresh_db(tmp_path):
     yield dbmod
     llm.set_provider(None)
     registry.reset()
+    state.invalidate()
+    quota.reset()
+    credentials.invalidate()
 
 
 @pytest.fixture()

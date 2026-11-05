@@ -11,7 +11,8 @@ import enum
 from datetime import datetime, UTC
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy.sql.expression import false as sa_false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -51,6 +52,9 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(32), default="operator")  # admin | operator | viewer
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    disabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
+    # bumped on password reset / role change / disable → every previously issued token stops working
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class Agent(Base):
@@ -598,6 +602,16 @@ class LLMCall(Base):
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     latency_ms: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str] = mapped_column(Text, default="")
+    # DAEMON cost intelligence
+    workflow: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    project: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    profile: Mapped[str] = mapped_column(String(16), default="", server_default="")
+    locality: Mapped[str] = mapped_column(String(16), default="", server_default="")  # local | lan | external | cache
+    cache_hit: Mapped[bool] = mapped_column(Boolean, default=False, server_default=sa_false())
+    saved_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")  # actual saving (cache hit = original cost)
+    energy_wh: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")  # ESTIMATE for local inference
+    prompt_hash: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    cached_input_tokens: Mapped[int] = mapped_column(Integer, default=0, server_default="0")  # provider-side prompt-cache reads
 
 
 # =====================================================================================
@@ -817,3 +831,179 @@ class GsusStep(Base):
     approval_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     summary: Mapped[str] = mapped_column(Text, default="")
     output: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+# =====================================================================================
+# DAEMON CORE — sovereign AI infrastructure & cost intelligence
+# =====================================================================================
+class LocalModel(Base):
+    """A model in the local library. Weights live on disk (MODELS_DIR), never in git or the DB.
+    `license` is copied from the source's own metadata at install time; commercial use is only
+    marked permitted for known permissive licenses — anything else needs human review."""
+
+    __tablename__ = "local_models"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(96), unique=True, index=True)
+    display_name: Mapped[str] = mapped_column(String(160))
+    family: Mapped[str] = mapped_column(String(64), default="")
+    kind: Mapped[str] = mapped_column(String(16), default="chat")  # chat | embedding
+    fmt: Mapped[str] = mapped_column(String(16), default="gguf")
+    quantization: Mapped[str] = mapped_column(String(16), default="")
+    parameters: Mapped[str] = mapped_column(String(16), default="")
+    source: Mapped[str] = mapped_column(String(32), default="huggingface")  # huggingface | local_file
+    source_repo: Mapped[str] = mapped_column(String(255), default="")
+    source_file: Mapped[str] = mapped_column(String(255), default="")
+    source_revision: Mapped[str] = mapped_column(String(64), default="")
+    license: Mapped[str] = mapped_column(String(64), default="unknown")
+    license_evidence: Mapped[str] = mapped_column(Text, default="")
+    license_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    commercial_use: Mapped[str] = mapped_column(String(24), default="review_required")  # permitted | review_required
+    sha256_expected: Mapped[str] = mapped_column(String(64), default="")
+    sha256_actual: Mapped[str] = mapped_column(String(64), default="")
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    file_path: Mapped[str] = mapped_column(String(512), default="")
+    status: Mapped[str] = mapped_column(String(16), default="available")  # available|downloading|installed|failed|removed
+    progress_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    error: Mapped[str] = mapped_column(Text, default="")
+    context_length: Mapped[int] = mapped_column(Integer, default=4096)
+    languages: Mapped[list[str]] = mapped_column(JSON, default=list)
+    capabilities: Mapped[list[str]] = mapped_column(JSON, default=list)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    installed_by: Mapped[str] = mapped_column(String(255), default="")
+    installed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ProviderRecord(Base):
+    """Provider registry. Facts carry a source URL and a verification date; unknown stays unknown."""
+
+    __tablename__ = "provider_records"
+    id: Mapped[str] = mapped_column(String(48), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    kind: Mapped[str] = mapped_column(String(24))  # local_runtime | api | model_hub
+    website: Mapped[str] = mapped_column(String(255), default="")
+    docs_url: Mapped[str] = mapped_column(String(255), default="")
+    pricing_url: Mapped[str] = mapped_column(String(255), default="")
+    terms_url: Mapped[str] = mapped_column(String(255), default="")
+    privacy_url: Mapped[str] = mapped_column(String(255), default="")
+    models: Mapped[list[str]] = mapped_column(JSON, default=list)
+    facts: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # free_tier, rate_limits, token_limits, commercial, geo, registration
+    adapter: Mapped[bool] = mapped_column(Boolean, default=False)  # an integration exists in this codebase
+    status: Mapped[str] = mapped_column(String(24), default="unverified")  # operational|unverified|paused|not_integrated
+    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    verified_by: Mapped[str] = mapped_column(String(255), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class ProviderCredential(Base):
+    """Owner-authorised API credential. The secret is Fernet-encrypted at rest and never returned by the API."""
+
+    __tablename__ = "provider_credentials"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider: Mapped[str] = mapped_column(String(48), index=True)
+    label: Mapped[str] = mapped_column(String(128), default="")
+    secret_enc: Mapped[str] = mapped_column(Text)
+    fingerprint: Mapped[str] = mapped_column(String(32))
+    status: Mapped[str] = mapped_column(String(16), default="active")  # active | disabled | revoked
+    attestation: Mapped[str] = mapped_column(Text, default="")
+    authorized_by: Mapped[str] = mapped_column(String(255))
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_validated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_validation: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    rotated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ResponseCache(Base):
+    __tablename__ = "response_cache"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    provider: Mapped[str] = mapped_column(String(48), default="")
+    model: Mapped[str] = mapped_column(String(96), default="")
+    text: Mapped[str] = mapped_column(Text, default="")
+    data: Mapped[Any] = mapped_column(JSON, nullable=True)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    original_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    hits: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class PromptVersion(Base):
+    __tablename__ = "prompt_versions"
+    __table_args__ = (UniqueConstraint("name", "version", name="uq_prompt_versions_name_version"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(96), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    variables: Mapped[list[str]] = mapped_column(JSON, default=list)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[str] = mapped_column(String(255), default="system")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class BenchmarkRun(Base):
+    __tablename__ = "benchmark_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider: Mapped[str] = mapped_column(String(48))
+    model: Mapped[str] = mapped_column(String(96))
+    suite: Mapped[str] = mapped_column(String(48), default="daemon-core-v1")
+    status: Mapped[str] = mapped_column(String(16), default="running")  # running | completed | failed
+    results: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    summary: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_by: Mapped[str] = mapped_column(String(255), default="")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class OptimizationProposal(Base):
+    __tablename__ = "optimization_proposals"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(48))
+    title: Mapped[str] = mapped_column(String(255))
+    detail: Mapped[str] = mapped_column(Text, default="")
+    evidence: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    estimated_saving_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fingerprint: Mapped[str] = mapped_column(String(64), index=True, default="")
+    status: Mapped[str] = mapped_column(String(16), default="proposed")  # proposed | approved | rejected
+    decided_by: Mapped[str] = mapped_column(String(255), default="")
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ModelWorker(Base):
+    """A registered inference worker (OpenAI-compatible endpoint, e.g. llama.cpp server or vLLM) on another machine."""
+
+    __tablename__ = "model_workers"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(64), unique=True)
+    base_url: Mapped[str] = mapped_column(String(255))
+    models: Mapped[list[str]] = mapped_column(JSON, default=list)
+    locality: Mapped[str] = mapped_column(String(16), default="lan")  # local | lan | external
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(String(16), default="unknown")  # healthy | unreachable | unknown
+    last_heartbeat: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    registered_by: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class TrainingDataset(Base):
+    """Fine-tuning lab dataset. Private user data needs explicit consent; nothing trains without a feasibility pass."""
+
+    __tablename__ = "training_datasets"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    purpose: Mapped[str] = mapped_column(Text, default="")
+    source: Mapped[str] = mapped_column(Text, default="")
+    contains_private_data: Mapped[bool] = mapped_column(Boolean, default=False)
+    consent: Mapped[str] = mapped_column(String(24), default="none")  # none | explicit
+    consent_by: Mapped[str] = mapped_column(String(255), default="")
+    record_count: Mapped[int] = mapped_column(Integer, default=0)
+    sha256: Mapped[str] = mapped_column(String(64), default="")
+    status: Mapped[str] = mapped_column(String(24), default="registered")  # registered | blocked_no_consent
+    created_by: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

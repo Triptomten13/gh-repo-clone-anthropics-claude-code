@@ -26,7 +26,9 @@ with TestClient(app) as c:
            data={"evidence_class": "historical_fact"})
     for path in ["/api/overview", "/api/products", "/api/archive/stats", "/api/archive/entities", "/api/archive/graph", "/api/hq/departments",
                  "/api/ai/usage", "/api/ai/models", "/api/archivum/contradictions", "/api/archivum/timeline", "/api/memory", "/api/flare/personas",
-                 "/api/flare/brands", "/api/field/overview", "/api/finance/summary"]:
+                 "/api/flare/brands", "/api/field/overview", "/api/finance/summary", "/api/auth/users", "/api/ai/status", "/api/ai/health",
+                 "/api/daemon/library", "/api/daemon/providers", "/api/daemon/settings", "/api/daemon/prompts", "/api/daemon/tools",
+                 "/api/daemon/credentials", "/api/daemon/benchmarks", "/api/daemon/workers", "/api/daemon/finetune/feasibility"]:
         r = c.get(path)
         print(f"{r.status_code} GET {path}")
         if r.status_code != 200:
@@ -36,6 +38,17 @@ with TestClient(app) as c:
         print(f"{r.status_code} G-sus run → {r.json().get('status')}")
         if r.status_code != 200 or r.json().get("status") != "completed":
             failures.append(("gsus", r.text[:300]))
+    for method, path, body in [("patch", "/api/daemon/settings", {"profile": "ECO"}), ("post", "/api/daemon/proposals/generate", None),
+                               ("post", "/api/daemon/selftest?generate=false", None), ("post", "/api/ai/embeddings", {"texts": ["smoke"]}),
+                               ("post", "/api/daemon/finetune/datasets", {"name": "smoke", "contains_private_data": True})]:
+        r = getattr(c, method)(path, json=body) if body is not None else getattr(c, method)(path)
+        print(f"{r.status_code} {method.upper()} {path}")
+        if r.status_code != 200:
+            failures.append((path, r.text[:300]))
+    r = c.get("/api/daemon/costs")
+    print(f"{r.status_code} GET /api/daemon/costs")
+    if r.status_code != 200:
+        failures.append(("/api/daemon/costs", r.text[:300]))
     r = c.post("/api/ai/evals/run")
     print(f"{r.status_code} evals", [(s["suite"], s["score"]) for s in r.json()["suites"]])
 if failures:

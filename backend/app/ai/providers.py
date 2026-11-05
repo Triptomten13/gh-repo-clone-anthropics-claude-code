@@ -40,6 +40,7 @@ class Completion:
     output_tokens: int
     cost_usd: float
     latency_ms: int
+    cached_input_tokens: int = 0
 
 
 class Provider(Protocol):
@@ -70,20 +71,40 @@ def _parse_json(text: str, schema: dict | None) -> Any | None:
 class AnthropicProvider:
     id = "anthropic"
 
+    locality = "external"
+
     def __init__(self, client: Any | None = None) -> None:
         self._client = client
+        self._injected = client is not None
+        self._key_fp: str | None = None
+
+    @staticmethod
+    def _stored_key() -> str | None:
+        try:
+            from ..daemon.credentials import secret_for
+
+            return secret_for("anthropic")
+        except Exception:
+            return None
 
     def configured(self) -> bool:
-        return self._client is not None or bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN"))
+        return self._injected or bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN") or self._stored_key())
 
     @property
     def client(self) -> Any:
-        if self._client is None:
+        if self._injected:
+            return self._client
+        stored = None if (os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")) else self._stored_key()
+        fp = hashlib.sha256(stored.encode()).hexdigest()[:12] if stored else "env"
+        if self._client is None or fp != self._key_fp:  # rebuilt after a credential rotation
             if not self.configured():
-                raise ProviderUnavailable("ANTHROPIC_API_KEY not set")
+                raise ProviderUnavailable("no Anthropic credential (env ANTHROPIC_API_KEY or an owner-authorised stored key)")
             import anthropic
 
-            self._client = anthropic.Anthropic(timeout=float(os.getenv("ANTHROPIC_TIMEOUT_S", "300")), max_retries=2)
+            kw: dict[str, Any] = {"timeout": float(os.getenv("ANTHROPIC_TIMEOUT_S", "300")), "max_retries": 2}
+            if stored:
+                kw["api_key"] = stored
+            self._client, self._key_fp = anthropic.Anthropic(**kw), fp
         return self._client
 
     def health(self) -> dict[str, Any]:
@@ -94,8 +115,10 @@ class AnthropicProvider:
         output_config: dict[str, Any] = {"effort": effort}
         if schema is not None:
             output_config["format"] = {"type": "json_schema", "schema": schema}
+        # top-level cache_control = automatic prompt caching of the stable prefix (system prompt); prefixes below the
+        # model's minimum cacheable length are simply not cached
         kwargs: dict[str, Any] = dict(model=model, max_tokens=max_tokens, system=system, messages=[{"role": "user", "content": prompt}],
-                                      thinking={"type": "adaptive"}, output_config=output_config)
+                                      thinking={"type": "adaptive"}, output_config=output_config, cache_control={"type": "ephemeral"})
         t0 = time.monotonic()
         try:
             import anthropic
@@ -105,7 +128,9 @@ class AnthropicProvider:
                     resp = self.client.beta.messages.create(betas=["server-side-fallback-2026-07-01"], fallbacks="default", **kwargs)
                 else:
                     resp = self.client.messages.create(**kwargs)
-            except (anthropic.APIConnectionError, anthropic.RateLimitError, anthropic.InternalServerError) as e:
+            except anthropic.RateLimitError as e:
+                raise ProviderUnavailable(f"anthropic: RateLimitError (429): {e}") from e
+            except (anthropic.APIConnectionError, anthropic.InternalServerError, anthropic.AuthenticationError) as e:
                 raise ProviderUnavailable(f"anthropic: {type(e).__name__}: {e}") from e
         except ImportError as e:  # pragma: no cover
             raise ProviderUnavailable("anthropic SDK not installed") from e
@@ -114,8 +139,14 @@ class AnthropicProvider:
         text = "".join(b.text for b in resp.content if getattr(b, "type", "") == "text")
         spec = registry.find("anthropic", model)
         u = resp.usage
+        cache_read = int(getattr(u, "cache_read_input_tokens", 0) or 0)
+        cache_write = int(getattr(u, "cache_creation_input_tokens", 0) or 0)
+        cost = 0.0
+        if spec:  # cache writes ≈1.25× and cache reads ≈0.1× the input price (Anthropic prompt-caching pricing)
+            cost = spec.cost(u.input_tokens, u.output_tokens) + round(
+                (cache_write * 1.25 + cache_read * 0.1) / 1e6 * (spec.input_usd_per_mtok or 0.0), 6)
         return Completion(text, _parse_json(text, schema), "anthropic", resp.model, u.input_tokens, u.output_tokens,
-                          spec.cost(u.input_tokens, u.output_tokens) if spec else 0.0, int((time.monotonic() - t0) * 1000))
+                          round(cost, 6), int((time.monotonic() - t0) * 1000), cache_read)
 
     def stream(self, *, model: str, system: str, prompt: str, effort: str, max_tokens: int) -> Iterator[str]:
         with self.client.messages.stream(model=model, max_tokens=max_tokens, system=system, thinking={"type": "adaptive"},
@@ -135,6 +166,12 @@ class OllamaProvider:
 
     def configured(self) -> bool:
         return bool(self.base_url)
+
+    @property
+    def locality(self) -> str:
+        from ..daemon.runtime import locality_of_url
+
+        return locality_of_url(self.base_url or "http://localhost")
 
     @property
     def http(self) -> httpx.Client:

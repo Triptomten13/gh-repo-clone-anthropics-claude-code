@@ -7,3 +7,8 @@ node_modules/
 .next/
 *.tsbuildinfo
 next-env.d.ts
+
+# local model weights and archive files (never commit)
+backend/data/
+*.gguf
+*.gguf.part

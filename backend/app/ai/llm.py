@@ -50,8 +50,9 @@ class UnavailableProvider:
         return []
 
 
-_provider: Any = None
+_override: Any = None
 _router: LLMRouter | None = None
+_UNAVAILABLE = UnavailableProvider()
 
 
 def get_router() -> LLMRouter:
@@ -62,17 +63,18 @@ def get_router() -> LLMRouter:
 
 
 def get_provider() -> Any:
-    """The active completion provider: the router (if enabled and any provider is configured), a test override, or 'none'."""
-    global _provider
-    if _provider is None:
-        r = get_router()
-        _provider = r if get_settings().llm_enabled and r.configured() else UnavailableProvider()
-    return _provider
+    """The active completion provider: a test override, else the router when enabled and any provider (local
+    model, worker, or authorised API) is configured, else 'none'. Re-evaluated on every call so that installing
+    or activating a local model takes effect without a restart."""
+    if _override is not None:
+        return _override
+    r = get_router()
+    return r if get_settings().llm_enabled and r.configured() else _UNAVAILABLE
 
 
 def set_provider(p: Any | None) -> None:
     """Override (tests, or alternative providers registered at startup). None resets to auto-detection."""
-    global _provider, _router
-    _provider = p
+    global _override, _router
+    _override = p
     if p is None:
         _router = None

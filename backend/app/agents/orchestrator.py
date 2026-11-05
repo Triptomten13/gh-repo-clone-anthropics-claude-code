@@ -237,6 +237,21 @@ class Orchestrator:
                 return t
         return None
 
+    def recover_interrupted(self, db: Session) -> dict[str, int]:
+        """After a restart, tasks left 'running' were interrupted mid-flight: requeue them if attempts remain, else fail them.
+        Nothing is marked succeeded without a result."""
+        requeued = failed = 0
+        for t in db.scalars(select(Task).where(Task.status == TaskStatus.running.value)).all():
+            if t.attempts < t.max_attempts:
+                t.status, requeued = TaskStatus.queued.value, requeued + 1
+            else:
+                t.status, t.error, failed = TaskStatus.failed.value, "interrupted by restart (no attempts left)", failed + 1
+                t.finished_at = datetime.now(UTC)
+        if requeued or failed:
+            gov.audit(db, "system", "orchestrator.recover", "tasks", requeued=requeued, failed=failed)
+        db.commit()
+        return {"requeued": requeued, "failed": failed}
+
     def drain(self, max_tasks: int = 100) -> list[int]:
         """Run queued tasks (including ones spawned along the way) until the queue is empty.
         Single worker per process: a concurrent call returns immediately."""
