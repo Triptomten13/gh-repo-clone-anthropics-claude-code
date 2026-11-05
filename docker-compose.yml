@@ -1,0 +1,54 @@
+# Local / single-host deployment. Secrets come from .env (see .env.example).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rocky
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rocky}
+      POSTGRES_DB: rocky
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rocky"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./backend
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://rocky:${POSTGRES_PASSWORD:-rocky}@db/rocky
+    depends_on:
+      db: { condition: service_healthy }
+    ports: ["8000:8000"]
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+    depends_on: [api]
+    ports: ["3000:3000"]
+
+  backup:
+    # Daily logical backup into ./backups; dumps older than 14 days are pruned.
+    image: postgres:16-alpine
+    depends_on: [db]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-rocky}
+    volumes: ["./backups:/backups"]
+    entrypoint: ["sh", "/backups-script/backup.sh"]
+    configs:
+      - source: backup_script
+        target: /backups-script/backup.sh
+
+configs:
+  backup_script:
+    content: |
+      while true; do
+        pg_dump -h db -U rocky rocky | gzip > "/backups/rocky-$$(date +%F).sql.gz"
+        find /backups -name 'rocky-*.sql.gz' -mtime +14 -delete
+        sleep 86400
+      done
+
+volumes:
+  pgdata:
