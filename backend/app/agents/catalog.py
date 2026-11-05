@@ -43,6 +43,7 @@ class CEOAgent(BaseAgent):
                 ctx.spawn("cfo.economics", base, priority=20).id,
                 ctx.spawn("product.score", base, priority=30).id,
                 ctx.spawn("opportunity.generate", base, priority=40).id,
+                ctx.spawn("flare.mutate", base, priority=45).id,  # every evaluated product enters the Mutation Engine
             ]
             pid = p.id
             return AgentOutput(summary=f"Opportunity pipeline started for product {pid}", result={"spawned": spawned},
@@ -544,9 +545,10 @@ ALL_AGENTS: list[BaseAgent] = [
 
 
 def build_orchestrator():
+    from .flare_agents import flare_agents
     from .orchestrator import orchestrator
 
-    for a in ALL_AGENTS:
+    for a in [*ALL_AGENTS, *flare_agents()]:
         if a.id not in orchestrator.agents:
             orchestrator.register(a)
     return orchestrator

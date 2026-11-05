@@ -32,7 +32,7 @@ def test_full_product_pipeline(fresh_db):
     p = db.get(Product, p.id)
     statuses = {t.type: t.status for t in db.query(Task).all()}
     assert statuses == {"ceo.evaluate_product": "succeeded", "risk.assess": "succeeded", "cfo.economics": "succeeded",
-                        "product.score": "succeeded", "opportunity.generate": "succeeded"}, statuses
+                        "product.score": "succeeded", "opportunity.generate": "succeeded", "flare.mutate": "succeeded"}, statuses
     assert p.opportunity_score is not None and p.net_margin is not None
     assert p.compliance_status in ("needs_review", "restricted", "blocked")  # never auto-approved
     opp = db.query(Opportunity).one()

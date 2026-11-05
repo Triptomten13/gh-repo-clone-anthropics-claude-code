@@ -55,8 +55,10 @@ class AgentContext:
         return {"approval_id": a.id, "action": action, "title": title, "status": a.status}
 
     # --- delegation
-    def spawn(self, task_type: str, payload: dict[str, Any], priority: int = 50) -> Task:
-        return self.orch.submit(self.db, task_type, payload, requested_by=self.agent_row.id, parent=self.task, priority=priority)
+    def spawn(self, task_type: str, payload: dict[str, Any], priority: int = 50, agent_id: str | None = None,
+              depends_on: list[int] | None = None) -> Task:
+        return self.orch.submit(self.db, task_type, payload, requested_by=self.agent_row.id, parent=self.task,
+                                priority=priority, agent_id=agent_id, depends_on=depends_on)
 
     # --- LLM
     def llm(self, system: str, prompt: str, schema: dict | None = None, tier: str | None = None) -> LLMResult:

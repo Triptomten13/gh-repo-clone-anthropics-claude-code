@@ -26,7 +26,7 @@ def test_viewer_cannot_mutate(client):
 
 def test_demo_flow_end_to_end(client):
     r = client.post("/api/demo")
-    assert r.status_code == 200 and r.json()["products"] == 4
+    assert r.status_code == 200 and r.json()["products"] == 9
     r = client.post("/api/tasks", json={"type": "ceo.evaluate_pipeline", "payload": {}})
     assert r.status_code == 200
     r = client.post("/api/tasks", json={"type": "trend.analyze", "payload": {}})
@@ -45,11 +45,11 @@ def test_demo_flow_end_to_end(client):
     ov = client.get("/api/overview").json()
     assert ov["finance"]["contains_demo_data"] is True and ov["finance"]["revenue"] > 0
     assert client.get("/api/finance/forecast").json()["available"] is True
-    assert len(client.get("/api/opportunities").json()) == 4
+    assert len(client.get("/api/opportunities").json()) == 9
     agents = client.get("/api/agents").json()
     assert any(a["tasks_succeeded"] > 0 for a in agents)
     cleared = client.delete("/api/demo").json()
-    assert cleared["products"] == 4
+    assert cleared["products"] == 9
     assert client.get("/api/products").json() == []
 
 

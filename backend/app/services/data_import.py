@@ -131,6 +131,34 @@ def load_demo(db: Session, seed: int = 7) -> dict[str, int]:
              competitor_count=15, competition_quality=35, sentiment=0.6, review_complaint_rate=0.2, return_risk=0.03,
              marketing_potential=80, customization_potential=55, differentiation_potential=75, scalability=55, supplier_id=sup_cn.id),
     ]
+    field_ops = [  # Field Operations sample catalogue (synthetic)
+        dict(name="Roll-top stem bag for e-scooter", category="mobility", tags=["commuter", "winter", "giftable"],
+             description="Waterproof roll-top bag with reflective piping that straps to the scooter stem.", wholesale_price=88, shipping_cost=28,
+             delivery_days=11, retail_price=449, competitor_prices=[299, 399, 449, 499], engagement_signal=72, search_interest=48,
+             competitor_count=70, competition_quality=45, marketing_potential=78, customization_potential=60, differentiation_potential=65,
+             scalability=70, return_risk=0.05, supplier_id=sup_cn.id),
+        dict(name="Winter commuter pannier with reflective panels", category="mobility", tags=["e-bike", "winter", "commuter"],
+             description="Pannier bag for e-bike racks with reflective panels and roll-top closure.", wholesale_price=160, shipping_cost=45,
+             delivery_days=4, retail_price=899, competitor_prices=[699, 899, 1099], purchase_signal=51, search_interest=57,
+             competitor_count=35, competition_quality=60, marketing_potential=70, customization_potential=50, differentiation_potential=60,
+             scalability=65, return_risk=0.04, supplier_id=sup_eu.id),
+        dict(name="Hand-crank emergency radio with solar charging", category="survival", tags=["emergency", "preparedness"],
+             description="Emergency radio with hand crank, solar panel, LED light and power bank.", wholesale_price=140, shipping_cost=35,
+             delivery_days=12, retail_price=599, competitor_prices=[449, 599, 749], purchase_signal=58, search_interest=62,
+             competitor_count=50, competition_quality=55, marketing_potential=65, customization_potential=30, differentiation_potential=45,
+             scalability=60, return_risk=0.06, supplier_id=sup_cn.id),
+        dict(name="Bushcraft ferro rod fire starter set", category="outdoor", tags=["bushcraft", "consumable", "giftable"],
+             description="Ferro rod, striker and tinder tin for fire-starting.", wholesale_price=35, shipping_cost=15, delivery_days=10,
+             retail_price=249, competitor_prices=[149, 199, 249], purchase_signal=49, engagement_signal=66, competitor_count=120,
+             competition_quality=50, marketing_potential=80, customization_potential=70, differentiation_potential=55, scalability=65,
+             return_risk=0.02, supplier_id=sup_cn.id),
+        dict(name="Modular EDC organiser pouch", category="edc", tags=["edc", "modular"],
+             description="Organiser pouch with webbing grid for everyday carry tools, cables and a flashlight.", wholesale_price=55,
+             shipping_cost=20, delivery_days=11, retail_price=349, competitor_prices=[249, 349, 449], engagement_signal=81, search_interest=44,
+             competitor_count=200, competition_quality=65, marketing_potential=85, customization_potential=80, differentiation_potential=70,
+             scalability=75, return_risk=0.03, supplier_id=sup_cn.id),
+    ]
+    products += field_ops
     created = import_products(db, products, is_demo=True)
     obs = 0
     curves = {"sourdough": (0.10, ["youtube", "reddit", "etsy"]), "coffee": (0.02, ["youtube", "etsy"]),
@@ -164,6 +192,23 @@ def clear_demo(db: Session) -> dict[str, int]:
 
     counts = {}
     demo_ids = [p.id for p in db.query(Product).filter(Product.is_demo.is_(True)).all()]
+    from ..models import (BrandConcept, Campaign, CampaignPerformance, CollaborationSession, CollaborationTurn, CompatibilityRecord,
+                          CreativeAsset, GraphEdge, GraphNode)
+
+    concept_ids = [c.id for c in db.query(BrandConcept).filter(BrandConcept.product_id.in_(demo_ids)).all()]
+    camp_ids = [c.id for c in db.query(Campaign).filter(Campaign.product_id.in_(demo_ids)).all()]
+    sess_ids = [x.id for x in db.query(CollaborationSession).filter(CollaborationSession.product_id.in_(demo_ids)).all()]
+    db.query(CreativeAsset).filter(CreativeAsset.concept_id.in_(concept_ids) | CreativeAsset.product_id.in_(demo_ids)).delete(synchronize_session=False)
+    db.query(CampaignPerformance).filter(CampaignPerformance.campaign_id.in_(camp_ids)).delete(synchronize_session=False)
+    counts["campaigns"] = db.query(Campaign).filter(Campaign.id.in_(camp_ids)).delete(synchronize_session=False)
+    counts["concepts"] = db.query(BrandConcept).filter(BrandConcept.id.in_(concept_ids)).delete(synchronize_session=False)
+    db.query(CollaborationTurn).filter(CollaborationTurn.session_id.in_(sess_ids)).delete(synchronize_session=False)
+    counts["sessions"] = db.query(CollaborationSession).filter(CollaborationSession.id.in_(sess_ids)).delete(synchronize_session=False)
+    db.query(CompatibilityRecord).filter(CompatibilityRecord.product_id.in_(demo_ids)).delete(synchronize_session=False)
+    for pid in demo_ids:
+        for g in (f"mutation:{pid}", f"sideways:{pid}"):
+            db.query(GraphNode).filter(GraphNode.graph == g).delete(synchronize_session=False)
+            db.query(GraphEdge).filter(GraphEdge.graph == g).delete(synchronize_session=False)
     counts["opportunities"] = db.query(Opportunity).filter(Opportunity.product_id.in_(demo_ids)).delete(synchronize_session=False)
     counts["ledger_entries"] = db.query(LedgerEntry).filter(LedgerEntry.is_demo.is_(True)).delete(synchronize_session=False)
     counts["products"] = db.query(Product).filter(Product.is_demo.is_(True)).delete(synchronize_session=False)

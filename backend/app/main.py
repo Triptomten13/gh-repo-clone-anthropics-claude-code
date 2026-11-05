@@ -8,6 +8,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from .agents.catalog import build_orchestrator
+from .api.flare_routes import router as flare_router
 from .api.routes import router
 from .config import get_settings
 from .db import SessionLocal, init_db
@@ -42,6 +43,7 @@ app = FastAPI(title="Rocky — Autonomous Commerce Intelligence", version="0.1.0
 app.add_middleware(CORSMiddleware, allow_origins=list(get_settings().cors_origins), allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)
+app.include_router(flare_router)
 
 
 @app.get("/health")

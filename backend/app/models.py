@@ -92,6 +92,7 @@ class Task(Base):
     tokens_used: Mapped[int] = mapped_column(Integer, default=0)
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     requested_by: Mapped[str] = mapped_column(String(64), default="system")
+    depends_on: Mapped[list[int]] = mapped_column(JSON, default=list)  # task ids that must finish first
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -134,6 +135,10 @@ class Supplier(Base):
     offers_custom_packaging: Mapped[bool] = mapped_column(Boolean, default=False)
     has_product_documentation: Mapped[bool] = mapped_column(Boolean, default=False)
     reliability_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    certifications: Mapped[list[str]] = mapped_column(JSON, default=list)  # documents actually received, e.g. "EN 15194 test report"
+    warranty_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    spare_parts_available: Mapped[bool] = mapped_column(Boolean, default=False)
+    qc_process: Mapped[str] = mapped_column(Text, default="")
     notes: Mapped[str] = mapped_column(Text, default="")
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -149,6 +154,7 @@ class Product(Base):
     source_platform: Mapped[str] = mapped_column(String(64), default="manual")
     source_url: Mapped[str] = mapped_column(String(1024), default="")
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), nullable=True)
+    brand_id: Mapped[int | None] = mapped_column(ForeignKey("brands.id"), nullable=True, index=True)
     supplier_location: Mapped[str] = mapped_column(String(64), default="")
     currency: Mapped[str] = mapped_column(String(3), default="SEK")
     wholesale_price: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -270,6 +276,8 @@ class LedgerEntry(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     store_id: Mapped[int | None] = mapped_column(ForeignKey("stores.id"), nullable=True, index=True)
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), nullable=True, index=True)
+    brand_id: Mapped[int | None] = mapped_column(ForeignKey("brands.id"), nullable=True, index=True)
+    customer_ref: Mapped[str] = mapped_column(String(64), default="")  # pseudonymous first-party id, never raw PII
     channel: Mapped[str] = mapped_column(String(64), default="direct")
     kind: Mapped[str] = mapped_column(String(32), index=True)  # revenue|cogs|shipping|fees|ad_spend|refund|chargeback|opex|tax
     amount: Mapped[float] = mapped_column(Float)  # positive numbers; sign derived from kind
@@ -319,4 +327,250 @@ class SystemState(Base):
     __tablename__ = "system_state"
     key: Mapped[str] = mapped_column(String(64), primary_key=True)
     value: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# =====================================================================================
+# ROCKY FLARE — creative intelligence layer
+# =====================================================================================
+class Persona(Base):
+    """Editable agent personality. Deliberately has NO permission or budget fields:
+    personalities shape judgement, never authority."""
+
+    __tablename__ = "personas"
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    agent_id: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    role: Mapped[str] = mapped_column(String(128))
+    division: Mapped[str] = mapped_column(String(64), index=True)
+    personality: Mapped[str] = mapped_column(Text, default="")
+    expertise: Mapped[list[str]] = mapped_column(JSON, default=list)
+    creative_tendencies: Mapped[list[str]] = mapped_column(JSON, default=list)
+    research_methods: Mapped[list[str]] = mapped_column(JSON, default=list)
+    decision_philosophy: Mapped[str] = mapped_column(Text, default="")
+    communication_style: Mapped[str] = mapped_column(String(64), default="systematic")
+    strengths: Mapped[list[str]] = mapped_column(JSON, default=list)
+    known_biases: Mapped[list[str]] = mapped_column(JSON, default=list)
+    creative_specialization: Mapped[str] = mapped_column(String(255), default="")
+    tools: Mapped[list[str]] = mapped_column(JSON, default=list)
+    genre_affinities: Mapped[dict[str, float]] = mapped_column(JSON, default=dict)
+    evaluation_lens: Mapped[dict[str, float]] = mapped_column(JSON, default=dict)
+    naming_style: Mapped[str] = mapped_column(String(32), default="minimal")
+    novelty_appetite: Mapped[float] = mapped_column(Float, default=0.5)  # 0 conservative .. 1 experimental
+    risk_tolerance: Mapped[float] = mapped_column(Float, default=0.5)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class PersonaVersion(Base):
+    __tablename__ = "persona_versions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    persona_id: Mapped[str] = mapped_column(ForeignKey("personas.id"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSON)
+    changed_by: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PersonaMemory(Base):
+    """What a persona learned: calibration points (its score vs. realised outcome) and lessons."""
+
+    __tablename__ = "persona_memory"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    persona_id: Mapped[str] = mapped_column(ForeignKey("personas.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(32))  # calibration | lesson | win
+    concept_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    predicted: Mapped[float | None] = mapped_column(Float, nullable=True)
+    actual: Mapped[float | None] = mapped_column(Float, nullable=True)
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CustomGenre(Base):
+    """Hybrid or user-defined genres discovered by the fusion engine."""
+
+    __tablename__ = "custom_genres"
+    id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    components: Mapped[list[str]] = mapped_column(JSON, default=list)
+    data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    origin: Mapped[str] = mapped_column(String(64), default="fusion")  # fusion | user | preset
+    usage_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Brand(Base):
+    __tablename__ = "brands"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(32), default="concept")  # concept | approved | live | retired
+    concept_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    genre_dna: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    audience: Mapped[str] = mapped_column(Text, default="")
+    segments: Mapped[list[str]] = mapped_column(JSON, default=list)
+    positioning: Mapped[str] = mapped_column(Text, default="")
+    marketing_strategy: Mapped[str] = mapped_column(Text, default="")
+    website: Mapped[str] = mapped_column(String(255), default="")
+    social_strategy: Mapped[str] = mapped_column(Text, default="")
+    categories: Mapped[list[str]] = mapped_column(JSON, default=list)
+    trademark_status: Mapped[str] = mapped_column(String(32), default="pending")  # pending | clear | conflict (set by a human)
+    trademark_note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class BrandConcept(Base):
+    __tablename__ = "brand_concepts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lineage_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    parent_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), nullable=True, index=True)
+    brand_id: Mapped[int | None] = mapped_column(ForeignKey("brands.id"), nullable=True)
+    session_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    author_persona: Mapped[str] = mapped_column(String(64), default="")
+    name: Mapped[str] = mapped_column(String(128))
+    tagline: Mapped[str] = mapped_column(String(255), default="")
+    primary_genre: Mapped[str] = mapped_column(String(96), default="")
+    secondary_genre: Mapped[str] = mapped_column(String(96), default="")
+    hybrid: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    direction: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # the 11 brand-system fields
+    audience: Mapped[str] = mapped_column(Text, default="")
+    usp: Mapped[str] = mapped_column(Text, default="")
+    story: Mapped[str] = mapped_column(Text, default="")
+    positioning: Mapped[str] = mapped_column(String(32), default="mid")
+    evaluation: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    originality: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    panel_scores: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(32), default="draft")  # draft|needs_revision|shortlisted|approved|rejected
+    source: Mapped[str] = mapped_column(String(16), default="engine")  # engine | llm | human
+    epistemic: Mapped[str] = mapped_column(String(16), default="hypothesis")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CreativeAsset(Base):
+    __tablename__ = "creative_assets"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lineage_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    parent_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    brand_id: Mapped[int | None] = mapped_column(ForeignKey("brands.id"), nullable=True, index=True)
+    concept_id: Mapped[int | None] = mapped_column(ForeignKey("brand_concepts.id"), nullable=True, index=True)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), nullable=True)
+    kind: Mapped[str] = mapped_column(String(32), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    prompt: Mapped[str] = mapped_column(Text, default="")
+    provider: Mapped[str] = mapped_column(String(64), default="procedural_svg")
+    mime: Mapped[str] = mapped_column(String(64), default="image/svg+xml")
+    content: Mapped[str] = mapped_column(Text, default="")
+    params: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(16), default="draft")  # draft | approved | rejected
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Campaign(Base):
+    __tablename__ = "campaigns"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    brand_id: Mapped[int | None] = mapped_column(ForeignKey("brands.id"), nullable=True, index=True)
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), nullable=True, index=True)
+    concept_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    name: Mapped[str] = mapped_column(String(255))
+    identity: Mapped[str] = mapped_column(String(48), index=True)
+    genre: Mapped[str] = mapped_column(String(96), default="")
+    platform: Mapped[str] = mapped_column(String(32), default="")
+    audience: Mapped[str] = mapped_column(Text, default="")
+    hook: Mapped[str] = mapped_column(Text, default="")
+    message: Mapped[str] = mapped_column(Text, default="")
+    visual_concept: Mapped[str] = mapped_column(Text, default="")
+    video_format: Mapped[str] = mapped_column(String(64), default="")
+    cta: Mapped[str] = mapped_column(String(128), default="")
+    budget_recommendation_sek: Mapped[float | None] = mapped_column(Float, nullable=True)
+    measurement: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    flags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(32), default="draft")  # draft | pending_approval | running | completed
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CampaignPerformance(Base):
+    """Actual results (from ad platforms or manual entry). Learning only ever uses these rows."""
+
+    __tablename__ = "campaign_performance"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id"), index=True)
+    period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    impressions: Mapped[int] = mapped_column(Integer, default=0)
+    clicks: Mapped[int] = mapped_column(Integer, default=0)
+    engagements: Mapped[int] = mapped_column(Integer, default=0)  # likes + comments + shares
+    spend: Mapped[float] = mapped_column(Float, default=0.0)
+    orders: Mapped[int] = mapped_column(Integer, default=0)
+    revenue: Mapped[float] = mapped_column(Float, default=0.0)
+    contribution: Mapped[float | None] = mapped_column(Float, nullable=True)  # after COGS/fees/returns, before ad spend
+    source: Mapped[str] = mapped_column(String(64), default="manual")
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class CollaborationSession(Base):
+    __tablename__ = "collaboration_sessions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(32), index=True)  # discussion | panel | council | competition
+    topic: Mapped[str] = mapped_column(String(255))
+    product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id"), nullable=True, index=True)
+    concept_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
+    members: Mapped[list[str]] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String(16), default="open")
+    decision: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    concluded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class CollaborationTurn(Base):
+    __tablename__ = "collaboration_turns"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("collaboration_sessions.id"), index=True)
+    persona_id: Mapped[str] = mapped_column(String(64))
+    task_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    seat: Mapped[str] = mapped_column(String(64), default="")
+    stance: Mapped[str] = mapped_column(String(16), default="neutral")  # propose|support|caution|oppose|decide|neutral
+    message: Mapped[str] = mapped_column(Text, default="")
+    scores: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    evidence: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)
+    method: Mapped[str] = mapped_column(String(16), default="heuristic")  # heuristic | llm
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class GraphNode(Base):
+    """Shared relationship graph: mutation graphs, cross-industry graphs, product ecosystems."""
+
+    __tablename__ = "graph_nodes"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    graph: Mapped[str] = mapped_column(String(96), index=True)
+    key: Mapped[str] = mapped_column(String(128))
+    kind: Mapped[str] = mapped_column(String(48))
+    label: Mapped[str] = mapped_column(String(255))
+    data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class GraphEdge(Base):
+    __tablename__ = "graph_edges"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    graph: Mapped[str] = mapped_column(String(96), index=True)
+    source: Mapped[str] = mapped_column(String(128))
+    target: Mapped[str] = mapped_column(String(128))
+    relation: Mapped[str] = mapped_column(String(48))
+    data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class CompatibilityRecord(Base):
+    """Product ↔ vehicle/mount compatibility. Default is 'unverified' — never assumed."""
+
+    __tablename__ = "compatibility_records"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), index=True)
+    target: Mapped[str] = mapped_column(String(255))  # e.g. "Handlebar Ø22.2 mm" or a specific scooter model
+    target_kind: Mapped[str] = mapped_column(String(32), default="vehicle_model")  # vehicle_model | mount_standard
+    status: Mapped[str] = mapped_column(String(32), default="unverified")  # unverified | supplier_claimed | verified | incompatible
+    evidence: Mapped[str] = mapped_column(Text, default="")
+    verified_by: Mapped[str] = mapped_column(String(255), default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

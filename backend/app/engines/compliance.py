@@ -29,7 +29,8 @@ BASELINE = [
 CATEGORIES: dict[str, tuple[tuple[str, ...], list[str], str]] = {
     "electronics": (
         ("electronic", "charger", "usb", "led", "lamp", "power bank", "bluetooth", "wifi", "wireless", "speaker",
-         "headphone", "earbud", "smart", "gadget", "plug", "adapter", "heater", "electric"),
+         "headphone", "earbud", "smart", "gadget", "plug", "adapter", "heater", "electric", "solar", "power station",
+         "inverter", "heated", "hand warmer", "headlamp", "flashlight", "torch", "lantern", "gps"),
         ["CE marking + EU Declaration of Conformity (LVD 2014/35/EU, EMC 2014/30/EU)",
          "RoHS 2011/65/EU restricted substances",
          "WEEE 2012/19/EU: producer registration (Naturvårdsverket) and take-back",
@@ -79,14 +80,85 @@ CATEGORIES: dict[str, tuple[tuple[str, ...], list[str], str]] = {
     ),
 }
 
+# --- Survival, tactical & mobility division (Field Operations) -------------------------------
+CATEGORIES.update({
+    "e_mobility_vehicle": (
+        ("e-scooter", "electric scooter", "elsparkcykel", "e-bike", "ebike", "electric bicycle", "elcykel", "pedelec",
+         "hoverboard", "electric unicycle", "conversion kit", "hub motor"),
+        ["EPAC e-bikes: EN 15194 (≤25 km/h, ≤250 W, pedal assist — otherwise a type-approved vehicle under (EU) 168/2013)",
+         "Light personal e-vehicles (e-scooters): EN 17128; Machinery/LVD/EMC conformity",
+         "Swedish classification and rules (Transportstyrelsen): verify speed/power class, where riding is allowed, helmet rules for under-15s",
+         "Battery pack + charger documentation (Battery Regulation (EU) 2023/1542, IEC 62133 / UN38.3)"],
+        "high",
+    ),
+    "vehicle_safety_component": (
+        ("brake", "brake pad", "tyre", "tire", "inner tube", "mirror", "reflector", "bike light", "bicycle light", "scooter light",
+         "front light", "rear light", "tail light", "fork", "handlebar", "stem", "kickstand", "mudguard", "fender", "rack",
+         "pannier rack", "child seat", "grip"),
+        ["Component affects vehicle safety: verify fitment per model and load/strength testing (ISO 4210 for bicycle parts where relevant)",
+         "Lighting/reflectors: Swedish requirements for cycles in darkness (white front, red rear, reflectors) — verify current rules",
+         "No universal-compatibility claims: publish a verified compatibility list only",
+         "Installation instructions and torque/weight limits in Swedish"],
+        "high",
+    ),
+    "helmets_ppe": (
+        ("helmet", "hjälm", "knee pad", "elbow pad", "back protector", "hi-vis", "high visibility", "reflective vest"),
+        ["PPE Regulation (EU) 2016/425: EU type-examination by a notified body where required",
+         "Bicycle helmets: EN 1078; high-visibility clothing: EN ISO 20471 (only if certified — otherwise no protective claims)"],
+        "high",
+    ),
+    "water_treatment": (
+        ("water filter", "water purifier", "purification", "filtration", "purifying tablet", "water treatment"),
+        ["Claims about removing bacteria/viruses require lab test evidence to a recognised protocol",
+         "Chemical purification tablets: Biocidal Products Regulation (EU) 528/2012",
+         "Food-contact materials for wetted parts"],
+        "high",
+    ),
+    "first_aid_medical": (
+        ("first aid", "first-aid", "bandage", "tourniquet", "trauma kit", "medical kit", "ifak", "splint", "burn gel"),
+        ["Contents may be medical devices: Medical Device Regulation (EU) 2017/745 — CE + documentation per item",
+         "No medical advice in product copy or content without qualified review"],
+        "high",
+    ),
+    "fire_and_fuel": (
+        ("fire starter", "fire-starting", "ferro rod", "firesteel", "fire steel", "stove", "gas canister", "gas cartridge",
+         "fuel", "lighter", "tinder", "matches"),
+        ["Gas cartridges: EN 417 and dangerous-goods transport rules (ADR / IATA) — check carrier acceptance",
+         "Lighters: child-resistance EN 13869 and ISO 9994",
+         "Fire-risk warnings and local fire-ban guidance in Swedish (eldningsförbud)"],
+        "high",
+    ),
+    "blades": (
+        ("knife", "knives", "machete", "axe", "hatchet", "saw", "multi-tool", "multitool", "blade"),
+        ["Knivlagen (1988:254): no marketing that encourages carrying in public; age-verification policy",
+         "Blade-lock and sheath safety; clear 'tool, not weapon' positioning"],
+        "high",
+    ),
+    "radio_communication": (
+        ("radio", "walkie", "walkie-talkie", "pmr", "two-way radio", "transceiver", "satellite messenger"),
+        ["Radio Equipment Directive 2014/53/EU",
+         "Licence-free use only on permitted bands (e.g. PMR446); other transceivers may need a licence (PTS)"],
+        "high",
+    ),
+})
+
 PROHIBITED = (
-    "replica", "counterfeit", "knockoff", "dupe of", "pepper spray", "taser", "stun gun", "knife", "weapon",
+    "replica", "counterfeit", "knockoff", "dupe of", "pepper spray", "taser", "stun gun", "weapon", "brass knuckles",
+    "knuckle duster", "throwing star", "switchblade", "butterfly knife", "body armor", "body armour",
+    "speed unlock", "derestrict", "de-restrict", "speed limiter bypass", "remove speed limit", "unlock speed", "tuning kit",
+    "chip tuning", "tuning chip",
     "cbd", "thc", "nicotine", "vape", "e-cigarette", "prescription", "laser pointer", "firework",
     "fake review", "spy camera",
 )
 HEALTH_CLAIM_PATTERNS = (
     r"\bcures?\b", r"\bheals?\b", r"\btreats?\b", r"\bprevents?\b", r"\bweight loss\b", r"\bdetox\b",
     r"\banti[- ]?aging\b", r"\bboosts? (your )?immun", r"\bpain relief\b", r"\bmedical\b", r"\bclinically proven\b",
+)
+
+
+PERFORMANCE_CLAIMS = (
+    r"\buniversal(ly)? (fit|compatible|compatibility|mount)\b", r"\bfits all\b", r"\bfits every\b", r"\b100% waterproof\b",
+    r"\bmilitary[- ]grade\b", r"\bindestructible\b", r"\bbulletproof\b", r"\bunbreakable\b",
 )
 
 
@@ -102,6 +174,7 @@ class ComplianceReport:
     blockers: list[str] = field(default_factory=list)
     restrictions: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    mobility_class: str | None = None  # vehicle | electrical_system | vehicle_safety_affecting | ordinary_accessory
     disclaimer: str = "Decision support only, not legal advice. Final approval requires a human reviewer."
 
     def as_dict(self) -> dict:
@@ -138,6 +211,40 @@ def assess(name: str, description: str = "", category: str = "", tags: list[str]
         if m:
             blockers.append(f"health/medical claim '{m.group(0)}': requires substantiation and may trigger MDR (EU) 2017/745 or claims rules")
 
+    for pat in PERFORMANCE_CLAIMS:
+        m = re.search(pat, claims_text)
+        if m:
+            blockers.append(f"performance claim '{m.group(0)}': requires verified test evidence (or remove it)")
+
+    # An accessory *for* an e-scooter is not the vehicle itself.
+    accessory = re.search(r"\b(bag|pouch|mount|holder|cover|lock|case|strap|organi[sz]er|pannier|basket|light|lamp|mirror|"
+                          r"grip|mudguard|fender|reflector|helmet|glove|kit|pump|tool|charger|battery bag|phone)\b", text)
+    drivetrain = re.search(r"conversion kit|hub motor|motor kit|controller", text)
+    if "e_mobility_vehicle" in cats and accessory and not drivetrain:
+        cats.remove("e_mobility_vehicle")
+        checklist = [c for c in checklist if c["category"] != "e_mobility_vehicle"]
+        restrictions = [r for r in restrictions if not r.startswith("e_mobility_vehicle")]
+    # Mount *location* words (handlebar, stem, rack …) don't make a bag or phone holder a safety component.
+    if "vehicle_safety_component" in cats:
+        comps = [k for k in CATEGORIES["vehicle_safety_component"][0] if _has(text, k)]
+        location_only = set(comps) <= {"handlebar", "stem", "fork", "rack", "pannier rack", "grip"}
+        storage = re.search(r"\b(bag|pouch|holder|case|organi[sz]er|basket|phone|cover|box|bottle)\b", text)
+        if location_only and storage:
+            cats.remove("vehicle_safety_component")
+            checklist = [c for c in checklist if c["category"] != "vehicle_safety_component"]
+            restrictions = [r for r in restrictions if not r.startswith("vehicle_safety_component")]
+            warnings.append("mounts on the vehicle: state max load; must not obstruct steering, brakes, lights or reflectors")
+    mobility_ctx = re.search(r"scooter|bike|bicycle|cykel|e-mobility|commut|pannier|handlebar", text)
+    mobility_class = None
+    if "e_mobility_vehicle" in cats:
+        mobility_class = "vehicle"
+    elif mobility_ctx and re.search(r"charger|charging|battery pack|spare battery|controller|wiring|dc[- ]?dc|display|throttle", text):
+        mobility_class = "electrical_system"
+    elif "vehicle_safety_component" in cats or ("helmets_ppe" in cats and re.search(r"bike|scooter|cykel", text)):
+        mobility_class = "vehicle_safety_affecting"
+    elif mobility_ctx:
+        mobility_class = "ordinary_accessory"
+
     if non_eu_supplier:
         checklist.append({"id": "import", "item": "Import: customs declaration, duty classification (HS code), EORI number, importer-of-record responsibilities",
                           "done": False, "category": "import"})
@@ -150,4 +257,4 @@ def assess(name: str, description: str = "", category: str = "", tags: list[str]
 
     status = "blocked" if blockers else ("restricted" if restrictions else "needs_review")
     return ComplianceReport(status=status, categories=cats, checklist=checklist, blockers=blockers,
-                            restrictions=restrictions, warnings=warnings)
+                            restrictions=restrictions, warnings=warnings, mobility_class=mobility_class)

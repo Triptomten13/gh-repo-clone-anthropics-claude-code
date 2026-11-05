@@ -38,6 +38,10 @@ ACTION_LEVELS: dict[str, Level] = {
     "product.update_status": Level.INTERNAL_OPS,
     "experiment.create": Level.INTERNAL_OPS,
     "store.create_draft_listing": Level.INTERNAL_OPS,
+    "brand.create": Level.INTERNAL_OPS,
+    "concept.revise": Level.DRAFTING,
+    "asset.generate": Level.DRAFTING,
+    "campaign.draft": Level.DRAFTING,
     # external publishing (approval required)
     "store.publish_listing": Level.EXTERNAL_PUBLISH,
     "content.publish": Level.EXTERNAL_PUBLISH,
@@ -45,12 +49,16 @@ ACTION_LEVELS: dict[str, Level] = {
     "customer.message": Level.EXTERNAL_PUBLISH,
     "supplier.send_inquiry": Level.EXTERNAL_PUBLISH,
     "product.launch": Level.EXTERNAL_PUBLISH,
+    "brand.launch": Level.EXTERNAL_PUBLISH,
+    "asset.publish": Level.EXTERNAL_PUBLISH,
     # financial (approval required)
     "ads.launch_campaign": Level.FINANCIAL,
     "ads.budget_change": Level.FINANCIAL,
     "purchase.order": Level.FINANCIAL,
     "supplier.agreement": Level.FINANCIAL,
     "experiment.run_paid": Level.FINANCIAL,
+    "campaign.launch": Level.FINANCIAL,
+    "acquisition.offer": Level.FINANCIAL,
 }
 
 APPROVAL_THRESHOLD = Level.EXTERNAL_PUBLISH

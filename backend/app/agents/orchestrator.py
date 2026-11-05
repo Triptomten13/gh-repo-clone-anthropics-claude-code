@@ -67,8 +67,9 @@ class Orchestrator:
             self.routes[t] = agent.id
 
     def sync_agents(self, db: Session) -> None:
-        """Ensure an Agent row exists for each registered agent. Never overwrites a
-        permission level changed by a human admin."""
+        """Ensure an Agent row exists for each registered agent (and seed personas). Never
+        overwrites a permission level or persona changed by a human admin."""
+        from ..flare.service import seed_personas
         for a in self.agents.values():
             row = db.get(Agent, a.id)
             if row is None:
@@ -76,6 +77,8 @@ class Orchestrator:
                              permission_level=a.level, model_tier=a.tier))
             else:
                 row.name, row.division, row.description = a.name, a.division, a.description
+        db.flush()
+        seed_personas(db)
         db.commit()
 
     # ------------------------------------------------------------ governance checks
@@ -91,12 +94,14 @@ class Orchestrator:
 
     def submit(self, db: Session, task_type: str, payload: dict[str, Any] | None = None, requested_by: str = "system",
                parent: Task | None = None, priority: int = 50, agent_id: str | None = None,
-               force: bool = False) -> Task:
+               force: bool = False, depends_on: list[int] | None = None) -> Task:
         s = get_settings()
         payload = payload or {}
         if task_type not in self.routes and agent_id is None:
             raise GovernanceError(f"no agent handles task type '{task_type}'")
         agent_id = agent_id or self.routes[task_type]
+        if agent_id not in self.agents:
+            raise GovernanceError(f"unknown agent '{agent_id}'")
         if gov.kill_switch_engaged(db):
             raise GovernanceError("kill switch engaged: no new tasks accepted")
         depth = (parent.depth + 1) if parent else 0
@@ -118,6 +123,7 @@ class Orchestrator:
                 return dup
         t = Task(type=task_type, agent_id=agent_id, parent_id=parent.id if parent else None, depth=depth,
                  payload=payload, dedupe_key=key, priority=priority, requested_by=requested_by,
+                 depends_on=list(depends_on or []),
                  max_attempts=s.default_max_attempts, timeout_s=s.default_task_timeout_s)
         db.add(t)
         db.flush()
@@ -137,7 +143,13 @@ class Orchestrator:
                     raise Blocked("kill switch engaged")
                 if row.status != "active":
                     raise Blocked(f"agent {row.id} is {row.status}")
-                out = agent.handle(ctx, task)
+                if task.type.startswith("persona."):
+                    # Any agent that carries a persona can sit on panels, councils and discussions.
+                    from .flare_agents import persona_handle
+
+                    out = persona_handle(ctx, task, task.payload.get("persona_id"))
+                else:
+                    out = agent.handle(ctx, task)
                 db.commit()  # persist agent side effects (incl. spawned tasks)
                 return TaskStatus.succeeded.value, out, None, ctx.tokens, ctx.cost_usd
             except (Blocked, NotConfigured, NotImplementedPlatform) as e:
@@ -211,8 +223,18 @@ class Orchestrator:
             db.close()
 
     def next_queued(self, db: Session) -> Task | None:
-        return db.scalars(select(Task).where(Task.status == TaskStatus.queued.value)
-                          .order_by(Task.priority.asc(), Task.id.asc())).first()
+        """Highest-priority queued task whose dependencies have all finished (any terminal state).
+        Dependents of failed/blocked tasks still run and must handle missing inputs explicitly."""
+        queued = db.scalars(select(Task).where(Task.status == TaskStatus.queued.value)
+                            .order_by(Task.priority.asc(), Task.id.asc())).all()
+        for t in queued:
+            deps = t.depends_on or []
+            if not deps:
+                return t
+            open_deps = db.scalar(select(func.count(Task.id)).where(Task.id.in_(deps), Task.status.in_(ACTIVE)))
+            if not open_deps:
+                return t
+        return None
 
     def drain(self, max_tasks: int = 100) -> list[int]:
         """Run queued tasks (including ones spawned along the way) until the queue is empty.
