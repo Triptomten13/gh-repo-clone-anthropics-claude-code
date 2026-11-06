@@ -1,6 +1,9 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api, wsUrl } from "./api";
+import { api } from "./api";
+import { subscribe, type LiveEvent, type LiveStatus } from "./live";
+
+export type { LiveEvent, LiveStatus };
 
 export function useApi<T>(path: string | null, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
@@ -18,32 +21,17 @@ export function useApi<T>(path: string | null, deps: unknown[] = []) {
   return { data, error, loading, reload, setData };
 }
 
-export type LiveEvent = { type: string; ts: string; [k: string]: any };
-
-/** Subscribe to the live agent event stream; calls onEvent for each message. */
+/** Subscribe to the live agent event stream (one shared connection per tab — see lib/live.ts). */
 export function useLiveEvents(onEvent?: (e: LiveEvent) => void, max = 80) {
   const [events, setEvents] = useState<LiveEvent[]>([]);
-  const [connected, setConnected] = useState(false);
+  const [status, setStatus] = useState<LiveStatus>("connecting");
   const cb = useRef(onEvent);
   cb.current = onEvent;
-  useEffect(() => {
-    let ws: WebSocket | null = null;
-    let stop = false;
-    let retry: ReturnType<typeof setTimeout>;
-    const connect = () => {
-      ws = new WebSocket(wsUrl());
-      ws.onopen = () => setConnected(true);
-      ws.onclose = () => { setConnected(false); if (!stop) retry = setTimeout(connect, 3000); };
-      ws.onmessage = (m) => {
-        const ev = JSON.parse(m.data) as LiveEvent;
-        setEvents((prev) => [ev, ...prev].slice(0, max));
-        cb.current?.(ev);
-      };
-    };
-    connect();
-    return () => { stop = true; clearTimeout(retry); ws?.close(); };
-  }, [max]);
-  return { events, connected };
+  useEffect(() => subscribe((ev) => {
+    setEvents((prev) => [ev, ...prev].slice(0, max));
+    cb.current?.(ev);
+  }, setStatus), [max]);
+  return { events, connected: status === "live", status };
 }
 
 /** Debounced reload trigger for pages that should refresh when agents finish tasks. */

@@ -1,6 +1,8 @@
 "use client";
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+/** "" = same origin (default): the web server proxies /api, /ws and /health to the backend (next.config.ts), so the
+ *  app works unchanged from a phone on the LAN or behind HTTPS. Set NEXT_PUBLIC_API_URL only for a separate API host. */
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
 const TOKEN_KEY = "rocky.token";
 
 export function getToken(): string | null {
@@ -14,13 +16,31 @@ export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
-export async function api<T = any>(path: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {
+/** Reads time out (a phone on a bad network must not spin forever); writes do not by default, because AI work —
+ *  deep reasoning, research — legitimately takes minutes. Pass timeoutMs to override. */
+const READ_TIMEOUT_MS = 30_000;
+
+export async function api<T = any>(path: string, init: RequestInit & { json?: unknown; timeoutMs?: number } = {}): Promise<T> {
   const headers = new Headers(init.headers);
   const tok = getToken();
   if (tok) headers.set("Authorization", `Bearer ${tok}`);
   let body = init.body;
   if (init.json !== undefined) { headers.set("Content-Type", "application/json"); body = JSON.stringify(init.json); }
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers, body });
+  const method = (init.method || "GET").toUpperCase();
+  const timeout = init.timeoutMs ?? (method === "GET" ? READ_TIMEOUT_MS : 0);
+  const ctrl = new AbortController();
+  const timer = timeout ? setTimeout(() => ctrl.abort(), timeout) : undefined;
+  init.signal?.addEventListener("abort", () => ctrl.abort());
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...init, headers, body, signal: ctrl.signal });
+  } catch (e) {
+    if (init.signal?.aborted) throw e;
+    throw new ApiError(0, ctrl.signal.aborted ? `The server did not answer within ${Math.round(timeout / 1000)} s` :
+      "Cannot reach the Demonkoncernen server — check the connection");
+  } finally {
+    clearTimeout(timer);
+  }
   if (res.status === 401 && typeof window !== "undefined" && !path.startsWith("/api/auth")) {
     setToken(null);
     window.location.href = "/login";
@@ -33,9 +53,6 @@ export async function api<T = any>(path: string, init: RequestInit & { json?: un
   return res.json();
 }
 
-export function wsUrl(): string {
-  return `${API_URL.replace(/^http/, "ws")}/ws/events?token=${encodeURIComponent(getToken() || "")}`;
-}
 
 export const sek = (v: number | null | undefined, digits = 0) =>
   v === null || v === undefined ? "—" : new Intl.NumberFormat("sv-SE", { style: "currency", currency: "SEK", maximumFractionDigits: digits }).format(v);

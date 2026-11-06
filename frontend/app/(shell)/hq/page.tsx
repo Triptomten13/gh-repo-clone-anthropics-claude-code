@@ -59,7 +59,7 @@ export default function HQ() {
               : <Empty title="No recent work" />}
           </Card>
           <Card title="Metrics & links">
-            <div className="mb-3 flex flex-wrap gap-2">{(LINKS[d.id] ?? []).map(([l, h]) => <Link key={h} href={h} className="rounded border border-line px-2 py-0.5 text-[12px] text-cyan hover:border-cyan">{l} →</Link>)}</div>
+            <div className="mb-3 flex flex-wrap gap-2">{(LINKS[d.id] ?? []).map(([l, h]) => <Link key={h} href={h} className="inline-flex min-h-7 items-center rounded border border-line px-2.5 py-1 text-[12px] text-cyan hover:border-cyan pointer-coarse:min-h-9">{l} →</Link>)}</div>
             <Json value={d.metrics} />
           </Card>
         </div>

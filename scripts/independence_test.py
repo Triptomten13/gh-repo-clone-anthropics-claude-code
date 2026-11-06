@@ -83,7 +83,7 @@ class Server:
 
     def start(self) -> Server:
         log = (self.work / "server.log").open("ab")
-        self.proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(PORT)],
+        self.proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(PORT), "--timeout-graceful-shutdown", "5"],
                                      cwd=BACKEND, env=self.env, stdout=log, stderr=subprocess.STDOUT)
         for _ in range(120):
             try:

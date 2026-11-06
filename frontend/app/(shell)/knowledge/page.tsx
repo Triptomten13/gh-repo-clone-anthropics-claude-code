@@ -1,4 +1,5 @@
 "use client";
+import { useDialog } from "@/components/dialog";
 import { Fragment, useEffect, useState } from "react";
 import { GraphView } from "@/components/flare";
 import { Button, Card, Empty, ErrorBanner, EVIDENCE_CLASSES, EvidenceBadge, Field, PageHeader, Stat, StatusBadge, Table } from "@/components/ui";
@@ -174,11 +175,12 @@ function DocumentDetail({ id, onChange, onClose }: { id: number; onChange: () =>
   const d = useApi<any>(`/api/archive/documents/${id}`, [id]);
   const [note, setNote] = useState({ text: "", kind: "interpretation", evidence_class: "religious_interpretation" });
   const [err, setErr] = useState<string | null>(null);
+  const dlg = useDialog();
   const x = d.data;
   if (!x) return <ErrorBanner error={d.error} />;
   const patch = async (body: any) => { try { await api(`/api/archive/documents/${id}`, { method: "PATCH", json: body }); d.reload(); onChange(); } catch (e) { setErr((e as Error).message); } };
   const annotate = async () => { try { await api(`/api/archive/documents/${id}/annotations`, { method: "POST", json: note }); setNote({ ...note, text: "" }); d.reload(); } catch (e) { setErr((e as Error).message); } };
-  const del = async () => { if (!confirm(`Delete "${x.title}" permanently? This cannot be undone.`)) return; try { await api(`/api/archive/documents/${id}?confirm=true`, { method: "DELETE" }); onChange(); onClose(); } catch (e) { setErr((e as Error).message); } };
+  const del = async () => { if (!(await dlg.confirm({ title: `Delete "${x.title}"?`, message: "The document, its chunks, annotations and relations are removed permanently. This cannot be undone.", confirmLabel: "Delete permanently", danger: true }))) return; try { await api(`/api/archive/documents/${id}?confirm=true`, { method: "DELETE" }); onChange(); onClose(); } catch (e) { setErr((e as Error).message); } };
   return (
     <Card title={x.title} action={<span className="font-mono text-[10.5px] text-ink-3">{x.uid.slice(0, 8)} · v{x.version}</span>}>
       <ErrorBanner error={err} />

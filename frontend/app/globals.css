@@ -71,3 +71,30 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--color-viole
   .pulse-dot { animation: pulse 2.4s ease-in-out infinite; }
   @keyframes pulse { 0%, 100% { opacity: .45 } 50% { opacity: 1 } }
 }
+
+/* ---------------------------------------------------------------- cross-platform (desktop · tablet · phone) */
+/* keyboard users always see where they are; mouse clicks do not draw rings */
+:where(a, button, [role="button"], summary, select, input, textarea):focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+/* a <select> is as wide as its longest option — never wider than its container (grid/flex children shrink too) */
+select { max-width: 100%; text-overflow: ellipsis; }
+body { overscroll-behavior-y: none; }
+@media (pointer: coarse) {
+  /* iOS Safari zooms the page when a focused field's text is under 16 px */
+  input, select, textarea { font-size: 16px; }
+  input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; }
+  select { min-height: 40px; }
+}
+/* native <dialog>: backdrop, bottom sheet on phones, side drawer for navigation */
+dialog::backdrop { background: rgb(5 5 9 / 0.66); backdrop-filter: blur(2px); }
+dialog.dk-dialog { max-height: 90dvh; overflow: auto; }
+dialog.dk-drawer[open] { display: block; margin: 0; inset: 0 auto 0 0; }
+@media (prefers-reduced-motion: no-preference) {
+  dialog.dk-drawer[open] > div { animation: dk-slide-in 160ms ease-out; }
+  dialog.dk-dialog[open] { animation: dk-rise 140ms ease-out; }
+  @keyframes dk-slide-in { from { transform: translateX(-24px); opacity: .4 } to { transform: none; opacity: 1 } }
+  @keyframes dk-rise { from { transform: translateY(16px); opacity: .4 } to { transform: none; opacity: 1 } }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}

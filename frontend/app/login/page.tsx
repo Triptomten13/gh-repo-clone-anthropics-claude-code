@@ -27,7 +27,7 @@ export default function Login() {
     } catch (err) { setError((err as Error).message); } finally { setBusy(false); }
   };
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <div className="flex min-h-dvh items-center justify-center px-4 py-[max(1rem,env(safe-area-inset-top))]">
       <form onSubmit={submit} className="w-full max-w-sm rounded-xl border border-line bg-surface p-7">
         <div className="mb-6 flex items-center gap-3">
           <Sigil size={40} />

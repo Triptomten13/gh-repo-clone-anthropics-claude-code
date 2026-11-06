@@ -8,7 +8,7 @@ import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import event as sa_event
 from sqlalchemy import func, select
@@ -105,7 +105,8 @@ async def security_middleware(request: Request, call_next):
     for k, v in SECURITY_HEADERS.items():
         response.headers.setdefault(k, v)
     route = request.scope.get("route")
-    if request.url.path.startswith("/api/") and request.method != "OPTIONS":  # CORS preflights are not application work
+    # CORS preflights are not application work; the live stream's "latency" is its connection lifetime
+    if request.url.path.startswith("/api/") and request.method != "OPTIONS" and request.url.path != "/api/events/stream":
         telemetry.record_request(f"{request.method} {getattr(route, 'path', request.url.path)}", (time.perf_counter() - t0) * 1000,
                                  response.status_code, counter[0], int(response.headers.get("content-length") or 0))
     return response
@@ -125,12 +126,56 @@ def health():
     return {"ok": True}
 
 
+def _live_user(token: str) -> bool:
+    """Live events need the same checks as every API call: valid signature, user exists and is enabled, token not
+    revoked (token_version). A short-lived session — a long-lived stream must not hold a pooled DB connection."""
+    from .models import User
+
+    try:
+        body = decode_token(token)
+    except ValueError:
+        return False
+    with SessionLocal() as db:
+        u = db.get(User, body.get("sub"))
+        return bool(u and not u.disabled and body.get("tv", 0) == (u.token_version or 0))
+
+
+LIVE_KEEPALIVE_S = 15
+
+
+@app.get("/api/events/stream")
+async def events_stream(request: Request):
+    """Live agent/system events as a text/event-stream over plain HTTP (works through any HTTP proxy, incl. the web
+    server's same-origin proxy and phones on the LAN). The token travels in the Authorization header, not the URL."""
+    auth = request.headers.get("authorization", "")
+    token = auth[7:] if auth.lower().startswith("bearer ") else ""
+    if not token or not await asyncio.to_thread(_live_user, token):
+        return JSONResponse({"detail": "invalid or revoked token"}, status_code=401)
+    q = bus.subscribe()
+
+    async def gen():
+        import json
+
+        try:
+            yield "retry: 3000\n: connected\n\n"
+            while not await request.is_disconnected():
+                try:
+                    ev = await asyncio.wait_for(q.get(), timeout=LIVE_KEEPALIVE_S)
+                except TimeoutError:
+                    yield ": keepalive\n\n"  # keeps proxies and mobile networks from closing an idle connection
+                    continue
+                yield f"data: {json.dumps(ev, default=str)}\n\n"
+        finally:
+            bus.unsubscribe(q)
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+
+
 @app.websocket("/ws/events")
 async def events(ws: WebSocket):
+    """Kept for existing clients; the web app uses /api/events/stream (WebSocket upgrades do not pass every proxy)."""
     token = ws.query_params.get("token", "")
-    try:
-        decode_token(token)
-    except ValueError:
+    if not await asyncio.to_thread(_live_user, token):
         await ws.close(code=4401)
         return
     await ws.accept()

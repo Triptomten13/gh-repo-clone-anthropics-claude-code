@@ -16,7 +16,7 @@ export function PageHeader({ title, kicker, children }: { title: string; kicker?
 
 export function Card({ title, action, children, className = "", pad = true }: { title?: ReactNode; action?: ReactNode; children: ReactNode; className?: string; pad?: boolean }) {
   return (
-    <section className={`rounded-lg border border-line bg-surface ${className}`}>
+    <section className={`min-w-0 rounded-lg border border-line bg-surface ${className}`}>
       {title && (
         <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-2.5">
           <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-2">{title}</h2>
@@ -47,7 +47,7 @@ export function Button({ children, onClick, variant = "ghost", disabled, busy, t
   }[variant];
   return (
     <button type={type} title={title} onClick={onClick} disabled={disabled || busy}
-      className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] transition disabled:cursor-not-allowed disabled:opacity-40 ${styles}`}>
+      className={`inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] transition pointer-coarse:min-h-10 disabled:cursor-not-allowed disabled:opacity-40 ${styles}`}>
       {busy && <Loader2 size={13} className="animate-spin" />}
       {children}
     </button>

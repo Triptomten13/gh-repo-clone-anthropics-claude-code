@@ -11,4 +11,4 @@ ENV MODELS_DIR=/app/data/models ARCHIVE_DIR=/app/data/archive
 RUN useradd -r rocky && mkdir -p /app/data/models /app/data/archive && chown -R rocky /app
 USER rocky
 EXPOSE 8000
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --timeout-graceful-shutdown 5"]

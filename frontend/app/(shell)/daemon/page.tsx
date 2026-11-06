@@ -1,4 +1,5 @@
 "use client";
+import { useDialog } from "@/components/dialog";
 import { useEffect, useState } from "react";
 import { CheckCircle2, CloudOff, Cpu, OctagonX, ShieldCheck } from "lucide-react";
 import { LocalExternalBars } from "@/components/charts";
@@ -122,6 +123,7 @@ function StatusTab({ s, act }: { s: any; act: Act }) {
 }
 
 function ModelsTab({ act }: { act: Act }) {
+  const dlg = useDialog();
   const lib = useApi<any>("/api/daemon/library");
   useEffect(() => {
     if (!lib.data?.models?.some((m: any) => m.status === "downloading")) return;
@@ -149,7 +151,7 @@ function ModelsTab({ act }: { act: Act }) {
                   <Button disabled={m.fit.verdict === "does_not_fit"} onClick={() => act(() => api(`/api/daemon/library/${m.key}/install`, { method: "POST" }), lib.reload)}>Install</Button>}
                 {m.runnable && slotFor(m).filter((sl) => !m.active_slots.includes(sl)).map((sl) =>
                   <Button key={sl} onClick={() => act(() => api("/api/daemon/library/activate", { method: "POST", json: { slot: sl, key: m.key } }), lib.reload)}>Use as {sl}</Button>)}
-                {m.status === "installed" && !m.active_slots.length && <Button variant="danger" onClick={() => confirm(`Delete ${m.key} weights from disk?`) && act(() => api(`/api/daemon/library/${m.key}`, { method: "DELETE" }), lib.reload)}>Remove</Button>}
+                {m.status === "installed" && !m.active_slots.length && <Button variant="danger" onClick={async () => { if (await dlg.confirm({ title: `Delete ${m.key}?`, message: "The model weights are removed from disk. Re-installing downloads them again.", confirmLabel: "Delete weights", danger: true })) act(() => api(`/api/daemon/library/${m.key}`, { method: "DELETE" }), lib.reload); }}>Remove</Button>}
               </td>
             </tr>
           ))}
@@ -215,6 +217,7 @@ function CostsTab({ act }: { act: Act }) {
 }
 
 function ProvidersTab({ act }: { act: Act }) {
+  const dlg = useDialog();
   const provs = useApi<any[]>("/api/daemon/providers");
   const creds = useApi<any>("/api/daemon/credentials");
   const [f, setF] = useState({ provider: "anthropic", label: "", secret: "", attest: false });
@@ -231,7 +234,7 @@ function ProvidersTab({ act }: { act: Act }) {
               <td className="text-[12px] text-ink-3">{p.last_verified_at ? <><span className="num">{String(p.last_verified_at).slice(0, 10)}</span><div className="text-[11px]">{p.verified_by}</div></> : "never"}</td>
               <td className="whitespace-nowrap text-right">
                 {p.kind === "api" && p.adapter && <Button onClick={() => act(() => api(`/api/daemon/providers/${p.id}/pause`, { method: "POST", json: { paused: !p.paused } }), provs.reload)}>{p.paused ? "Resume" : "Pause"}</Button>}{" "}
-                <Button onClick={() => { const url = prompt(`Official documentation URL you checked for ${p.name}:`); if (url) act(() => api(`/api/daemon/providers/${p.id}/verify`, { method: "POST", json: { source_url: url, notes: "verified by admin" } }), provs.reload); }}>Record verification</Button>
+                <Button onClick={async () => { const url = await dlg.prompt({ title: `Verify ${p.name}`, message: "Record the official documentation page you checked the pricing and terms against.", label: "Documentation URL", inputType: "url", confirmLabel: "Record verification" }); if (url) act(() => api(`/api/daemon/providers/${p.id}/verify`, { method: "POST", json: { source_url: url, notes: "verified by admin" } }), provs.reload); }}>Record verification</Button>
               </td>
             </tr>
           ))}
@@ -248,8 +251,8 @@ function ProvidersTab({ act }: { act: Act }) {
                 <td className="text-[12px] text-ink-3">{c.last_validated_at ? `${c.last_validation?.ok ? "ok" : "failed"} · ${ago(c.last_validated_at)}` : "never"}</td>
                 <td className="whitespace-nowrap text-right">{c.status === "active" && <>
                   <Button onClick={() => act(() => api(`/api/daemon/credentials/${c.id}/validate`, { method: "POST" }), creds.reload)}>Test</Button>{" "}
-                  <Button onClick={() => { const sec = prompt("New secret (rotation):"); if (sec) act(() => api(`/api/daemon/credentials/${c.id}/rotate`, { method: "POST", json: { secret: sec } }), creds.reload); }}>Rotate</Button>{" "}
-                  <Button variant="danger" onClick={() => confirm("Disconnect and destroy this secret?") && act(() => api(`/api/daemon/credentials/${c.id}`, { method: "DELETE" }), creds.reload)}>Disconnect</Button></>}</td>
+                  <Button onClick={async () => { const sec = await dlg.prompt({ title: "Rotate secret", message: "The new secret replaces the stored one; it is encrypted at rest and never shown again.", label: "New secret", inputType: "password", confirmLabel: "Rotate" }); if (sec) act(() => api(`/api/daemon/credentials/${c.id}/rotate`, { method: "POST", json: { secret: sec } }), creds.reload); }}>Rotate</Button>{" "}
+                  <Button variant="danger" onClick={async () => { if (await dlg.confirm({ title: "Disconnect this credential?", message: "The stored secret is destroyed. Calls that need it stop until a new one is added.", confirmLabel: "Disconnect", danger: true })) act(() => api(`/api/daemon/credentials/${c.id}`, { method: "DELETE" }), creds.reload); }}>Disconnect</Button></>}</td>
               </tr>
             ))}
           </Table>

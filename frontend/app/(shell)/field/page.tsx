@@ -28,7 +28,7 @@ export default function FieldOps() {
   const ov = useApi<any>("/api/field/overview");
   const pick = (t: string) => { setTab(t); history.replaceState(null, "", `#${t}`); };
   return (
-    <div className="field-bg -mx-4 -my-6 min-h-full px-4 py-6 md:-mx-8 md:px-8">
+    <div className="field-bg -mx-3 -my-5 min-h-full px-3 py-5 sm:-mx-5 sm:px-5 lg:-mx-8 lg:-my-6 lg:px-8 lg:py-6">
       <PageHeader kicker="Rocky Flare // Survival, tactical & mobility division" title="Field Operations">
         <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-gold">Prepare · Adapt · Explore · Create</span>
       </PageHeader>

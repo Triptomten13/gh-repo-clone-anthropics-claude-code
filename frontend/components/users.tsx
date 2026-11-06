@@ -1,4 +1,5 @@
 "use client";
+import { useDialog } from "@/components/dialog";
 import { useState } from "react";
 import { Button, Card, ErrorBanner, Field, StatusBadge, Table } from "@/components/ui";
 import { ago, api, setToken } from "@/lib/api";
@@ -13,6 +14,7 @@ export function UsersCard() {
   const [err, setErr] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", password: "", role: "operator" });
+  const dlg = useDialog();
   const act = async (fn: () => Promise<unknown>, ok: string) => {
     try { await fn(); setMsg(ok); setErr(null); users.reload(); } catch (e) { setErr((e as Error).message); setMsg(null); }
   };
@@ -36,7 +38,7 @@ export function UsersCard() {
             <td className="text-ink-3">{ago(u.created_at)}</td>
             <td className="whitespace-nowrap text-right">
               {u.email !== me.data?.email && <>
-                <Button onClick={() => { const pw = prompt(`New password for ${u.email} (min 10 characters)`); if (pw) act(() => api(`/api/auth/users/${u.id}/password`, { method: "POST", json: { password: pw } }), `Password reset for ${u.email}`); }}>Reset password</Button>{" "}
+                <Button onClick={async () => { const pw = await dlg.prompt({ title: `Reset password for ${u.email}`, message: "All of this user's sessions are signed out.", label: "New password", inputType: "password", minLength: 10, confirmLabel: "Reset password", danger: true }); if (pw) act(() => api(`/api/auth/users/${u.id}/password`, { method: "POST", json: { password: pw } }), `Password reset for ${u.email}`); }}>Reset password</Button>{" "}
                 <Button variant={u.disabled ? "ghost" : "danger"} onClick={() => act(() => api(`/api/auth/users/${u.id}`, { method: "PATCH", json: { disabled: !u.disabled } }), `${u.email} ${u.disabled ? "enabled" : "disabled"}`)}>{u.disabled ? "Enable" : "Disable"}</Button>
               </>}
             </td>

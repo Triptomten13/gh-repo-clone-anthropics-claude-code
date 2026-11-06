@@ -36,7 +36,7 @@ export default function ThinkSideways() {
         <div className="mt-3 flex flex-wrap gap-1.5">{(meta.data?.questions ?? []).map((x: string) => <button key={x} onClick={() => setQ(x)} className="rounded border border-line-strong px-2 py-0.5 text-[12px] text-ink-3 hover:text-ink">{x}</button>)}</div>
       </Card>
       <Card title="Field Operations challenges" className="mb-4">
-        <div className="grid gap-1.5 md:grid-cols-2">{(meta.data?.challenges ?? []).map((c: any) => <button key={c.id} onClick={() => challenge(c.id)} className="rounded-md border border-line bg-bg/50 px-3 py-2 text-left text-[12.5px] hover:border-gold">{c.text}<span className="ml-1 font-mono text-[10px] text-ink-3">{c.engine}</span></button>)}</div>
+        <div className="grid gap-1.5 md:grid-cols-2">{(meta.data?.challenges ?? []).map((c: any) => <button key={c.id} onClick={() => challenge(c.id)} className="rounded-md border border-line bg-bg/50 px-3 py-2 text-left text-[12.5px] hover:border-gold">{c.text}<span className="ml-1 break-all font-mono text-[10px] text-ink-3">{c.engine}</span></button>)}</div>
       </Card>
       {!res ? <Card><Empty title="Ask a question or pick a challenge">Results are hypotheses with a named bridge — validate demand before investing.</Empty></Card> : (
         <>

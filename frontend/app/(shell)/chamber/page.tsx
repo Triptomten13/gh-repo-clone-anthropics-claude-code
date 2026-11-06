@@ -55,7 +55,7 @@ export default function Chamber() {
             <label className="sr-only" htmlFor="objective">Objective</label>
             <textarea id="objective" rows={3} className="w-full font-serif text-[16px]" placeholder="State an objective. G-sus plans it, delegates it, checks it — you stay in control."
               value={objective} onChange={(e) => setObjective(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && objective.length > 2) start(); }} />
-            <div className="mt-2 flex flex-wrap gap-1.5">{EXAMPLES.map((x) => <button key={x} onClick={() => setObjective(x)} className="rounded border border-line px-2 py-0.5 text-[11.5px] text-ink-3 hover:border-violet-dim hover:text-ink-2">{x}</button>)}</div>
+            <div className="mt-2 flex flex-wrap gap-1.5">{EXAMPLES.map((x) => <button key={x} onClick={() => setObjective(x)} className="min-h-7 rounded border border-line px-2.5 py-1 text-left text-[11.5px] text-ink-3 hover:border-violet-dim hover:text-ink-2 pointer-coarse:min-h-9">{x}</button>)}</div>
             <div className="mt-3 flex flex-wrap items-end gap-3">
               <Field label="Tone"><select value={tone} onChange={(e) => setTone(e.target.value)}>{(meta.data?.tones ?? []).map((t: string) => <option key={t}>{t.replace("_", " ")}</option>)}</select></Field>
               <Field label="Depth"><select value={depth} onChange={(e) => setDepth(e.target.value)}>{(meta.data?.depths ?? []).map((t: string) => <option key={t}>{t}</option>)}</select></Field>
