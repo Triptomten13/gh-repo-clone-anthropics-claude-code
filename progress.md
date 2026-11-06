@@ -20,7 +20,7 @@
 | Backup / restore | round-trip + tamper refusal tested (docs/BACKUP_RECOVERY.md) |
 | Docs restructure | docs/ holds architecture, AI system, knowledge, agents, security, design system, decisions, testing, roadmap, DAEMON, cost, install, backup |
 
-Totals: 274 backend tests pass; ruff clean; Playwright 81 passed, 4 skipped (Chromium, CI run 34) and WebKit + Firefox
+Totals: 274 backend tests pass; ruff clean; Playwright 109 passed, 4 skipped (Chromium: unit, 4 device profiles, matrices — completion round) and WebKit + Firefox
 green (CI); public demo suite 10/10; migrations 0001–0011 verified on SQLite and PostgreSQL; PostgreSQL smoke passes; Independence Tests A–G pass with real local models (2026-11-06T05:10Z).
 CI was red from the cost-intelligence phase until 2026-11-06 (`cryptography` undeclared) — fixed; CI run 29 green.
 

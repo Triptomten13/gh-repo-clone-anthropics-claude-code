@@ -77,6 +77,10 @@ export const fmt = (v: number | null | undefined, digits = 1) => (v === null || 
 export const ago = (iso?: string | null) => {
   if (!iso) return "—";
   const s = (Date.now() - new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z").getTime()) / 1000;
+  if (s < -5) {  // a time in the future (an expiry, a schedule): "in 23h", never "0s ago"
+    const f = -s;
+    return f < 3600 ? `in ${Math.ceil(f / 60)}m` : f < 86400 ? `in ${Math.floor(f / 3600)}h` : `in ${Math.floor(f / 86400)}d`;
+  }
   if (s < 60) return `${Math.max(0, Math.floor(s))}s ago`;
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;

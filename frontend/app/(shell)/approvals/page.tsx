@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { Button, Card, Empty, ErrorBanner, PageHeader, StatusBadge, Table } from "@/components/ui";
+import { Button, Card, Empty, ErrorBanner, PageHeader, StatusBadge } from "@/components/ui";
 import { useDialog } from "@/components/dialog";
 import { ago, api, sek } from "@/lib/api";
 import { useApi, useMe, useRefreshOn } from "@/lib/hooks";
@@ -86,22 +86,26 @@ function Approvals() {
       </p>
       <Card pad={false}>
         {ap.data?.length ? (
-          <Table head={["Request", "Level", "Amount", "Requested by", "State", "When", "Decision"]} label="Approvals">
+          // one element per approval: a row from md up, a stacked card on phones with the decision right under the request
+          <ul aria-label="Approvals" className="divide-y divide-line">
+            <li aria-hidden className="hidden grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(13rem,1.3fr)] gap-3 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-3 md:grid">
+              <span>Request</span><span>Level · amount</span><span>Requested</span><span>State</span><span>Decision</span></li>
             {ap.data.map((a) => {
               const state = lifecycle(a);
               const from = origin(a);
+              const own = !!me && a.requested_by === `user:${me.email}`;
               return (
-                <tr key={a.id} id={`approval-${a.id}`} className={`align-top ${a.id === focus ? "bg-surface-2" : ""}`}>
-                  <td className="min-w-[16rem]">
+                <li key={a.id} id={`approval-${a.id}`} className={`grid grid-cols-1 gap-2 px-4 py-3 md:grid-cols-[minmax(0,2.2fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(13rem,1.3fr)] md:gap-3 ${a.id === focus ? "bg-surface-2" : ""}`}>
+                  <div className="min-w-0">
                     <div className="font-medium"><span className="font-mono text-[12px] text-violet">#{a.id}</span> {a.title}</div>
                     <div className="font-mono text-[11.5px] text-ink-3">{a.action}{from && <> · <Link className="text-violet underline underline-offset-2" href={from.href}>{from.label}</Link></>}</div>
                     <details className="max-w-lg"><summary className="cursor-pointer text-[12px] text-ink-3">details</summary>
                       <pre className="whitespace-pre-wrap text-[12px] text-ink-2">{a.description}</pre></details>
-                  </td>
-                  <td><span className={`text-[12px] ${a.level >= 5 ? "text-[#f08a8a]" : "text-warning"}`}>L{a.level} · {LEVEL[a.level] ?? a.category}</span></td>
-                  <td className="num">{a.amount_sek ? sek(a.amount_sek) : "—"}</td>
-                  <td className="text-ink-2">{a.requested_by}{a.on_behalf_of && <div className="text-[11px] text-ink-3">for {a.on_behalf_of}</div>}</td>
-                  <td>
+                  </div>
+                  <div className="text-[12px]"><span className={a.level >= 5 ? "text-[#f08a8a]" : "text-warning"}>L{a.level} · {LEVEL[a.level] ?? a.category}</span>
+                    {a.amount_sek ? <div className="num text-ink-2">{sek(a.amount_sek)}</div> : null}</div>
+                  <div className="text-[12px] text-ink-2">{a.requested_by}{a.on_behalf_of && <div className="text-[11px] text-ink-3">for {a.on_behalf_of}</div>}<div className="text-ink-3">{ago(a.created_at)}</div></div>
+                  <div>
                     <StatusBadge status={state === "used" ? "completed" : state} />
                     <div className="mt-1 space-y-0.5 text-[11px] text-ink-3">
                       {a.delegated_to && <div>delegated to {a.delegated_to}</div>}
@@ -110,25 +114,24 @@ function Approvals() {
                       {a.consumed_at && <div>used {ago(a.consumed_at)}</div>}
                       {a.expires_at && !a.consumed_at && !a.revoked_at && <div>{state === "expired" ? "expired" : "expires"} {ago(a.expires_at)}</div>}
                     </div>
-                  </td>
-                  <td className="text-ink-3">{ago(a.created_at)}</td>
-                  <td className="min-w-[13rem]">
-                    {canDecide && a.status === "pending" && !a.revoked_at && (
+                  </div>
+                  <div className="min-w-0">
+                    {canDecide && !own && a.status === "pending" && !a.revoked_at && (
                       <div className="flex flex-col gap-1.5">
                         <input aria-label={`Note for approval ${a.id}`} placeholder="note" value={notes[a.id] ?? ""} onChange={(e) => setNotes({ ...notes, [a.id]: e.target.value })} />
                         <div className="flex gap-1.5">
                           <Button variant="primary" busy={busy === a.id} onClick={() => decide(a.id, true)}>Approve</Button>
                           <Button variant="danger" busy={busy === a.id} onClick={() => decide(a.id, false)}>Reject</Button>
                         </div>
-                        {!!approvers.data?.length && (
-                          <div className="flex gap-1.5">
-                            <select aria-label={`Delegate approval ${a.id} to`} value={delegateTo[a.id] ?? ""} onChange={(e) => setDelegateTo({ ...delegateTo, [a.id]: e.target.value })}>
-                              <option value="">delegate to…</option>
-                              {approvers.data.map((u) => <option key={u.email} value={u.email}>{u.email} ({u.role})</option>)}
-                            </select>
-                            <Button disabled={!delegateTo[a.id]} busy={busy === a.id} onClick={() => delegate(a.id)}>Delegate</Button>
-                          </div>
-                        )}
+                      </div>
+                    )}
+                    {canDecide && a.status === "pending" && !a.revoked_at && !!approvers.data?.length && (
+                      <div className="mt-1.5 flex gap-1.5">
+                        <select className="min-w-0 flex-1" aria-label={`Delegate approval ${a.id} to`} value={delegateTo[a.id] ?? ""} onChange={(e) => setDelegateTo({ ...delegateTo, [a.id]: e.target.value })}>
+                          <option value="">delegate to…</option>
+                          {approvers.data.filter((u) => `user:${u.email}` !== a.requested_by).map((u) => <option key={u.email} value={u.email}>{u.email} ({u.role})</option>)}
+                        </select>
+                        <Button disabled={!delegateTo[a.id]} busy={busy === a.id} onClick={() => delegate(a.id)}>Delegate</Button>
                       </div>
                     )}
                     {state === "approved" && APPLICABLE.has(a.action) && (
@@ -137,12 +140,12 @@ function Approvals() {
                     {canDecide && (state === "approved" || (a.status === "pending" && !a.revoked_at)) && (
                       <div className="mt-1.5"><Button busy={busy === a.id} onClick={() => revoke(a.id)}>Revoke</Button></div>
                     )}
-                    {!canDecide && a.status === "pending" && <span className="text-[12px] text-ink-3">waiting for an approver</span>}
-                  </td>
-                </tr>
+                    {a.status === "pending" && !a.revoked_at && (own || !canDecide) && <p className="mt-1 text-[12px] text-ink-3">{own ? "You asked for this — another approver decides." : "Waiting for an approver."}</p>}
+                  </div>
+                </li>
               );
             })}
-          </Table>
+          </ul>
         ) : <div className="p-4"><Empty title={filter === "pending" ? "Nothing waiting for you" : "No approvals"} /></div>}
       </Card>
     </>

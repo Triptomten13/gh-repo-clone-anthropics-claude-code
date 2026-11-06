@@ -27,7 +27,7 @@ export default function OverviewPage() {
   const toggleBusiness = () => setShowBusiness((v) => { try { localStorage.setItem("dk.home.business", v ? "0" : "1"); } catch { /* ignore */ } return !v; });
   return (
     <>
-      <PageHeader kicker="Command center" title="Operating picture">
+      <PageHeader kicker="Executive overview" title="Operating picture">
         <button className="text-[12px] text-ink-3 hover:text-ink-2" aria-pressed={!showBusiness} onClick={() => toggleBusiness()}>{showBusiness ? "Hide business figures" : "Show business figures"}</button>
       </PageHeader>
       <CommandCenter />

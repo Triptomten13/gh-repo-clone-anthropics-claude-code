@@ -60,4 +60,6 @@ test("formatters show a dash for unknown values instead of inventing one", () =>
   expect([pct(null), fmt(undefined), ago(null)]).toEqual(["—", "—", "—"]);
   expect(pct(0.256)).toBe("26%");
   expect(ago(new Date(Date.now() - 90_000).toISOString())).toBe("1m ago");
+  expect(ago(new Date(Date.now() + 23.5 * 3600_000).toISOString())).toBe("in 23h"); // an expiry is in the future, not "0s ago"
+  expect(ago(new Date(Date.now() + 10 * 60_000).toISOString())).toBe("in 10m");
 });
