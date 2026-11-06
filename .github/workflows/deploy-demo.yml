@@ -1,0 +1,64 @@
+# Deploy the PUBLIC DEMO — manual only, never on push. Nothing here can reach the private Control Center.
+# Prerequisites (repository settings → Secrets and variables → Actions):
+#   secret   RENDER_DEPLOY_HOOK_URL   the demo service's deploy hook (Render → service → Settings → Deploy Hook)
+#   variable DEMO_URL                 the demo's public https URL, e.g. https://demonkoncernen-demo.onrender.com
+# Protect the "public-demo" environment (Settings → Environments) with required reviewers to make every deploy a
+# deliberate, approved step. Rollback: Render → service → Events → "Rollback" to the previous deploy, then re-run the
+# smoke job; or re-run this workflow on the previous commit.
+name: Deploy public demo
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type DEPLOY to deploy this commit to the public demo
+        required: true
+
+jobs:
+  verify:
+    if: github.event.inputs.confirm == 'DEPLOY'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - run: pip install -r requirements-dev.txt ruff
+      - run: ruff check .
+      - run: python -m pytest -q
+
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: public-demo
+    steps:
+      - name: trigger the deploy
+        run: |
+          test -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" || { echo "RENDER_DEPLOY_HOOK_URL is not set" >&2; exit 1; }
+          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" > /dev/null
+
+  smoke:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: wait for the new version
+        run: |
+          test -n "${{ vars.DEMO_URL }}" || { echo "DEMO_URL is not set" >&2; exit 1; }
+          want="${GITHUB_SHA::12}"
+          for i in $(seq 1 60); do
+            got="$(curl -fsS "${{ vars.DEMO_URL }}/api/version" | python3 -c 'import sys,json; print(json.load(sys.stdin)["commit"])' || true)"
+            [ "$got" = "$want" ] && curl -fsS "${{ vars.DEMO_URL }}/ready" && exit 0
+            sleep 15
+          done
+          echo "the demo did not report commit $want and ready within 15 minutes" >&2; exit 1
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci && npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: public demo suite against the live demo
+        run: npm run test:demo
+        working-directory: frontend
+        env: { DEMO_BASE_URL: "${{ vars.DEMO_URL }}" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: live-demo-report, path: frontend/test-results/demo-report.md }

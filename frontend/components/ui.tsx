@@ -132,6 +132,20 @@ export function ScoreBar({ score, confidence }: { score: number | null; confiden
   );
 }
 
+/** Where a value comes from — never colour-only, never implied. */
+const SOURCE: Record<string, { label: string; cls: string; title: string }> = {
+  live: { label: "LIVE DATA", cls: "border-good/50 text-[#5fd35f]", title: "Read from this server's database" },
+  demo: { label: "DEMO DATA", cls: "border-violet-dim text-violet", title: "Synthetic sample records — not real business data" },
+  simulated: { label: "SIMULATED OUTPUT", cls: "border-warning/50 text-warning", title: "Not produced by a model, tool or database" },
+  connected: { label: "CONNECTED SERVICE", cls: "border-cyan/50 text-cyan", title: "A service this server actually reached" },
+  unavailable: { label: "UNAVAILABLE SERVICE", cls: "border-line-strong text-ink-3", title: "Not configured or disabled on this server" },
+  rules: { label: "RULE-BASED · NO AI MODEL", cls: "border-gold/50 text-gold", title: "Computed by deterministic rules and heuristics, not by a language model" },
+};
+export function SourceLabel({ kind }: { kind: keyof typeof SOURCE | string }) {
+  const s = SOURCE[kind] ?? SOURCE.unavailable;
+  return <span title={s.title} className={`inline-flex items-center whitespace-nowrap rounded border px-1.5 py-px font-mono text-[9.5px] tracking-wider ${s.cls}`}>{s.label}</span>;
+}
+
 export function ErrorBanner({ error }: { error: string | null }) {
   if (!error) return null;
   return <div className="mb-4 rounded-md border border-critical/50 bg-critical/10 px-3 py-2 text-sm text-[#f3a5a5]">{error}</div>;

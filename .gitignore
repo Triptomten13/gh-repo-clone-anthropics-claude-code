@@ -19,3 +19,4 @@ backend/data/
 frontend/tests/.auth/
 frontend/test-results/
 frontend/playwright-report/
+.demo-data/

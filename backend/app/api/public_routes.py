@@ -36,9 +36,12 @@ VERSION = "0.3.0"
 
 @lru_cache(maxsize=1)
 def _commit() -> str:
-    """Build commit: GIT_SHA (set by the image build) or the checkout's HEAD; 'unknown' otherwise."""
-    if os.getenv("GIT_SHA"):
-        return os.getenv("GIT_SHA", "")[:12]
+    """Build commit: GIT_SHA (image build arg) or the platform's variable (Render: RENDER_GIT_COMMIT), else the
+    checkout's HEAD; 'unknown' otherwise."""
+    for var in ("GIT_SHA", "RENDER_GIT_COMMIT", "SOURCE_COMMIT"):
+        v = os.getenv(var, "").strip()
+        if v and v != "unknown":
+            return v[:12]
     try:
         out = subprocess.run(["git", "rev-parse", "--short=12", "HEAD"], cwd=Path(__file__).resolve().parents[2],  # noqa: S603,S607 — fixed argv
                              capture_output=True, text=True, timeout=3)

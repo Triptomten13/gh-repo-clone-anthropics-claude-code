@@ -2,7 +2,7 @@
  *  Every page: no sideways scrolling, navigation reachable, no console errors. Chromium emulation — not a physical device. */
 import { expect, test, type Browser } from "@playwright/test";
 import fs from "node:fs";
-import { ROUTES } from "../helpers";
+import { PUBLIC_ROUTES, ROUTES } from "../helpers";
 
 const SIZES: [string, number, number, boolean][] = [
   ["320 small phone", 320, 568, true], ["375 phone", 375, 667, true], ["390 iPhone", 390, 844, true], ["430 large phone", 430, 932, true],
@@ -35,6 +35,13 @@ for (const [label, w, h, touch] of SIZES) {
       }));
       if (m.overflow > 0) problems.push(`${r}: ${m.overflow}px sideways scroll`);
       if (m.nav === 0) problems.push(`${r}: no navigation visible`);
+    }
+    for (const r of PUBLIC_ROUTES) {
+      await page.goto(r);
+      await expect(page.locator("main, form").first()).toBeVisible();
+      await page.waitForTimeout(400);
+      const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      if (overflow > 0) problems.push(`${r}: ${overflow}px sideways scroll`);
     }
     expect(problems, problems.join("\n")).toEqual([]);
     expect(errors, errors.join("\n")).toEqual([]);

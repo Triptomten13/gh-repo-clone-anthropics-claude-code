@@ -242,7 +242,7 @@ function ProvidersTab({ act }: { act: Act }) {
         <p className="p-3 text-[11.5px] text-ink-3">Free tiers, quotas and prices are never assumed. A discovered provider stays &quot;unverified&quot; with unknown facts until someone checks its official documentation and records the URL here.</p>
       </Card>
       <Card title="Credentials (owner-authorised, encrypted at rest)" className="mt-4" pad={false}>
-        {creds.error ? <div className="p-4 text-[13px] text-ink-3">Admins only.</div> : <>
+        {creds.error ? <div className="p-4 text-[13px] text-ink-3">{creds.error.startsWith("Not available in the public demo") ? creds.error : "Admins only."}</div> : <>
           <Table head={["Provider", "Label", "Key", "Status", "Last test", ""]}>
             {(creds.data?.credentials ?? []).map((c: any) => (
               <tr key={c.id}>

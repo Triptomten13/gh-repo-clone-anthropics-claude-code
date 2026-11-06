@@ -19,10 +19,10 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql+psycopg://rocky:${POSTGRES_PASSWORD:-rocky}@db/rocky
-    depends_on:
-      db: { condition: service_healthy }
       # trust X-Forwarded-For only from inside the compose network (the https proxy); the port below is loopback-only
       FORWARDED_ALLOW_IPS: "*"
+    depends_on:
+      db: { condition: service_healthy }
     volumes: ["models:/app/data/models", "archive:/app/data/archive"]   # weights + uploaded documents survive rebuilds
     ports: ["127.0.0.1:8000:8000"]   # loopback only; phones and other computers come in through the https service
 
@@ -44,6 +44,22 @@ services:
       DK_SITE: ${DK_SITE:-localhost}
     ports: ["80:80", "443:443"]
     volumes: ["./deploy/Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data", "caddy_config:/config"]
+
+  demo:
+    # PUBLIC DEMO — a separate instance with its OWN temporary database (container-local SQLite, reset every
+    # DEMO_RESET_HOURS and on restart), no credentials, no models, offline mode forced:
+    #   docker compose --profile demo up --build demo      → http://localhost:3300
+    # It shares nothing with the private stack above (no env_file, no volumes, no database).
+    profiles: ["demo"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args: { GIT_SHA: "${GIT_SHA:-unknown}" }
+    environment:
+      DEMO_MODE: "1"
+      DEMO_SESSION_TTL_MIN: "${DEMO_SESSION_TTL_MIN:-120}"
+      DEMO_RESET_HOURS: "${DEMO_RESET_HOURS:-6}"
+    ports: ["127.0.0.1:3300:3000"]   # put the https profile (or your platform's TLS) in front before exposing it
 
   backup:
     # Daily logical backup into ./backups; dumps older than 14 days are pruned.

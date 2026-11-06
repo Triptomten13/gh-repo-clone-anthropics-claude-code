@@ -53,6 +53,8 @@ const PRIMARY: NavItem[] = [
   { href: "/knowledge", label: "Archive", icon: Library },
   { href: "/control", label: "Control", icon: Gauge },
 ];
+const DEMO_GROUP = { title: "Public demo", tone: "text-violet", items: [{ href: "/demo", label: "Demo Center", icon: Compass }] as NavItem[] };
+const DEMO_PRIMARY: NavItem[] = [{ href: "/demo", label: "Demo", icon: Compass }, ...PRIMARY.slice(1)];
 const GROUPS: { title: string; tone: string; items: NavItem[] }[] = [
   { title: "G-SUS · intelligence", tone: "text-violet", items: GSUS },
   { title: "Demonkoncernen · infrastructure", tone: "text-cyan", items: DEMON },
@@ -86,8 +88,9 @@ export function Shell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    if (!getToken()) router.replace("/login");
-    else setReady(true);
+    if (getToken()) { setReady(true); return; }
+    // signed out: a public demo server greets visitors with its landing page, a private one with the sign-in form
+    api<{ demo_mode?: boolean }>("/api/auth/status").then((r) => router.replace(r.demo_mode ? "/welcome" : "/login")).catch(() => router.replace("/login"));
   }, [router]);
   if (!ready) return null;
   return <DialogProvider><ShellFrame>{children}</ShellFrame></DialogProvider>;
@@ -99,6 +102,8 @@ function ShellFrame({ children }: { children: ReactNode }) {
   const identity = useIdentity();
   const status = useApi<Status>("/api/system/status");
   const approvals = useApi<any[]>("/api/approvals?status=pending");
+  const me = useApi<{ email: string; role: string }>("/api/auth/me");
+  const demo = me.data?.role === "demo";
   const daemon = useApi<any>("/api/ai/status");
   const { status: live } = useLiveEvents((e) => {
     if (e.type === "kill_switch" || e.type === "task") status.reload();
@@ -157,7 +162,7 @@ function ShellFrame({ children }: { children: ReactNode }) {
         </div>
         <div className="manuscript-rule mx-3 mb-2" />
         <nav className="flex-1 overflow-y-auto px-2 pb-3">
-          <NavGroups path={path} pending={pending} compact={collapsed} />
+          <NavGroups path={path} pending={pending} compact={collapsed} demo={demo} />
         </nav>
         <div className={`border-t border-line py-3 text-[11px] text-ink-3 ${collapsed ? "px-2 text-center" : "px-4"}`}>
           <div className={`flex items-center gap-1.5 ${collapsed ? "justify-center" : ""}`} title={LIVE_LABEL[live]}>
@@ -199,13 +204,20 @@ function ShellFrame({ children }: { children: ReactNode }) {
               aria-keyshortcuts="Control+K Meta+K">
               <Search size={13} aria-hidden /> Find a page <kbd className="rounded border border-line px-1 font-mono text-[10px]" aria-hidden>Ctrl K</kbd>
             </button>
-            <KillSwitch engaged={engaged} onChange={status.reload} />
+            {!demo && <KillSwitch engaged={engaged} onChange={status.reload} />}
           </div>
           {unreachable && (
             <div role="status" className="flex items-center gap-2 border-t border-warning/40 bg-warning/10 px-3 py-1.5 text-[12.5px] text-warning sm:px-6">
               <WifiOff size={14} aria-hidden />
               <span className="flex-1">{online ? "Cannot reach the Demonkoncernen server — figures may be out of date." : "This device is offline — figures may be out of date; AI and agents need the server."}</span>
               <button className="underline underline-offset-2" onClick={() => { status.reload(); daemon.reload(); approvals.reload(); }}>Retry</button>
+            </div>
+          )}
+          {demo && (
+            <div role="note" className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-violet-dim bg-violet/10 px-3 py-1.5 text-[12.5px] text-ink-2 sm:px-6">
+              <span className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.16em] text-violet">Public demo</span>
+              <span className="min-w-0 flex-1">Synthetic sample data in an isolated sandbox · no AI model, no external services · your session is temporary.</span>
+              <Link href="/demo" className="text-violet underline-offset-2 hover:underline">Demo Center</Link>
             </div>
           )}
         </header>
@@ -217,7 +229,7 @@ function ShellFrame({ children }: { children: ReactNode }) {
       {/* phones + portrait tablets: bottom tab bar (thumb reach), hidden while typing */}
       <nav aria-label="Primary" className={`fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden ${typing ? "hidden" : ""}`}>
         <ul className="mx-auto flex max-w-2xl">
-          {PRIMARY.map(({ href, label, icon: Icon }) => {
+          {(demo ? DEMO_PRIMARY : PRIMARY).map(({ href, label, icon: Icon }) => {
             const active = isActive(path, href);
             return (
               <li key={href} className="flex-1">
@@ -238,16 +250,16 @@ function ShellFrame({ children }: { children: ReactNode }) {
         </ul>
       </nav>
 
-      {drawer && <NavDrawer path={path} pending={pending} live={live} onClose={() => setDrawer(false)} onSignOut={signOut} company={identity.company_name} />}
+      {drawer && <NavDrawer path={path} pending={pending} live={live} onClose={() => setDrawer(false)} onSignOut={signOut} company={identity.company_name} demo={demo} />}
     </div>
   );
 }
 
-function NavGroups({ path, pending, compact = false, filter = "" }: { path: string; pending: number; compact?: boolean; filter?: string }) {
+function NavGroups({ path, pending, compact = false, filter = "", demo = false }: { path: string; pending: number; compact?: boolean; filter?: string; demo?: boolean }) {
   const f = filter.trim().toLowerCase();
   return (
     <>
-      {GROUPS.map((g) => {
+      {(demo ? [DEMO_GROUP, ...GROUPS] : GROUPS).map((g) => {
         const items = f ? g.items.filter((i) => i.label.toLowerCase().includes(f) || g.title.toLowerCase().includes(f)) : g.items;
         if (!items.length) return null;
         return (
@@ -280,7 +292,7 @@ function NavGroups({ path, pending, compact = false, filter = "" }: { path: stri
 }
 
 /** Every page, searchable: "More" on touch devices, Ctrl/⌘+K on desktop. A modal <dialog>: focus stays inside, Esc closes. */
-function NavDrawer({ path, pending, live, onClose, onSignOut, company }: { path: string; pending: number; live: LiveStatus; onClose: () => void; onSignOut: () => void; company: string }) {
+function NavDrawer({ path, pending, live, onClose, onSignOut, company, demo = false }: { path: string; pending: number; live: LiveStatus; onClose: () => void; onSignOut: () => void; company: string; demo?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [q, setQ] = useState("");
   useEffect(() => {
@@ -305,7 +317,7 @@ function NavDrawer({ path, pending, live, onClose, onSignOut, company }: { path:
               onKeyDown={(e) => { if (e.key === "Enter") { const a = ref.current?.querySelector<HTMLAnchorElement>("nav a"); a?.click(); } }} />
           </label>
         </div>
-        <nav aria-label="All pages" className="flex-1 overflow-y-auto overscroll-contain px-2 pb-3"><NavGroups path={path} pending={pending} filter={q} /></nav>
+        <nav aria-label="All pages" className="flex-1 overflow-y-auto overscroll-contain px-2 pb-3"><NavGroups path={path} pending={pending} filter={q} demo={demo} /></nav>
         <div className="flex items-center gap-3 border-t border-line px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-[12px] text-ink-3">
           <Activity size={13} className={live === "live" ? "text-good" : "text-ink-3"} aria-hidden />
           <span className="flex-1">{LIVE_LABEL[live]}</span>

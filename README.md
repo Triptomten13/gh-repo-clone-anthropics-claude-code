@@ -54,6 +54,11 @@ make test               # every automated test: backend pytest + frontend unit/e
 make help               # all commands (lint, typecheck, build, test-e2e, test-responsive, test-a11y, test-perf, …)
 ```
 
+**Public demo** (a separate, safe instance for showing the platform to others — sample data, temporary visitor
+sessions, no models, no external calls, no admin from the browser): `make demo` → http://localhost:3300, or
+`make demo-docker`, or deploy `render.yaml`. `make test-demo` runs the 10-scenario public demo suite and writes a
+PASS/FAIL report. Architecture, environments, security review and readiness: [docs/PUBLIC_LAUNCH.md](docs/PUBLIC_LAUNCH.md).
+
 Without `make` (e.g. Windows PowerShell): `cd backend; uvicorn app.main:app --port 8000` in one terminal and
 `cd frontend; npm run dev` in another. The browser only talks to the web server, which proxies `/api` to the backend —
 details, real-device testing and HTTPS: [docs/CROSS_PLATFORM.md](docs/CROSS_PLATFORM.md).
@@ -91,6 +96,7 @@ Deterministic agents (scoring, economics, compliance, trends, business models, e
 - [AGENTS.md](docs/AGENTS.md) — every agent, its task types, permission level and outputs
 - [SECURITY.md](docs/SECURITY.md) — permission levels, approvals, kill switch, secrets, data protection, threat model, incident response
 - [CONTROL_PLANE.md](docs/CONTROL_PLANE.md) — governed control plane: architecture, policies, roles, routing, air-gap, implementation matrix
+- [PUBLIC_LAUNCH.md](docs/PUBLIC_LAUNCH.md) — public demo vs private Control Center, hosting, environments, health endpoints, launch readiness
 - [INTEGRATIONS.md](docs/INTEGRATIONS.md) — every connector, its state and the credentials it needs
 - [ROCKY_FLARE.md](docs/ROCKY_FLARE.md) — creative intelligence layer & Field Operations: modules, workflows, acceptance map
 - [ROADMAP.md](docs/ROADMAP.md) — completed / partial / blocked / planned

@@ -15,7 +15,8 @@
     "test:a11y": "playwright test --project=setup --project=matrix tests/matrix/a11y.spec.ts",
     "test:pwa": "playwright test --project=setup --project=matrix tests/matrix/pwa.spec.ts",
     "test:perf": "playwright test --project=setup --project=matrix tests/matrix/perf.spec.ts",
-    "test:report": "playwright show-report"
+    "test:report": "playwright show-report",
+    "test:demo": "playwright test -c playwright.demo.config.ts; s=$?; node scripts/demo-report.mjs; r=$?; [ $s -eq 0 ] && [ $r -eq 0 ]"
   },
   "dependencies": {
     "lucide-react": "1.69.0",

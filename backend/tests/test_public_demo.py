@@ -187,3 +187,21 @@ def test_demo_endpoints_do_not_exist_on_a_private_server(client):
     st = client.get("/api/status").json()
     assert st["demo_mode"] is False and st["environment"] == "development"
     assert client.get("/api/auth/status").json()["demo_mode"] is False
+
+
+def test_unexpected_errors_never_leak_internals(demo_app, monkeypatch):
+    """A crash inside a public endpoint returns a bare 500 — no stack trace, file path or exception text."""
+    from fastapi.testclient import TestClient
+
+    import app.api.public_routes as pr
+    from app.main import app
+
+    def boom() -> str:
+        raise RuntimeError("secret internals: /home/app/config.py password=hunter2")
+
+    monkeypatch.setattr(pr, "_env_label", boom)
+    with TestClient(app, raise_server_exceptions=False) as c:
+        r = c.get("/api/version")
+    assert r.status_code == 500
+    assert "hunter2" not in r.text and "Traceback" not in r.text and "config.py" not in r.text and "RuntimeError" not in r.text
+    assert r.text.strip() == "Internal Server Error"

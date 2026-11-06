@@ -1,6 +1,6 @@
 # Demonkoncernen AB — one command per task. Run `make help`. (Windows without make: see docs/CROSS_PLATFORM.md §commands.)
 .PHONY: help install dev dev-lan prod prod-lan health test test-backend test-frontend test-unit test-e2e test-responsive test-a11y \
-        test-pwa test-perf lint typecheck build verify pg-smoke independence
+        test-pwa test-perf lint typecheck build verify pg-smoke independence demo demo-docker test-demo
 
 help:            ## list the commands
 	@grep -E '^[a-z0-9-]+:.*## ' $(MAKEFILE_LIST) | sed 's/:.*## /\t/' | expand -t 18
@@ -18,6 +18,11 @@ prod:            ## production build + standalone server (what Docker runs; PWA 
 	scripts/dev.sh --prod
 prod-lan:        ## production build, reachable on your network
 	scripts/dev.sh --lan --prod
+demo:            ## the PUBLIC DEMO locally: DEMO_MODE, its own throw-away database (http://localhost:3300)
+	rm -rf .demo-data && mkdir -p .demo-data && DEMO_MODE=1 API_PORT=8300 WEB_PORT=3300 DATABASE_URL=sqlite:///$(CURDIR)/.demo-data/demo.db \
+	  ARCHIVE_DIR=$(CURDIR)/.demo-data/archive SECRET_KEY=local-demo-only scripts/dev.sh --prod
+demo-docker:     ## the public demo as a container (all-in-one image) → http://localhost:3300
+	docker compose --profile demo up --build demo
 health:          ## check a running instance (WEB=http://… DK_EMAIL=… DK_PASSWORD=… for the full check)
 	scripts/health.sh $(or $(WEB),http://localhost:3000)
 
@@ -38,6 +43,8 @@ test-pwa:        ## installability and offline behaviour
 	cd frontend && npm run test:pwa
 test-perf:       ## LCP/CLS/INP/JS size, desktop + throttled phone → frontend/test-results/perf.json
 	cd frontend && npm run test:perf
+test-demo:       ## public demo suite + PASS/FAIL report (own demo stack; DEMO_BASE_URL=https://… checks a deployed demo)
+	cd frontend && npm run test:demo
 
 lint:            ## ruff (backend) + TypeScript strict type check (frontend)
 	cd backend && ruff check .

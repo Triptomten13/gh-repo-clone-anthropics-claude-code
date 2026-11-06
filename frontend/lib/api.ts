@@ -8,8 +8,23 @@ const TOKEN_KEY = "rocky.token";
 export function getToken(): string | null {
   try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
-export function setToken(t: string | null) {
-  try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* storage unavailable */ }
+export function setToken(t: string | null, demo = false) {
+  try {
+    t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY);
+    demo && t ? localStorage.setItem(DEMO_KEY, "1") : localStorage.removeItem(DEMO_KEY);
+  } catch { /* storage unavailable */ }
+}
+
+/** A public-demo visitor session (POST /api/demo/session). Only changes wording — every limit is enforced by the API. */
+const DEMO_KEY = "rocky.demo";
+export function isDemoSession(): boolean {
+  try { return localStorage.getItem(DEMO_KEY) === "1"; } catch { return false; }
+}
+
+/** Start a temporary public-demo session (demo servers only). */
+export async function startDemoSession(): Promise<void> {
+  const r = await api<{ token: string }>("/api/demo/session", { method: "POST" });
+  setToken(r.token, true);
 }
 
 export class ApiError extends Error {
@@ -48,6 +63,7 @@ export async function api<T = any>(path: string, init: RequestInit & { json?: un
   if (!res.ok) {
     let msg = res.statusText;
     try { const j = await res.json(); msg = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail ?? j); } catch { /* not json */ }
+    if (res.status === 403 && isDemoSession()) msg = `Not available in the public demo (${msg})`;
     throw new ApiError(res.status, msg);
   }
   return res.json();

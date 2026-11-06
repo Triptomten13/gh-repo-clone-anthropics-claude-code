@@ -51,7 +51,7 @@ const nextConfig: NextConfig = {
     // the service worker must be re-checked on every visit, or updates are never noticed
     return [
       // pages and static files — not the proxied API, which sends its own headers
-      { source: "/:path((?!api/|ws/|health$).*)", headers: PAGE_SECURITY_HEADERS },
+      { source: "/:path((?!api/|ws/|health$|ready$).*)", headers: PAGE_SECURITY_HEADERS },
       { source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }, { key: "Content-Type", value: "application/javascript; charset=utf-8" }] },
     ];
   },
@@ -60,6 +60,7 @@ const nextConfig: NextConfig = {
       { source: "/api/:path*", destination: `${BACKEND}/api/:path*` },
       { source: "/ws/:path*", destination: `${BACKEND}/ws/:path*` },
       { source: "/health", destination: `${BACKEND}/health` },
+      { source: "/ready", destination: `${BACKEND}/ready` }, // readiness for load balancers: database + schema
     ];
   },
 };

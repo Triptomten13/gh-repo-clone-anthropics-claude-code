@@ -3,19 +3,23 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Sigil } from "@/components/shell";
 import { Button, ErrorBanner, Field } from "@/components/ui";
-import { api, setToken } from "@/lib/api";
+import Link from "next/link";
+import { api, setToken, startDemoSession } from "@/lib/api";
 import { useIdentity } from "@/lib/identity";
 
 export default function Login() {
   const router = useRouter();
   const identity = useIdentity();
   const [setup, setSetup] = useState<boolean | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
+  const [demoBusy, setDemoBusy] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    api<{ setup_required: boolean }>("/api/auth/status").then((r) => setSetup(r.setup_required)).catch((e) => setError(`API unreachable: ${e.message}`));
+    api<{ setup_required: boolean; demo_mode?: boolean }>("/api/auth/status")
+      .then((r) => { setSetup(r.setup_required); setDemoMode(!!r.demo_mode); }).catch((e) => setError(`API unreachable: ${e.message}`));
   }, []);
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +46,17 @@ export default function Login() {
           <Field label="Email"><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" /></Field>
           <Field label="Password (min. 10 characters)"><input type="password" required minLength={10} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={setup ? "new-password" : "current-password"} /></Field>
         </div>
-        <div className="mt-5"><Button variant="primary" type="submit" busy={busy} disabled={setup === null}>{setup ? "Create admin & enter" : "Sign in"}</Button></div>
+        <div className="mt-5"><Button variant={demoMode ? "ghost" : "primary"} type="submit" busy={busy} disabled={setup === null}>{setup ? "Create admin & enter" : "Sign in"}</Button></div>
+        {demoMode && (
+          <div className="mt-6 border-t border-line pt-5">
+            <p className="mb-3 text-[13px] text-ink-2">This is the <b>public demo</b>. No account needed: a temporary visitor session explores synthetic sample data and runs the approved sample workflows.</p>
+            <Button variant="primary" busy={demoBusy} onClick={async () => {
+              setDemoBusy(true);
+              try { await startDemoSession(); router.replace("/demo"); } catch (err) { setError((err as Error).message); } finally { setDemoBusy(false); }
+            }}>Explore the demo</Button>
+          </div>
+        )}
+        <p className="mt-5 text-[12px] text-ink-3"><Link className="underline-offset-2 hover:underline" href="/welcome">About this platform</Link> · <Link className="underline-offset-2 hover:underline" href="/status">System status</Link></p>
       </form>
     </div>
   );
