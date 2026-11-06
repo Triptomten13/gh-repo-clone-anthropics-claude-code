@@ -93,8 +93,14 @@ def request_approval(db: Session, action: str, title: str, requested_by: str, de
                                                  Approval.status == ApprovalStatus.pending.value)).first()
     if existing:
         return existing
+    from datetime import timedelta
+
+    from .policy import APPROVAL_TTL_H, payload_hash
+
     a = Approval(action=action, level=int(required_level(action)), title=title, description=description,
-                 payload=payload or {}, amount_sek=amount_sek, requested_by=requested_by)
+                 payload=payload or {}, amount_sek=amount_sek, requested_by=requested_by, payload_hash=payload_hash(payload),
+                 expires_at=datetime.now(UTC) + timedelta(hours=APPROVAL_TTL_H),
+                 on_behalf_of=requested_by.removeprefix("user:") if requested_by.startswith("user:") else "")
     db.add(a)
     db.flush()
     audit(db, requested_by, "approval.requested", f"approval:{a.id}", approval_action=action, title=title, amount_sek=amount_sek)
@@ -102,15 +108,56 @@ def request_approval(db: Session, action: str, title: str, requested_by: str, de
     return a
 
 
+def _expired(a: Approval) -> bool:
+    exp = a.expires_at
+    if exp is None:
+        return False
+    return (exp if exp.tzinfo else exp.replace(tzinfo=UTC)) <= datetime.now(UTC)
+
+
 def decide_approval(db: Session, approval: Approval, approve: bool, actor: str, note: str = "") -> Approval:
+    """Human decision only (agents have no way to call this). Rejects: decided twice, expired, the requester or the
+    person the work is for deciding (no self-approval), anyone but the delegate once delegated."""
     if approval.status != ApprovalStatus.pending.value:
         raise ValueError(f"approval already {approval.status}")
+    if _expired(approval):
+        approval.status = "expired"
+        audit(db, "system", "approval.expired", f"approval:{approval.id}")
+        raise ValueError("approval request expired — silence is never approval; request it again")
+    if approve and (approval.requested_by == f"user:{actor}" or approval.on_behalf_of == actor):
+        raise ValueError("you cannot approve your own request — another approver must decide")
+    if approval.delegated_to and approval.delegated_to != actor:
+        raise ValueError(f"this approval was delegated to {approval.delegated_to}")
     approval.status = ApprovalStatus.approved.value if approve else ApprovalStatus.rejected.value
     approval.decided_by = actor
     approval.decision_note = note
     approval.decided_at = datetime.now(UTC)
     audit(db, actor, "approval.approved" if approve else "approval.rejected", f"approval:{approval.id}", note=note)
     bus.publish({"type": "approval", "id": approval.id, "status": approval.status})
+    return approval
+
+
+def revoke_approval(db: Session, approval: Approval, actor: str, reason: str = "") -> Approval:
+    """Withdraw an approval (pending or approved, not yet used). Execution checks revocation at use time."""
+    if approval.consumed_at is not None:
+        raise ValueError("already used — revoking cannot undo an executed action")
+    if approval.revoked_at is not None:
+        raise ValueError("already revoked")
+    approval.revoked_at, approval.revoked_by = datetime.now(UTC), actor
+    if approval.status == ApprovalStatus.pending.value:
+        approval.status = "revoked"
+    audit(db, actor, "approval.revoked", f"approval:{approval.id}", reason=reason)
+    bus.publish({"type": "approval", "id": approval.id, "status": "revoked"})
+    return approval
+
+
+def delegate_approval(db: Session, approval: Approval, actor: str, to: str) -> Approval:
+    if approval.status != ApprovalStatus.pending.value:
+        raise ValueError(f"approval already {approval.status}")
+    if to in (approval.on_behalf_of,) or approval.requested_by == f"user:{to}":
+        raise ValueError("cannot delegate to the requester")
+    approval.delegated_to = to
+    audit(db, actor, "approval.delegated", f"approval:{approval.id}", to=to)
     return approval
 
 

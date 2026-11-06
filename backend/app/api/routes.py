@@ -19,7 +19,7 @@ from ..governance import core as gov
 from ..integrations import registry as connectors
 from ..models import (Agent, AgentMessage, Approval, AuditLog, Experiment, LedgerEntry, Lesson, Opportunity, Product,
                       Store, Supplier, Task, Trend, User)
-from ..security.rbac import ROLE_PATTERN
+from ..security.rbac import ROLE_PATTERN, require_permission
 from ..security.auth import current_user, hash_password, issue_token, require_role, verify_password
 from ..services import data_import, scheduler
 
@@ -618,7 +618,7 @@ class Decision(BaseModel):
 
 
 @router.post("/approvals/{aid}/decide")
-def decide(aid: int, d: Decision, db: Session = Depends(get_db), user: User = Depends(admin_only)):
+def decide(aid: int, d: Decision, db: Session = Depends(get_db), user: User = Depends(require_permission("approval.decide"))):
     a = db.get(Approval, aid)
     if not a:
         raise HTTPException(404)

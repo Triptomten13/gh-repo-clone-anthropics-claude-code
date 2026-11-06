@@ -3,19 +3,24 @@
 Every endpoint checks a PERMISSION (security/rbac.py), not just a role, and every state change is audited."""
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Literal
+from datetime import UTC, datetime
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..governance import audit_chain
 from ..governance import core as gov
-from ..models import User
+from ..models import Approval, PolicyRule, ToolGrant, ToolInvocation, User
 from ..security.rbac import PERMISSIONS, ROLES, require_permission
+
+
+def _cols(o: Any) -> dict[str, Any]:
+    return {c.key: getattr(o, c.key) for c in o.__table__.columns}
 
 router = APIRouter(prefix="/api")
 
@@ -68,3 +73,247 @@ def audit_prune(p: PruneIn, db: Session = Depends(get_db), user: User = Depends(
 def rbac_roles(_: User = Depends(require_permission("policy.read"))):
     return {"permissions": PERMISSIONS, "roles": {r: sorted(p) for r, p in ROLES.items()},
             "note": "roles never inherit implicitly; builders cannot approve, approvers cannot change policy, auditors change nothing"}
+
+
+# ------------------------------------------------------------------ governance changes need a second person
+def _governed(db: Session, user: User, action: str, payload: dict, approval_id: int | None, title: str):
+    """Policy, grant and budget changes are RESTRICTED: filed as an approval request the first time; applied only when
+    called again with an approval decided by SOMEONE ELSE for exactly this payload. Returns None when allowed."""
+    from fastapi.responses import JSONResponse
+
+    from ..governance.policy import ApprovalRequired, PolicyDenied, Request, enforce
+
+    try:
+        enforce(db, Request(action=action, user_email=user.email, user_role=user.role, approval_id=approval_id, payload=payload),
+                request_approval_title=title)
+        return None
+    except ApprovalRequired as e:
+        db.commit()
+        return JSONResponse({"status": "pending_approval", "approval_id": e.decision.approval_id, "category": e.decision.category_name,
+                             "reasons": e.decision.reasons}, status_code=202)
+    except PolicyDenied as e:
+        db.commit()
+        raise HTTPException(403, {"category": e.decision.category_name, "reasons": e.decision.reasons}) from None
+
+
+# ------------------------------------------------------------------ policies
+class RuleIn(BaseModel):
+    key: str = Field(min_length=3, max_length=96, pattern=r"^[a-z0-9_.:-]+$")
+    action: str = Field(min_length=1, max_length=128)
+    category: int = Field(ge=1, le=5)
+    conditions: dict[str, Any] = {}
+    priority: int = Field(100, ge=0, le=10_000)
+    reason: str = Field("", max_length=2000)
+    approval_id: int | None = None
+
+
+@router.get("/policies")
+def policies(db: Session = Depends(get_db), _: User = Depends(require_permission("policy.read"))):
+    from ..governance import policy as P
+
+    rules = P.active_rules(db)
+    return {"version": P.policy_version(rules), "rules": [_cols(r) for r in rules],
+            "categories": {c.value: c.name for c in P.Category}, "classifications": P.CLASSIFICATIONS,
+            "mandatory": {"floors": {k: v.name for k, v in P.FLOORS.items()}, "prohibited": P.PROHIBITED, "agent_prohibited": P.AGENT_PROHIBITED,
+                          "note": "rules may raise a category, never lower it below a mandatory floor"}}
+
+
+@router.get("/policies/history")
+def policy_history(key: str | None = None, db: Session = Depends(get_db), _: User = Depends(require_permission("policy.read"))):
+    q = select(PolicyRule).order_by(PolicyRule.key, PolicyRule.version)
+    if key:
+        q = q.where(PolicyRule.key == key)
+    return [_cols(r) for r in db.scalars(q)]
+
+
+@router.post("/policies")
+def policy_upsert(r: RuleIn, db: Session = Depends(get_db), user: User = Depends(require_permission("policy.write"))):
+    from ..governance import policy as P
+
+    if "*" not in r.action:
+        floor, _ = P._floor(P.Request(action=r.action))
+        if r.category < floor:
+            raise HTTPException(422, f"cannot lower {r.action} below its mandatory floor {floor.name}")
+    payload = r.model_dump(exclude={"approval_id"})
+    pending = _governed(db, user, "policy.write", payload, r.approval_id, f"Policy change: {r.key} → {P.Category(r.category).name}")
+    if pending is not None:
+        return pending
+    now = datetime.now(UTC)
+    prev = db.scalars(select(PolicyRule).where(PolicyRule.key == r.key, PolicyRule.superseded_at.is_(None))).first()
+    version = (db.scalar(select(func.max(PolicyRule.version)).where(PolicyRule.key == r.key)) or 0) + 1
+    if prev:
+        prev.superseded_at = now
+    row = PolicyRule(key=r.key, version=version, action=r.action, category=r.category, conditions=r.conditions, priority=r.priority,
+                     reason=r.reason, created_by=user.email)
+    db.add(row)
+    db.flush()
+    gov.audit(db, user.email, "policy.write", f"policy:{r.key}@{version}", rule_action=r.action, category=r.category,
+              conditions=r.conditions, priority=r.priority, reason=r.reason, approval=r.approval_id, previous_version=prev.version if prev else None)
+    db.commit()
+    return {"status": "applied", "rule": _cols(row), "policy_version": P.policy_version(P.active_rules(db))}
+
+
+class RollbackIn(BaseModel):
+    to_version: int
+    approval_id: int | None = None
+
+
+@router.post("/policies/{key}/rollback")
+def policy_rollback(key: str, b: RollbackIn, db: Session = Depends(get_db), user: User = Depends(require_permission("policy.write"))):
+    old = db.scalars(select(PolicyRule).where(PolicyRule.key == key, PolicyRule.version == b.to_version)).first()
+    if old is None:
+        raise HTTPException(404, f"{key}@{b.to_version} not found")
+    return policy_upsert(RuleIn(key=key, action=old.action, category=old.category, conditions=old.conditions or {}, priority=old.priority,
+                                reason=f"rollback to v{b.to_version}: {old.reason}"[:2000], approval_id=b.approval_id), db, user)
+
+
+@router.post("/policies/{key}/disable")
+def policy_disable(key: str, approval_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(require_permission("policy.write"))):
+    row = db.scalars(select(PolicyRule).where(PolicyRule.key == key, PolicyRule.superseded_at.is_(None))).first()
+    if row is None:
+        raise HTTPException(404)
+    pending = _governed(db, user, "policy.write", {"disable": key}, approval_id, f"Disable policy {key}")
+    if pending is not None:
+        return pending
+    row.enabled = False
+    gov.audit(db, user.email, "policy.disable", f"policy:{key}@{row.version}", approval=approval_id)
+    db.commit()
+    return {"status": "disabled", "key": key}
+
+
+# ------------------------------------------------------------------ approvals (lifecycle)
+class DelegateIn(BaseModel):
+    to: str = Field(min_length=3, max_length=255)
+
+
+@router.post("/approvals/{aid}/revoke")
+def approval_revoke(aid: int, reason: str = "", db: Session = Depends(get_db), user: User = Depends(require_permission("approval.decide"))):
+    a = db.get(Approval, aid)
+    if not a:
+        raise HTTPException(404)
+    try:
+        gov.revoke_approval(db, a, user.email, reason)
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from e
+    db.commit()
+    return _cols(a)
+
+
+@router.post("/approvals/{aid}/delegate")
+def approval_delegate(aid: int, d: DelegateIn, db: Session = Depends(get_db), user: User = Depends(require_permission("approval.decide"))):
+    a = db.get(Approval, aid)
+    if not a:
+        raise HTTPException(404)
+    target = db.scalars(select(User).where(User.email == d.to.lower())).first()
+    from ..security.rbac import has
+
+    if target is None or not has(target, "approval.decide"):
+        raise HTTPException(422, "delegate must be an existing user with approval.decide")
+    try:
+        gov.delegate_approval(db, a, user.email, target.email)
+    except ValueError as e:
+        raise HTTPException(409, str(e)) from e
+    db.commit()
+    return _cols(a)
+
+
+# ------------------------------------------------------------------ tool security gateway
+@router.get("/tools")
+def tools_list(db: Session = Depends(get_db), _: User = Depends(require_permission("tools.read"))):
+    from ..governance import tool_gateway as G
+
+    G.ensure_default_grants(db)
+    db.commit()
+    return {"tools": [t.public() for t in G.TOOLS.values()], "operations": G.OPERATIONS,
+            "note": "deny by default: an agent can use a tool only through an explicit grant, and never beyond the role of the user it works for"}
+
+
+@router.get("/tools/grants")
+def tools_grants(db: Session = Depends(get_db), _: User = Depends(require_permission("tools.read"))):
+    return [_cols(g) for g in db.scalars(select(ToolGrant).order_by(ToolGrant.subject_kind, ToolGrant.subject_id, ToolGrant.tool))]
+
+
+class GrantIn(BaseModel):
+    subject_kind: Literal["agent", "workflow", "role"]
+    subject_id: str = Field(min_length=1, max_length=96)
+    tool: str
+    operations: list[Literal["READ", "CREATE", "UPDATE", "DELETE", "EXECUTE", "ADMINISTER"]] = Field(min_length=1)
+    environments: list[str] = []
+    max_calls_per_day: int | None = Field(None, ge=1, le=1_000_000)
+    credential_scope: str = Field("", max_length=96)
+    expires_at: datetime | None = None
+    reason: str = Field(min_length=3, max_length=2000)
+    approval_id: int | None = None
+
+
+@router.post("/tools/grants")
+def tools_grant(g: GrantIn, db: Session = Depends(get_db), user: User = Depends(require_permission("tools.grant"))):
+    from ..governance import tool_gateway as G
+
+    t = G.TOOLS.get(g.tool)
+    if t is None:
+        raise HTTPException(404, f"unknown tool {g.tool}")
+    if set(g.operations) - {t.operation}:
+        raise HTTPException(422, f"{g.tool} supports only {t.operation}")
+    payload = g.model_dump(exclude={"approval_id"}, mode="json")
+    pending = _governed(db, user, "tools.grant", payload, g.approval_id, f"Grant {g.tool} {g.operations} to {g.subject_kind} {g.subject_id}")
+    if pending is not None:
+        return pending
+    row = ToolGrant(**{k: v for k, v in g.model_dump(exclude={"approval_id"}).items()}, created_by=user.email)
+    db.add(row)
+    db.flush()
+    gov.audit(db, user.email, "tools.grant", f"grant:{row.id}", grant=payload, approval=g.approval_id)
+    db.commit()
+    return {"status": "applied", "grant": _cols(row)}
+
+
+@router.delete("/tools/grants/{gid}")
+def tools_revoke(gid: int, db: Session = Depends(get_db), user: User = Depends(require_permission("tools.grant"))):
+    g = db.get(ToolGrant, gid)
+    if g is None:
+        raise HTTPException(404)
+    g.enabled = False  # kept for history; revoking access never needs a second approval
+    gov.audit(db, user.email, "tools.revoke", f"grant:{gid}", subject=f"{g.subject_kind}:{g.subject_id}", tool=g.tool)
+    db.commit()
+    return {"status": "revoked", "grant": gid}
+
+
+@router.get("/tools/invocations")
+def tools_invocations(tool: str | None = None, agent: str | None = None, status: str | None = None, limit: int = Query(200, le=2000),
+                      db: Session = Depends(get_db), _: User = Depends(require_permission("tools.read"))):
+    q = select(ToolInvocation).order_by(ToolInvocation.id.desc()).limit(limit)
+    for col, v in (("tool", tool), ("agent_id", agent), ("status", status)):
+        if v:
+            q = q.where(getattr(ToolInvocation, col) == v)
+    return [_cols(i) for i in db.scalars(q)]
+
+
+class InvokeIn(BaseModel):
+    args: dict[str, Any] = {}
+    approval_id: int | None = None
+
+
+def gateway_response(db: Session, fn) -> Any:
+    from fastapi.responses import JSONResponse
+
+    from ..governance.tool_gateway import GatewayDenied
+
+    try:
+        out = fn()
+        db.commit()
+        return out
+    except GatewayDenied as e:
+        db.commit()  # the denial itself is evidence: invocation row + audit event are kept
+        code = {"invalid": 422, "pending_approval": 202, "not_configured": 409, "budget_exhausted": 429, "error": 502}.get(e.status, 403)
+        if "unknown tool" in str(e):
+            code = 404
+        return JSONResponse({"status": e.status, "detail": str(e), "approval_id": e.approval_id, "decision": e.decision,
+                             "invocation_id": getattr(e, "invocation_id", None)}, status_code=code)
+
+
+@router.post("/tools/{tool}/invoke")
+def tools_invoke(tool: str, b: InvokeIn, db: Session = Depends(get_db), user: User = Depends(require_permission("tools.invoke"))):
+    from ..governance import tool_gateway as G
+
+    G.ensure_default_grants(db)
+    return gateway_response(db, lambda: G.invoke(db, tool, b.args, user=user, approval_id=b.approval_id))

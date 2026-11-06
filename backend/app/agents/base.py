@@ -49,6 +49,23 @@ class AgentContext:
         except permissions.PermissionDenied as e:
             raise Blocked(str(e)) from e
 
+    def tool(self, name: str, args: dict[str, Any], approval_id: int | None = None) -> Any:
+        """Agents use tools ONLY through the Tool Security Gateway: their own grants, the requesting user's role,
+        budgets, policy and approvals all apply. A denial is a Blocked outcome (not retried)."""
+        from ..governance import tool_gateway as G
+        from ..models import User
+
+        user = None
+        if (self.task.requested_by or "").startswith("user:"):
+            from sqlalchemy import select
+
+            user = self.db.scalars(select(User).where(User.email == self.task.requested_by[5:])).first()
+        try:
+            return G.invoke(self.db, name, args, user=user, agent_id=self.agent_row.id, workflow=self.task.type, run_id=self.task.id,
+                            approval_id=approval_id)["result"]
+        except G.GatewayDenied as e:
+            raise Blocked(f"tool {name}: {e}") from e
+
     def request_approval(self, action: str, title: str, description: str = "", payload: dict | None = None,
                          amount_sek: float | None = None) -> dict[str, Any]:
         a = gov.request_approval(self.db, action, title, self.agent_row.id, description, payload, amount_sek)

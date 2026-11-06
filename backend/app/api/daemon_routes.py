@@ -481,17 +481,15 @@ def d_tools(_: User = Depends(current_user)):
 
 @router.post("/daemon/tools/{name}/invoke")
 def d_tool_invoke(name: str, args: dict[str, Any], db: Session = Depends(get_db), user: User = Depends(current_user)):
-    try:
-        res = tools.invoke(db, user, name, args)
-    except LookupError as e:
-        raise HTTPException(404, str(e)) from e
-    except PermissionError as e:
-        raise HTTPException(403, str(e)) from e
-    except ValueError as e:
-        raise HTTPException(422, str(e)) from e
-    gov.audit(db, user.email, "tool.invoke", name)
-    db.commit()
-    return {"tool": name, "result": res}
+    """Kept for existing clients; runs through the Tool Security Gateway like every tool call."""
+    from fastapi.responses import JSONResponse
+
+    from ..governance import tool_gateway as G
+    from .control_routes import gateway_response
+
+    G.ensure_default_grants(db)
+    out = gateway_response(db, lambda: G.invoke(db, name, args, user=user))
+    return out if isinstance(out, JSONResponse) else {"tool": name, "result": out["result"], "invocation_id": out["invocation_id"]}
 
 
 # ---------------------------------------------------------------- provider registry & credentials

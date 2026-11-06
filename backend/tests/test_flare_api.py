@@ -128,7 +128,7 @@ def test_11_12_campaigns_performance_learning(client, product):
     assert client.post(f"/api/flare/campaigns/{good}/request-launch").json()["level"] == 5
 
 
-def test_13_brand_portfolio_overlap_and_launch_gate(client, product):
+def test_13_brand_portfolio_overlap_and_launch_gate(client, product, approver):
     sid = run(client, "flare.competition", product_id=product)["session_id"]
     concepts = client.get(f"/api/flare/sessions/{sid}").json()["concepts"]
     clean = [c for c in concepts if not c["originality"]["requires_revision"]]
@@ -149,7 +149,8 @@ def test_13_brand_portfolio_overlap_and_launch_gate(client, product):
     client.patch(f"/api/flare/brands/{brand['id']}", json={"trademark_status": "clear", "trademark_note": "EUIPO+PRV search 2026-11-05: no conflicts"})
     appr = client.post(f"/api/flare/brands/{brand['id']}/request-launch").json()
     assert client.post(f"/api/flare/brands/{brand['id']}/activate").status_code == 403
-    client.post(f"/api/approvals/{appr['id']}/decide", json={"approve": True})
+    assert client.post(f"/api/approvals/{appr['id']}/decide", json={"approve": True}).status_code == 409  # not one's own launch
+    assert approver.post(f"/api/approvals/{appr['id']}/decide", json={"approve": True}).status_code == 200
     assert client.post(f"/api/flare/brands/{brand['id']}/activate").json()["status"] == "live"
 
 

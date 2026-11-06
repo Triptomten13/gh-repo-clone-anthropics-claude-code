@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
@@ -231,23 +230,14 @@ def archive_patch(did: int, body: DocPatch, db: Session = Depends(get_db), user:
 
 @router.delete("/archive/documents/{did}")
 def archive_delete(did: int, confirm: bool = False, db: Session = Depends(get_db), user: User = Depends(admin_only)):
-    d = _404(db.get(Document, did), "document")
+    _404(db.get(Document, did), "document")
     if not confirm:
         raise HTTPException(400, "deleting archive data is irreversible: repeat with confirm=true")
-    db.query(DocumentChunk).filter(DocumentChunk.document_id == did).execution_options(archive_docs=[did]).delete()
-    db.query(EntityMention).filter(EntityMention.document_id == did).delete()
-    db.query(Annotation).filter(Annotation.document_id == did).delete()
-    db.query(DocumentRelation).filter((DocumentRelation.source_id == did) | (DocumentRelation.target_id == did)).delete(synchronize_session=False)
-    if d.file_path:
-        Path(d.file_path).unlink(missing_ok=True)
-    from ..daemon import semantic_cache
+    from ..knowledge.vault import delete_document
 
-    purged = semantic_cache.purge_document(db, did)  # quoted chunks must not survive deletion inside cached answers
-    title = d.title
-    db.delete(d)
-    gov.audit(db, user.email, "archive.delete", f"document:{did}", title=title, cache_purged=purged)
+    out = delete_document(db, did, actor=user.email)
     db.commit()
-    return {"deleted": did}
+    return out
 
 
 class SearchIn(BaseModel):

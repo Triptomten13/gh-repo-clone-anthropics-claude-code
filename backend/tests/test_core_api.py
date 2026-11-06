@@ -37,7 +37,8 @@ def test_archive_ingest_search_cite_dedupe_version_delete(client):
     assert client.get(f"/api/archive/documents/{d1['id']}").json()["annotations"][0]["kind"] == "interpretation"
     assert client.get("/api/archive/graph").json()["edges"]
     assert client.delete(f"/api/archive/documents/{d2['id']}").status_code == 400  # needs confirm
-    assert client.delete(f"/api/archive/documents/{d2['id']}?confirm=true").json() == {"deleted": d2["id"]}
+    gone = client.delete(f"/api/archive/documents/{d2['id']}?confirm=true").json()
+    assert gone["deleted"] == d2["id"] and gone["verified"] is True and gone["chunks_removed"] >= 1
     assert any(a["action"] == "archive.delete" for a in client.get("/api/audit").json())
 
 

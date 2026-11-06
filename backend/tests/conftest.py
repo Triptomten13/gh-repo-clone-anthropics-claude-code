@@ -70,3 +70,17 @@ def client(fresh_db):
         assert r.status_code == 200, r.text
         c.headers["Authorization"] = f"Bearer {r.json()['token']}"
         yield c
+
+
+@pytest.fixture()
+def approver(client):
+    """A second person with approval.decide: approvals must never be decided by their requester (four eyes)."""
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    r = client.post("/api/auth/users", json={"email": "approver@example.com", "password": "correct-horse-battery", "role": "approver"})
+    assert r.status_code == 200, r.text
+    c = TestClient(app)
+    c.headers["Authorization"] = "Bearer " + c.post("/api/auth/login", json={"email": "approver@example.com", "password": "correct-horse-battery"}).json()["token"]
+    return c

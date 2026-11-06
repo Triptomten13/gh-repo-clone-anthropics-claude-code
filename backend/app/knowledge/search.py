@@ -53,7 +53,7 @@ def _hit(c: DocumentChunk, d: Document, score: float, terms: set[str]) -> dict[s
             "injection_risk": c.injection_risk, "citation": f"[{d.uid[:8]}§{c.ordinal}]"}
 
 
-def search(db: Session, query: str, k: int = 8, mode: str = "hybrid", filters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+def search(db: Session, query: str, k: int = 8, mode: str = "hybrid", filters: dict[str, Any] | None = None, user: Any = None) -> list[dict[str, Any]]:
     from . import index
 
     ix = index.get(db)

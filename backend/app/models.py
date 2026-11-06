@@ -13,6 +13,7 @@ from typing import Any
 
 from sqlalchemy import JSON, BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.sql.expression import false as sa_false
+from sqlalchemy.sql.expression import true as sa_true
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -306,6 +307,15 @@ class Approval(Base):
     decision_note: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # control plane (migration 0007): who it is for, what exactly it authorises, until when, and whether it was used
+    category: Mapped[int] = mapped_column(Integer, default=3, server_default="3")  # governance/policy.Category
+    on_behalf_of: Mapped[str] = mapped_column(String(255), default="", server_default="")  # the user whose work this is
+    payload_hash: Mapped[str] = mapped_column(String(64), default="", server_default="")  # binds the approval to these exact arguments
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delegated_to: Mapped[str] = mapped_column(String(255), default="", server_default="")
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_by: Mapped[str] = mapped_column(String(255), default="", server_default="")
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)  # single use
 
 
 class AuditLog(Base):
@@ -320,6 +330,87 @@ class AuditLog(Base):
     seq: Mapped[int | None] = mapped_column(BigInteger, nullable=True, unique=True)
     prev_hash: Mapped[str] = mapped_column(String(64), default="", server_default="")
     hash: Mapped[str] = mapped_column(String(64), default="", server_default="", index=True)
+
+
+class PolicyRule(Base):
+    """Configurable policy (governance/policy.py). Versioned: a change writes a NEW row and supersedes the old one, so
+    every decision can name the exact rule versions it applied, and a rollback re-activates a previous version."""
+    __tablename__ = "policy_rules"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    key: Mapped[str] = mapped_column(String(96), index=True)  # stable identity across versions
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    action: Mapped[str] = mapped_column(String(128), index=True)  # exact action or prefix pattern ending in "*"
+    category: Mapped[int] = mapped_column(Integer)  # 1 autonomous … 5 prohibited
+    conditions: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    priority: Mapped[int] = mapped_column(Integer, default=100)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true())
+    created_by: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+
+class ToolGrant(Base):
+    """DAEMON TOOL SECURITY GATEWAY: deny by default — a subject may use a tool operation only through a grant."""
+    __tablename__ = "tool_grants"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    subject_kind: Mapped[str] = mapped_column(String(16), index=True)  # agent | workflow | role
+    subject_id: Mapped[str] = mapped_column(String(96), index=True)
+    tool: Mapped[str] = mapped_column(String(96), index=True)
+    operations: Mapped[list[str]] = mapped_column(JSON, default=list)  # READ CREATE UPDATE DELETE EXECUTE ADMINISTER
+    environments: Mapped[list[str]] = mapped_column(JSON, default=list)  # [] = any
+    max_calls_per_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    credential_scope: Mapped[str] = mapped_column(String(96), default="", server_default="")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true())
+    reason: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class ToolInvocation(Base):
+    """One row per tool request — allowed, denied or waiting for approval (arguments redacted)."""
+    __tablename__ = "tool_invocations"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    tool: Mapped[str] = mapped_column(String(96), index=True)
+    operation: Mapped[str] = mapped_column(String(16))
+    agent_id: Mapped[str] = mapped_column(String(64), default="", index=True)
+    user_email: Mapped[str] = mapped_column(String(255), default="", index=True)
+    workflow: Mapped[str] = mapped_column(String(96), default="")
+    run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    grant_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    decision: Mapped[str] = mapped_column(String(24))  # allowed | denied | approval_required | prohibited
+    category: Mapped[int] = mapped_column(Integer, default=1)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(24))  # ok | error | denied | pending_approval | not_configured
+    args_redacted: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    output_summary: Mapped[str] = mapped_column(Text, default="")
+    approval_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class UsageCounter(Base):
+    """Atomic usage counters (compare-and-set): a limit is taken with ONE conditional UPDATE, so concurrent requests
+    can never both pass a check-then-act race (SQLite and PostgreSQL alike)."""
+    __tablename__ = "usage_counters"
+    key: Mapped[str] = mapped_column(String(160), primary_key=True)
+    day: Mapped[str] = mapped_column(String(10), primary_key=True)
+    used: Mapped[float] = mapped_column(Float, default=0.0)
+
+
+class BudgetRule(Base):
+    """Hard limits per user / agent / workflow / model / provider / project / global, per day, month or run."""
+    __tablename__ = "budget_rules"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    scope_kind: Mapped[str] = mapped_column(String(16), index=True)
+    scope_id: Mapped[str] = mapped_column(String(96), default="*")
+    metric: Mapped[str] = mapped_column(String(24))  # usd | tokens | model_calls | tool_calls | steps
+    period: Mapped[str] = mapped_column(String(8), default="day")  # day | month
+    limit: Mapped[float] = mapped_column(Float)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true())
+    created_by: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class Lesson(Base):

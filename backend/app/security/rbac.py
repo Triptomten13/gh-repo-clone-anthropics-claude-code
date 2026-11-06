@@ -47,7 +47,7 @@ ROLES: dict[str, set[str]] = {
     "system_admin": {"audit.read", "policy.read", "tools.read", "runs.read", "models.manage", "system.configure", "knowledge.read"},
     "workflow_designer": {"policy.read", "workflow.design", "runs.read", "eval.run", "tools.read", "knowledge.read"},
     "agent_developer": {"policy.read", "agent.develop", "runs.read", "eval.run", "tools.read", "knowledge.read"},
-    "operator": {"audit.read", "policy.read", "approval.read", "approval.decide", "tools.read", "tools.invoke", "runs.read", "work.run",
+    "operator": {"audit.read", "policy.read", "approval.read", "tools.read", "tools.invoke", "runs.read", "work.run",
                  "eval.run", "knowledge.read", "knowledge.write"},
     "approver": {"approval.read", "approval.decide", "policy.read", "runs.read", "knowledge.read"},
     "auditor": {"audit.read", "audit.export", "audit.verify", "policy.read", "approval.read", "tools.read", "runs.read"},

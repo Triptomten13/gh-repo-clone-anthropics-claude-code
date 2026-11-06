@@ -46,6 +46,9 @@ async def lifespan(app: FastAPI):
         library.ensure_rows(db)
         prompts.seed(db)
         registry_seed.seed(db)
+        from .governance.tool_gateway import ensure_default_grants
+
+        ensure_default_grants(db)
         db.commit()
         rec = orch.recover_interrupted(db)
         queued = db.scalar(select(func.count(Task.id)).where(Task.status == "queued"))

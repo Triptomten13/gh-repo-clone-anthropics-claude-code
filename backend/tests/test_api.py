@@ -75,14 +75,16 @@ def test_compliance_human_approval_and_launch_request(client):
     assert "compliance.human_decision" in actions and "approval.approved" in actions
 
 
-def test_paid_experiment_needs_approval(client):
+def test_paid_experiment_needs_approval(client, approver):
     e = client.post("/api/experiments", json={"name": "TikTok test", "hypothesis": "h", "budget_sek": 2000,
                                               "predicted": {"roas": 2.5}}).json()
     assert e["status"] == "pending_approval"
     assert client.post(f"/api/experiments/{e['id']}/start").status_code == 403
     a = next(a for a in client.get("/api/approvals").json() if a["action"] == "experiment.run_paid")
     assert a["level"] == 5
-    client.post(f"/api/approvals/{a['id']}/decide", json={"approve": True})
+    # the requester cannot approve their own spend (four eyes); a separate approver can
+    assert client.post(f"/api/approvals/{a['id']}/decide", json={"approve": True}).status_code == 409
+    assert approver.post(f"/api/approvals/{a['id']}/decide", json={"approve": True}).status_code == 200
     assert client.post(f"/api/experiments/{e['id']}/start").json()["status"] == "running"
     client.post(f"/api/experiments/{e['id']}/results", json={"orders": 40, "roas": 0.7, "contribution_margin": -500, "spend": 2000})
     ex = client.get("/api/experiments").json()[0]

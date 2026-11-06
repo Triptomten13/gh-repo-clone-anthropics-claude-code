@@ -201,3 +201,370 @@ def test_audit_trail_records_its_own_use(client, fresh_db):
     acts = {a for (a,) in s.execute(select(AuditLog.action).where(AuditLog.actor == "auditor2@example.com"))}
     assert {"audit.verify", "audit.export"} <= acts
     s.close()
+
+
+# ------------------------------------------------------------------ tool security gateway + policy (criteria 1-4, 8, 9, 12, 17-20)
+from app.governance import policy as P  # noqa: E402
+from app.governance import tool_gateway as G  # noqa: E402
+
+
+def _agent_id(db):
+    from app.models import Agent
+
+    return db.scalars(select(Agent.id).order_by(Agent.id)).first()
+
+
+def _grant(db, agent, tool, op, **kw):
+    from app.models import ToolGrant
+
+    g = ToolGrant(subject_kind="agent", subject_id=agent, tool=tool, operations=[op], created_by="test", reason="test", **kw)
+    db.add(g)
+    db.commit()
+    return g
+
+
+def _user(db, email="admin@example.com"):
+    from app.models import User
+
+    return db.scalars(select(User).where(User.email == email)).first()
+
+
+def _doc(client, text="Lantern inventory for the depot."):
+    return client.post("/api/archive/text", json={"title": f"doc {abs(hash(text)) % 10_000}", "text": text, "evidence_class": "primary_source"}).json()["id"]
+
+
+def _approve(db, approval_id, by="approver@example.com"):
+    from app.models import Approval
+
+    a = db.get(Approval, approval_id)
+    gov.decide_approval(db, a, True, by)
+    db.commit()
+
+
+def test_01_agent_without_a_grant_cannot_use_any_tool(client, fresh_db):
+    db = fresh_db.SessionLocal()
+    agent = _agent_id(db)
+    with pytest.raises(G.GatewayDenied, match="deny by default"):
+        G.invoke(db, "calc", {"expression": "1+1"}, agent_id=agent)
+    db.commit()
+    from app.models import ToolInvocation
+
+    rec = db.scalars(select(ToolInvocation).order_by(ToolInvocation.id.desc())).first()
+    assert rec.status == "denied" and rec.agent_id == agent
+    db.close()
+
+
+def test_01_grants_are_per_operation(client, fresh_db):
+    db = fresh_db.SessionLocal()
+    agent = _agent_id(db)
+    did = _doc(client)
+    _grant(db, agent, "archive.search", "READ")
+    assert G.invoke(db, "archive.search", {"query": "lantern"}, agent_id=agent)["status"] == "ok"
+    with pytest.raises(G.GatewayDenied, match="no grant for archive.annotate CREATE"):
+        G.invoke(db, "archive.annotate", {"document_id": did, "text": "x"}, agent_id=agent)
+    with pytest.raises(G.GatewayDenied, match="no grant for archive.delete DELETE"):
+        G.invoke(db, "archive.delete", {"document_id": did}, agent_id=agent)
+    db.close()
+
+
+def test_02_approval_required_action_waits_for_a_valid_single_use_approval_bound_to_its_arguments(client, fresh_db, approver):
+    db = fresh_db.SessionLocal()
+    agent = _agent_id(db)
+    d1, d2 = _doc(client, "First document about compasses."), _doc(client, "Second document about tents.")
+    _grant(db, agent, "archive.delete", "DELETE")
+    with pytest.raises(G.GatewayDenied) as e:
+        G.invoke(db, "archive.delete", {"document_id": d1}, agent_id=agent)
+    db.commit()
+    assert e.value.status == "pending_approval" and e.value.approval_id
+    aid = e.value.approval_id
+    with pytest.raises(G.GatewayDenied, match="pending"):  # silence is not approval
+        G.invoke(db, "archive.delete", {"document_id": d1}, agent_id=agent, approval_id=aid, request_approval=False)
+    db.commit()
+    _approve(db, aid)
+    with pytest.raises(G.GatewayDenied, match="different arguments"):  # cannot be reused for another document
+        G.invoke(db, "archive.delete", {"document_id": d2}, agent_id=agent, approval_id=aid, request_approval=False)
+    db.commit()
+    out = G.invoke(db, "archive.delete", {"document_id": d1}, agent_id=agent, approval_id=aid)
+    db.commit()
+    assert out["status"] == "ok" and out["result"]["verified"]
+    with pytest.raises(G.GatewayDenied, match="already used"):
+        G.invoke(db, "archive.delete", {"document_id": d1}, agent_id=agent, approval_id=aid, request_approval=False)
+    db.close()
+
+
+def test_03_nobody_approves_their_own_request(client, fresh_db, approver):
+    did = _doc(client)
+    r = client.post("/api/tools/archive.delete/invoke", json={"args": {"document_id": did}})
+    assert r.status_code == 202
+    aid = r.json()["approval_id"]
+    assert client.post(f"/api/approvals/{aid}/decide", json={"approve": True}).status_code == 409  # the admin asked for it
+    assert approver.post(f"/api/approvals/{aid}/decide", json={"approve": True}).status_code == 200
+    ok = client.post("/api/tools/archive.delete/invoke", json={"args": {"document_id": did}, "approval_id": aid})
+    assert ok.status_code == 200 and ok.json()["result"]["verified"]
+
+
+def test_agents_can_never_perform_governance_actions(client, fresh_db):
+    db = fresh_db.SessionLocal()
+    for action in ("policy.write", "tools.grant", "approval.decide", "budget.change", "audit.export", "permissions.self_grant"):
+        d = P.decide(db, P.Request(action=action, agent_id="any_agent", approval_id=None))
+        assert d.category == P.Category.PROHIBITED and not d.allowed, action
+    db.close()
+
+
+def test_04_expired_or_revoked_approvals_authorise_nothing(client, fresh_db, approver):
+    from app.models import Approval
+
+    db = fresh_db.SessionLocal()
+    agent = _agent_id(db)
+    d1 = _doc(client, "Expiring approval document.")
+    _grant(db, agent, "archive.delete", "DELETE")
+    with pytest.raises(G.GatewayDenied) as e:
+        G.invoke(db, "archive.delete", {"document_id": d1}, agent_id=agent)
+    db.commit()
+    aid = e.value.approval_id
+    _approve(db, aid)
+    a = db.get(Approval, aid)
+    a.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+    db.commit()
+    with pytest.raises(G.GatewayDenied, match="expired"):
+        G.invoke(db, "archive.delete", {"document_id": d1}, agent_id=agent, approval_id=aid, request_approval=False)
+    db.commit()
+    # revoked
+    a.expires_at = datetime.now(UTC) + timedelta(hours=1)
+    db.commit()
+    assert approver.post(f"/api/approvals/{aid}/revoke").status_code == 200
+    with pytest.raises(G.GatewayDenied, match="revoked"):
+        G.invoke(db, "archive.delete", {"document_id": d1}, agent_id=agent, approval_id=aid, request_approval=False)
+    # an expired PENDING request cannot be approved later either
+    with pytest.raises(G.GatewayDenied) as e2:
+        G.invoke(db, "archive.delete", {"document_id": d1}, agent_id=agent)
+    db.commit()
+    p = db.get(Approval, e2.value.approval_id)
+    p.expires_at = datetime.now(UTC) - timedelta(seconds=1)
+    db.commit()
+    assert approver.post(f"/api/approvals/{p.id}/decide", json={"approve": True}).status_code == 409
+    db.close()
+
+
+def test_08_credentials_are_scoped_to_grants_and_never_leave_the_gateway(client, fresh_db, approver, monkeypatch):
+    from app.daemon import credentials
+    from app.models import ToolInvocation
+
+    db = fresh_db.SessionLocal()
+    credentials.store(db, "smtp:marketing", "s3cr3t-smtp-pass", label="marketing SMTP", attestation=credentials.ATTESTATION, actor="admin@example.com")
+    db.commit()
+    seen = []
+
+    class FakeSMTP:
+        def __init__(self, *a, **k): ...
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def starttls(self): ...
+        def login(self, user, password): seen.append(password)
+        def send_message(self, msg): seen.append(msg["To"])
+
+    monkeypatch.setenv("SMTP_HOST", "smtp.example.invalid")
+    monkeypatch.setattr(G.smtplib, "SMTP", FakeSMTP)
+    from app.models import Agent
+
+    a_with, a_without = db.scalars(select(Agent.id).order_by(Agent.id).limit(2)).all()
+    _grant(db, a_with, "email.send", "EXECUTE", credential_scope="smtp:marketing")
+    _grant(db, a_without, "email.send", "EXECUTE")
+    args = {"to": "buyer@example.com", "subject": "Quote", "body": "Hello"}
+    results = {}
+    for agent in (a_with, a_without):
+        with pytest.raises(G.GatewayDenied) as e:
+            G.invoke(db, "email.send", args, agent_id=agent)
+        db.commit()
+        _approve(db, e.value.approval_id)
+        try:
+            results[agent] = G.invoke(db, "email.send", args, agent_id=agent, approval_id=e.value.approval_id)["status"]
+        except G.GatewayDenied as err:
+            results[agent] = err.status
+        db.commit()
+    assert results == {a_with: "ok", a_without: "not_configured"}
+    assert seen == ["s3cr3t-smtp-pass", "buyer@example.com"]  # the secret reached SMTP only
+    blob = json.dumps([[i.args_redacted, i.output_summary, i.reason] for i in db.scalars(select(ToolInvocation))])
+    assert "s3cr3t" not in blob
+    audit_blob = json.dumps(client.get("/api/audit/records?limit=1000").json())
+    assert "s3cr3t" not in audit_blob
+    db.close()
+
+
+def test_08_a_tool_that_echoes_a_secret_is_redacted(client, fresh_db, monkeypatch):
+    from app.daemon import credentials
+
+    db = fresh_db.SessionLocal()
+    credentials.store(db, "smtp:x", "leaky-secret-123", label="x", attestation=credentials.ATTESTATION, actor="admin@example.com")
+    db.commit()
+    agent = _agent_id(db)
+    leaky = G.GovernedTool("test.leak", "echo a secret", "READ", {"properties": {}}, lambda ctx: {"oops": ctx.secret("smtp")})
+    monkeypatch.setitem(G.TOOLS, "test.leak", leaky)
+    _grant(db, agent, "test.leak", "READ", credential_scope="smtp:x")
+    assert G.invoke(db, "test.leak", {}, agent_id=agent)["result"] == {"oops": "[REDACTED]"}
+    db.close()
+
+
+def test_09_every_tool_request_leaves_an_audit_event(client, fresh_db):
+    from app.models import AuditLog, ToolInvocation
+
+    db = fresh_db.SessionLocal()
+    agent = _agent_id(db)
+    _grant(db, agent, "calc", "READ")
+    for args in ({"expression": "2+2"}, {"expression": "__import__('os')"}, {"nope": 1}):
+        try:
+            G.invoke(db, "calc", args, agent_id=agent)
+        except G.GatewayDenied:
+            pass
+        db.commit()
+    for t in ("archive.delete", "unknown.tool"):
+        try:
+            G.invoke(db, t, {}, agent_id=agent)
+        except G.GatewayDenied:
+            pass
+        db.commit()
+    inv = db.scalars(select(ToolInvocation)).all()
+    events = db.scalars(select(AuditLog).where(AuditLog.action == "tool.invoke")).all()
+    assert len(inv) == 5 and len(events) == len(inv)
+    assert {e.details["invocation"] for e in events} == {i.id for i in inv}
+    db.close()
+
+
+def test_12_19_tool_budgets_hold_under_concurrency(client, fresh_db):
+    db = fresh_db.SessionLocal()
+    agent = _agent_id(db)
+    _grant(db, agent, "calc", "READ", max_calls_per_day=3)
+    db.close()
+    results, lock = [], threading.Lock()
+
+    def call():
+        s = fresh_db.SessionLocal()
+        try:
+            G.invoke(s, "calc", {"expression": "1+1"}, agent_id=agent)
+            out = "ok"
+        except G.GatewayDenied as e:
+            out = e.status
+        except Exception as e:  # noqa: BLE001
+            out = f"error {e!r}"
+        s.commit()
+        s.close()
+        with lock:
+            results.append(out)
+
+    ts = [threading.Thread(target=call) for _ in range(8)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert results.count("ok") == 3 and results.count("budget_exhausted") == 5, results
+
+
+def test_19_one_approval_cannot_be_used_twice_concurrently(client, fresh_db, approver):
+    db = fresh_db.SessionLocal()
+    agent = _agent_id(db)
+    _grant(db, agent, "archive.annotate", "CREATE")
+    did = _doc(client, "Concurrency annotation target.")
+    from app.models import PolicyRule
+
+    db.add(PolicyRule(key="test.annotate-approval", version=1, action="tool:archive.annotate.CREATE", category=3, conditions={},
+                      priority=10, reason="test", created_by="test"))
+    db.commit()
+    args = {"document_id": did, "text": "one note"}
+    with pytest.raises(G.GatewayDenied) as e:
+        G.invoke(db, "archive.annotate", args, agent_id=agent)
+    db.commit()
+    _approve(db, e.value.approval_id)
+    db.close()
+    results, lock = [], threading.Lock()
+
+    def use():
+        s = fresh_db.SessionLocal()
+        try:
+            G.invoke(s, "archive.annotate", args, agent_id=agent, approval_id=e.value.approval_id, request_approval=False)
+            out = "ok"
+        except G.GatewayDenied as err:
+            out = err.status
+        s.commit()
+        s.close()
+        with lock:
+            results.append(out)
+
+    ts = [threading.Thread(target=use) for _ in range(5)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert results.count("ok") == 1, results
+
+
+def test_17_an_agent_never_exceeds_the_user_it_works_for(client, fresh_db):
+    db = fresh_db.SessionLocal()
+    agent = _agent_id(db)
+    _grant(db, agent, "archive.delete", "DELETE")
+    _grant(db, agent, "calc", "READ")
+    client.post("/api/auth/users", json={"email": "viewer@example.com", "password": "correct-horse-battery", "role": "viewer"})
+    G.ensure_default_grants(db)
+    db.commit()
+    viewer = _user(db, "viewer@example.com")
+    did = _doc(client)
+    with pytest.raises(G.GatewayDenied, match=r"user this agent works for \(viewer\) has no grant for archive.delete"):
+        G.invoke(db, "archive.delete", {"document_id": did}, agent_id=agent, user=viewer)
+    assert G.invoke(db, "calc", {"expression": "6*7"}, agent_id=agent, user=viewer)["result"] == 42  # both allow it
+    db.close()
+
+
+def test_18_policy_changes_need_permission_and_a_second_person(client, fresh_db, approver):
+    sec = _login_as(client, "security_admin")
+    operator = _login_as(client, "operator")
+    rule = {"key": "email.always-restricted", "action": "tool:email.send.EXECUTE", "category": 4, "reason": "outbound mail is sensitive"}
+    assert operator.post("/api/policies", json=rule).status_code == 403  # no policy.write
+    assert approver.post("/api/policies", json=rule).status_code == 403  # approvers cannot write policy
+    r = sec.post("/api/policies", json=rule)
+    assert r.status_code == 202 and r.json()["category"] == "RESTRICTED"
+    aid = r.json()["approval_id"]
+    assert sec.post(f"/api/approvals/{aid}/decide", json={"approve": True}).status_code == 403  # security admins do not approve at all
+    assert approver.post(f"/api/approvals/{aid}/decide", json={"approve": True}).status_code == 200
+    changed = {**rule, "category": 5, "approval_id": aid}  # the approval was for category 4, not 5
+    assert sec.post("/api/policies", json=changed).status_code == 202
+    applied = sec.post("/api/policies", json={**rule, "approval_id": aid})
+    assert applied.status_code == 200 and applied.json()["rule"]["version"] == 1
+    # a rule may not lower a mandatory floor
+    low = {"key": "launch.autonomous", "action": "product.launch", "category": 1, "reason": "x"}
+    assert sec.post("/api/policies", json=low).status_code == 422
+
+
+def test_20_policy_rollback_restores_a_previous_version(client, fresh_db, approver):
+    sec = _login_as(client, "security_admin")
+
+    def apply(body):
+        r = sec.post("/api/policies", json=body)
+        if r.status_code == 202:
+            approver.post(f"/api/approvals/{r.json()['approval_id']}/decide", json={"approve": True})
+            r = sec.post("/api/policies", json={**body, "approval_id": r.json()["approval_id"]})
+        return r
+
+    v1 = apply({"key": "web.fetch.supervised", "action": "tool:web.fetch.READ", "category": 2, "reason": "watch external reads"})
+    v2 = apply({"key": "web.fetch.supervised", "action": "tool:web.fetch.READ", "category": 3, "reason": "tighten"})
+    assert (v1.json()["rule"]["version"], v2.json()["rule"]["version"]) == (1, 2)
+    r = sec.post("/api/policies/web.fetch.supervised/rollback", json={"to_version": 1})
+    assert r.status_code == 202
+    approver.post(f"/api/approvals/{r.json()['approval_id']}/decide", json={"approve": True})
+    done = sec.post("/api/policies/web.fetch.supervised/rollback", json={"to_version": 1, "approval_id": r.json()["approval_id"]})
+    assert done.status_code == 200 and done.json()["rule"]["category"] == 2 and done.json()["rule"]["version"] == 3
+    hist = client.get("/api/policies/history?key=web.fetch.supervised").json()
+    assert [h["version"] for h in hist] == [1, 2, 3] and sum(h["superseded_at"] is None for h in hist) == 1
+
+
+def test_tool_grants_need_a_second_person_and_revocation_is_immediate(client, fresh_db, approver):
+    sec = _login_as(client, "security_admin")
+    db = fresh_db.SessionLocal()
+    agent = _agent_id(db)
+    db.close()
+    body = {"subject_kind": "agent", "subject_id": agent, "tool": "calc", "operations": ["READ"], "reason": "arithmetic for reports"}
+    r = sec.post("/api/tools/grants", json=body)
+    assert r.status_code == 202
+    approver.post(f"/api/approvals/{r.json()['approval_id']}/decide", json={"approve": True})
+    g = sec.post("/api/tools/grants", json={**body, "approval_id": r.json()["approval_id"]}).json()["grant"]
+    db = fresh_db.SessionLocal()
+    assert G.invoke(db, "calc", {"expression": "3*3"}, agent_id=agent)["result"] == 9
+    db.commit()
+    assert sec.delete(f"/api/tools/grants/{g['id']}").status_code == 200
+    with pytest.raises(G.GatewayDenied, match="deny by default"):
+        G.invoke(db, "calc", {"expression": "3*3"}, agent_id=agent)
+    db.close()
