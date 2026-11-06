@@ -19,6 +19,7 @@ from ..governance import core as gov
 from ..integrations import registry as connectors
 from ..models import (Agent, AgentMessage, Approval, AuditLog, Experiment, LedgerEntry, Lesson, Opportunity, Product,
                       Store, Supplier, Task, Trend, User)
+from ..security.rbac import ROLE_PATTERN
 from ..security.auth import current_user, hash_password, issue_token, require_role, verify_password
 from ..services import data_import, scheduler
 
@@ -84,11 +85,13 @@ def login(c: Credentials, request: Request, db: Session = Depends(get_db)):
 
 @router.get("/auth/me")
 def me(user: User = Depends(current_user)):
-    return {"email": user.email, "role": user.role}
+    from ..security.rbac import permissions_of
+
+    return {"email": user.email, "role": user.role, "permissions": sorted(permissions_of(user.role))}
 
 
 class NewUser(Credentials):
-    role: str = Field(default="operator", pattern="^(admin|operator|viewer)$")
+    role: str = Field(default="operator", pattern=ROLE_PATTERN)
 
 
 @router.post("/auth/users")
@@ -120,7 +123,7 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(admin_only)):
 
 
 class UserPatch(BaseModel):
-    role: str | None = Field(default=None, pattern="^(admin|operator|viewer)$")
+    role: str | None = Field(default=None, pattern=ROLE_PATTERN)
     disabled: bool | None = None
 
 

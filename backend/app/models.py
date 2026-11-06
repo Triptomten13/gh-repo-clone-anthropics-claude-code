@@ -309,6 +309,7 @@ class Approval(Base):
 
 
 class AuditLog(Base):
+    """Append-only, hash-chained (governance/audit_chain.py): sealed at commit with seq + keyed hash."""
     __tablename__ = "audit_log"
     id: Mapped[int] = mapped_column(primary_key=True)
     actor: Mapped[str] = mapped_column(String(255), index=True)
@@ -316,6 +317,9 @@ class AuditLog(Base):
     target: Mapped[str] = mapped_column(String(255), default="")
     details: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    seq: Mapped[int | None] = mapped_column(BigInteger, nullable=True, unique=True)
+    prev_hash: Mapped[str] = mapped_column(String(64), default="", server_default="")
+    hash: Mapped[str] = mapped_column(String(64), default="", server_default="", index=True)
 
 
 class Lesson(Base):
@@ -1111,3 +1115,7 @@ class SemanticCacheEntry(Base):
 
 # Archive index change tracking: every process that writes document_chunks must record change tokens (see knowledge/index.py)
 from .knowledge import index as _archive_index  # noqa: E402,F401
+# Audit chain: every process that writes audit records must seal them at commit (see governance/audit_chain.py)
+from .governance import audit_chain as _audit_chain  # noqa: E402
+
+_audit_chain._install()

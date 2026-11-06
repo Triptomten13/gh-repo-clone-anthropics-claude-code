@@ -57,6 +57,33 @@ def _active_admins(db) -> int:
     return int(db.scalar(select(func.count(User.id)).where(User.role == "admin", User.disabled.is_(False))) or 0)
 
 
+def _audit_cmd(db, actor: str, args) -> int:
+    import json as _json
+    from datetime import datetime
+
+    from .governance import audit_chain
+
+    if args.cmd == "audit-verify":
+        out = audit_chain.verify(db)
+        gov.audit(db, actor, "audit.verify", "audit_log", ok=out["ok"], checked=out["checked"], via="cli")
+        db.commit()
+        print(_json.dumps(out, indent=1))
+        return 0 if out["ok"] else 1
+    if args.cmd == "audit-export":
+        filters = {"since": datetime.fromisoformat(args.since) if args.since else None, "until": datetime.fromisoformat(args.until) if args.until else None}
+        gov.audit(db, actor, "audit.export", "audit_log", format=args.format, via="cli")
+        db.commit()
+        data, _ = audit_chain.export(db, args.format, filters, actor)
+        with open(args.out, "wb") as f:
+            f.write(data)
+        print(f"wrote {args.out} ({len(data)} bytes)")
+        return 0
+    with open(args.zip, "rb") as f:
+        out = audit_chain.verify_export(f.read())
+    print(_json.dumps(out, indent=1))
+    return 0 if out["ok"] else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m app.cli", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -67,9 +94,18 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--password-stdin", action="store_true", help="read the password from the first line of stdin")
     p = sub.add_parser("set-role")
     p.add_argument("--email", required=True)
-    p.add_argument("--role", required=True, choices=["admin", "operator", "viewer"])
+    from .security.rbac import ROLES
+
+    p.add_argument("--role", required=True, choices=sorted(ROLES))
     for name in ("disable", "enable"):
         sub.add_parser(name).add_argument("--email", required=True)
+    sub.add_parser("audit-verify", help="verify the tamper-evident audit chain (exit 1 if broken)")
+    p = sub.add_parser("audit-export", help="export audit records (signed ZIP by default)")
+    p.add_argument("--out", required=True)
+    p.add_argument("--format", choices=["zip", "json", "csv"], default="zip")
+    p.add_argument("--since")
+    p.add_argument("--until")
+    sub.add_parser("audit-verify-export", help="check an exported audit ZIP (signature, file hashes, chain)").add_argument("zip")
     args = ap.parse_args(argv)
 
     if os.getenv("CLI_INIT_DB", "1") == "1":
@@ -77,6 +113,8 @@ def main(argv: list[str] | None = None) -> int:
     db = SessionLocal()
     actor = _actor()
     try:
+        if args.cmd.startswith("audit-"):
+            return _audit_cmd(db, actor, args)
         if args.cmd == "list-users":
             rows = db.scalars(select(User).order_by(User.id)).all()
             if not rows:

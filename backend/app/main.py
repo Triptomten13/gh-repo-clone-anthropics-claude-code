@@ -17,6 +17,7 @@ from sqlalchemy.engine import Engine
 from .agents.catalog import build_orchestrator
 from .api.core_routes import router as core_router
 from .api.daemon_routes import router as daemon_router
+from .api.control_routes import router as control_router
 from .api.hyper_routes import router as hyper_router
 from .api.flare_routes import router as flare_router
 from .api.routes import router
@@ -74,6 +75,7 @@ app.include_router(router)
 app.include_router(flare_router)
 app.include_router(core_router)
 app.include_router(daemon_router)
+app.include_router(control_router)
 app.include_router(hyper_router)
 
 SECURITY_HEADERS = {
