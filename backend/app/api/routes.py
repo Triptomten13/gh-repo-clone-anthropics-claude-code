@@ -43,11 +43,20 @@ def auth_status(db: Session = Depends(get_db)):
     from ..config import get_settings
 
     s = get_settings()
-    return {"setup_required": db.scalar(select(func.count(User.id))) == 0, "company_name": s.company_name, "platform_name": s.platform_name}
+    from ..demo import public as demo
+
+    return {"setup_required": not demo.enabled() and db.scalar(select(func.count(User.id))) == 0, "company_name": s.company_name,
+            "platform_name": s.platform_name, "demo_mode": demo.enabled(),
+            "demo_session_minutes": demo.session_minutes() if demo.enabled() else None}
 
 
 @router.post("/auth/setup")
 def setup(c: Credentials, db: Session = Depends(get_db)):
+    from ..demo.public import enabled as demo_mode
+
+    if demo_mode():  # on a public server anyone could claim the administrator account through the browser
+        raise HTTPException(403, "first-run setup is disabled on the public demo — the operator creates accounts on the server "
+                                 "(python -m app.cli create-admin)")
     if db.scalar(select(func.count(User.id))):
         raise HTTPException(409, "already set up")
     u = User(email=c.email.lower(), password_hash=hash_password(c.password), role="admin")

@@ -60,6 +60,10 @@ def load(db=None) -> dict[str, Any]:
             val = copy.deepcopy(DEFAULTS)
         finally:
             s.close()
+    from ..demo.public import enabled as demo_mode
+
+    if demo_mode():
+        val["offline_mode"] = True  # a public demo never calls an external service or spends money, whatever is saved
     with _lock:
         _cache = (now, val)
     return copy.deepcopy(val)

@@ -19,6 +19,7 @@ from .api.core_routes import router as core_router
 from .api.daemon_routes import router as daemon_router
 from .api.control_routes import router as control_router
 from .api.hyper_routes import router as hyper_router
+from .api.public_routes import router as public_router
 from .api.flare_routes import router as flare_router
 from .api.routes import router
 from .api.streaming import STREAM_HEADERS
@@ -57,6 +58,12 @@ async def lifespan(app: FastAPI):
         queued = db.scalar(select(func.count(Task.id)).where(Task.status == "queued"))
     finally:
         db.close()
+    from .demo import public as demo
+
+    demo_task = None
+    if demo.enabled():  # public demo server: sample data, forced offline mode, scheduled full reset
+        logging.getLogger(__name__).info("PUBLIC DEMO MODE: %s", demo.bootstrap())
+        demo_task = asyncio.create_task(demo.reset_loop())
     from .daemon import residency, telemetry
 
     telemetry.start()
@@ -72,6 +79,8 @@ async def lifespan(app: FastAPI):
     yield
     if loop_task:
         loop_task.cancel()
+    if demo_task:
+        demo_task.cancel()
 
 
 app = FastAPI(title=f"{get_settings().company_name} — {get_settings().platform_name} Commerce Intelligence", version="0.2.0", lifespan=lifespan)
@@ -83,6 +92,7 @@ app.include_router(core_router)
 app.include_router(daemon_router)
 app.include_router(control_router)
 app.include_router(hyper_router)
+app.include_router(public_router)
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",

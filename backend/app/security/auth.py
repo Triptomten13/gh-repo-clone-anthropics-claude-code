@@ -48,10 +48,10 @@ def _unb64(s: str) -> bytes:
     return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
 
 
-def issue_token(user: User) -> str:
+def issue_token(user: User, ttl_s: int | None = None) -> str:
     s = get_settings()
     body = {"sub": user.id, "email": user.email, "role": user.role, "tv": user.token_version or 0,
-            "exp": int(time.time()) + s.token_ttl_hours * 3600}
+            "exp": int(time.time()) + (ttl_s if ttl_s is not None else s.token_ttl_hours * 3600)}
     payload = _b64(json.dumps(body, separators=(",", ":")).encode())
     sig = _b64(hmac.new(s.secret_key.encode(), payload.encode(), hashlib.sha256).digest())
     return f"{payload}.{sig}"

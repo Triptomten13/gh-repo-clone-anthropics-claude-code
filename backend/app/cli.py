@@ -94,7 +94,7 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--password-stdin", action="store_true", help="read the password from the first line of stdin")
     p = sub.add_parser("set-role")
     p.add_argument("--email", required=True)
-    from .security.rbac import ROLES
+    from .security.rbac import ASSIGNABLE_ROLES as ROLES
 
     p.add_argument("--role", required=True, choices=sorted(ROLES))
     for name in ("disable", "enable"):

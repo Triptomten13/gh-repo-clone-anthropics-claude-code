@@ -410,12 +410,29 @@ def vault_collection_upsert(c: CollectionIn, db: Session = Depends(get_db), user
 
 
 # ------------------------------------------------------------------ observability: runs + replay
+def _started_by(db: Session, rid: int, email: str) -> bool:
+    """The run, or one of its ancestors (a visitor's G-sus run → its delegated tasks), was started by `email`."""
+    from ..models import Run
+
+    seen = 0
+    while rid and seen < 20:
+        r = db.get(Run, rid)
+        if r is None:
+            return False
+        if r.user_email == email:
+            return True
+        rid, seen = r.parent_id, seen + 1
+    return False
+
+
 @router.get("/runs")
 def runs_list(kind: str | None = None, status: str | None = None, agent: str | None = None, limit: int = Query(100, le=1000),
-              db: Session = Depends(get_db), _: User = Depends(require_permission("runs.read"))):
+              db: Session = Depends(get_db), user: User = Depends(require_permission("runs.read"))):
     from ..models import Run
 
     q = select(Run).order_by(Run.id.desc()).limit(limit)
+    if user.role == "demo":  # public demo: a visitor sees only executions they started
+        q = q.where(Run.user_email == user.email)
     for col, v in (("kind", kind), ("status", status), ("agent_id", agent)):
         if v:
             q = q.where(getattr(Run, col) == v)
@@ -426,6 +443,8 @@ def runs_list(kind: str | None = None, status: str | None = None, agent: str | N
 def runs_replay(rid: int, db: Session = Depends(get_db), user: User = Depends(require_permission("runs.read"))):
     from ..governance import observability
 
+    if user.role == "demo" and not _started_by(db, rid, user.email):
+        raise HTTPException(404, "run not found")
     try:
         out = observability.replay(db, rid)
     except LookupError:

@@ -53,8 +53,12 @@ ROLES: dict[str, set[str]] = {
     "auditor": {"audit.read", "audit.export", "audit.verify", "policy.read", "approval.read", "tools.read", "runs.read"},
     "user": {"work.run", "tools.invoke", "knowledge.read", "knowledge.write"},
     "viewer": {"audit.read", "policy.read", "approval.read", "tools.read", "runs.read", "knowledge.read"},
+    # public demo visitor (DEMO_MODE servers only, created by POST /api/demo/session — never assignable): read sample
+    # data and run the approved sample workflows; no tools, approvals, uploads, settings or administration
+    "demo": {"audit.read", "policy.read", "approval.read", "tools.read", "runs.read", "knowledge.read", "work.run", "eval.run"},
 }
-ROLE_PATTERN = "^(" + "|".join(ROLES) + ")$"
+ASSIGNABLE_ROLES = [r for r in ROLES if r != "demo"]
+ROLE_PATTERN = "^(" + "|".join(ASSIGNABLE_ROLES) + ")$"
 # roles only a super admin may hand out (prevents a security admin from minting super admins)
 PRIVILEGED_ROLES = {"admin", "security_admin"}
 

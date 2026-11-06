@@ -33,8 +33,11 @@ class AskIn(BaseModel):
 
 
 @router.post("/ai/ask")
-def ai_ask(a: AskIn, db: Session = Depends(get_db), user: User = Depends(operator)):
+def ai_ask(a: AskIn, db: Session = Depends(get_db), user: User = Depends(require_role("admin", "operator", "demo"))):
     """Think before using a model: classify → cheapest reliable strategy → execute → answer with an execution trace."""
+    from ..demo import public as demo
+
+    demo.take_action(db, user)  # public demo: per-session action budget (offline mode is forced there)
     from ..ai.router import LLMRefused, LLMUnavailable
     from ..daemon import intel
     from ..governance import budgets

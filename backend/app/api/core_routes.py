@@ -31,6 +31,7 @@ from .routes import row
 router = APIRouter(prefix="/api")
 operator = require_role("admin", "operator")
 admin_only = require_role("admin")
+operator_or_demo = require_role("admin", "operator", "demo")  # + the public demo's server-side limits (app/demo/public.py)
 
 
 def _404(obj: Any, what: str) -> Any:
@@ -74,7 +75,12 @@ def ai_calls(limit: int = Query(100, le=500), db: Session = Depends(get_db), _: 
 
 
 @router.post("/ai/evals/run")
-def run_evals(include_llm: bool = False, db: Session = Depends(get_db), user: User = Depends(operator)):
+def run_evals(include_llm: bool = False, db: Session = Depends(get_db), user: User = Depends(operator_or_demo)):
+    from ..demo import public as demo
+
+    if demo.is_demo_user(user):
+        demo.take_action(db, user)
+        include_llm = False
     res = evals.run_all(include_llm=include_llm)
     st = gov.get_state(db, "evals")
     st["runs"] = [res, *(st.get("runs") or [])][:20]
@@ -637,19 +643,31 @@ def _run_out(db: Session, r: GsusRun) -> dict[str, Any]:
 
 
 @router.post("/gsus/runs")
-def gsus_run(body: RunIn, db: Session = Depends(get_db), user: User = Depends(operator)):
+def gsus_run(body: RunIn, db: Session = Depends(get_db), user: User = Depends(operator_or_demo)):
+    from ..demo import public as demo
+
+    if demo.is_demo_user(user):
+        demo.check_gsus(user, body.objective, body.mode)
+        demo.take_action(db, user)
+        body.settings = {}
     run = gsus.start(db, body.objective, body.mode, body.settings, user.email)
     return _run_out(db, run)
 
 
 @router.get("/gsus/runs")
-def gsus_runs(db: Session = Depends(get_db), _: User = Depends(current_user)):
-    return [row(r) for r in db.scalars(select(GsusRun).order_by(GsusRun.id.desc()).limit(100)).all()]
+def gsus_runs(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    q = select(GsusRun).order_by(GsusRun.id.desc()).limit(100)
+    if user.role == "demo":  # public demo: a visitor sees only their own runs
+        q = q.where(GsusRun.created_by == user.email)
+    return [row(r) for r in db.scalars(q).all()]
 
 
 @router.get("/gsus/runs/{rid}")
-def gsus_get(rid: int, db: Session = Depends(get_db), _: User = Depends(current_user)):
-    return _run_out(db, _404(db.get(GsusRun, rid), "run"))
+def gsus_get(rid: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    r = _404(db.get(GsusRun, rid), "run")
+    if user.role == "demo" and r.created_by != user.email:
+        raise HTTPException(404, "run not found")
+    return _run_out(db, r)
 
 
 @router.post("/gsus/runs/{rid}/resume")
