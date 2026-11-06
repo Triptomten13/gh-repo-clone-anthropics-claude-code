@@ -13,4 +13,4 @@ export async function openShell(page: Page, path = "/") {
 /** Every page in the navigation (the shell routes). */
 export const ROUTES = ["/", "/agents", "/ai", "/approvals", "/archive", "/archivum", "/chamber", "/control", "/daemon", "/experiments", "/field",
   "/finance", "/flare", "/flare/brands", "/flare/campaigns", "/flare/collab", "/flare/mutations", "/flare/personas", "/flare/portfolio",
-  "/flare/sideways", "/hq", "/knowledge", "/lab", "/portfolio", "/radar", "/research", "/settings"];
+  "/flare/sideways", "/governance", "/hq", "/knowledge", "/lab", "/portfolio", "/radar", "/research", "/settings"];

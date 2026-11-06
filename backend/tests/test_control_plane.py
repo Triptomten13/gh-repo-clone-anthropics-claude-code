@@ -922,3 +922,33 @@ def test_14_only_real_private_networks_count_as_private(fresh_db, monkeypatch):
     for addr in ("203.0.113.7", "198.18.0.1", "192.0.2.1", "93.184.215.14", "8.8.8.8"):
         assert not egress.decide(addr)[0], addr
     assert egress.decide("127.0.0.1") == (True, "loopback")
+
+
+def test_efficiency_score_rewards_success_not_cheapness(client, fresh_db):
+    from app.agents.base import AgentOutput, BaseAgent
+
+    class Good(BaseAgent):
+        id, name, division, task_types = "good", "Good", "test", ("test.good",)
+
+        def handle(self, ctx, task):
+            return AgentOutput(summary="done")
+
+    class Cheap(BaseAgent):
+        id, name, division, task_types = "cheapfail", "Cheap", "test", ("test.cheapfail",)
+
+        def handle(self, ctx, task):
+            from app.agents.base import Blocked
+
+            raise Blocked("could not do it")
+
+    orch, db = _orch_with(Good, fresh_db)
+    if "cheapfail" not in orch.agents:
+        orch.register(Cheap())
+    orch.sync_agents(db)
+    for t in ("test.good", "test.cheapfail"):
+        orch.submit(db, t, {})
+    db.commit()
+    orch.drain()
+    rep = {a["agent"]: a for a in client.get("/api/agents/efficiency").json()["agents"]}
+    assert rep["good"]["ies"] > 0 and rep["cheapfail"]["ies"] == 0 and rep["cheapfail"]["ies_components"]["cost_usd"] == 0
+    db.close()

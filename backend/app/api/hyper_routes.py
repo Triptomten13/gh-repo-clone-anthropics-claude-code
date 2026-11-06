@@ -369,6 +369,12 @@ def agents_efficiency(days: int = Query(7, ge=1, le=90), db: Session = Depends(g
     for a in out.values():
         d = a.pop("durations")
         a["avg_seconds"] = round(sum(d) / len(d), 2) if d else None
+        # Intelligence Efficiency Score: verified successes per resource unit (1 unit = 10k tokens, $0.01 or 1 minute).
+        # No successes → 0, however cheap: a cheap wrong answer is not efficiency.
+        units = a["tokens"] / 10_000 + a["cost_usd"] / 0.01 + sum(d) / 60
+        a["ies"] = round(a["succeeded"] / (1 + units), 3)
+        a["ies_components"] = {"verified_successes": a["succeeded"], "tokens": a["tokens"], "cost_usd": round(a["cost_usd"], 6),
+                               "execution_minutes": round(sum(d) / 60, 2), "resource_units": round(units, 3)}
         a["success_rate"] = round(a["succeeded"] / a["tasks"], 3) if a["tasks"] else None
         a["cost_per_success_usd"] = round(a["cost_usd"] / a["succeeded"], 6) if a["succeeded"] else None
         a["delegation"] = (None if not a["spawned"] else {"subtasks": a["spawned"], "subtask_success_rate": round(a["spawned_succeeded"] / a["spawned"], 3),
@@ -376,4 +382,7 @@ def agents_efficiency(days: int = Query(7, ge=1, le=90), db: Session = Depends(g
         a["cost_usd"] = round(a["cost_usd"], 6)
         res.append(a)
     return {"days": days, "agents": sorted(res, key=lambda x: (-x["tasks"], x["agent"])),
-            "note": "delegation is worth it when sub-tasks succeed and add information; many low-success sub-tasks are wasted compute"}
+            "note": "delegation is worth it when sub-tasks succeed and add information; many low-success sub-tasks are wasted compute",
+            "ies_definition": "IES = verified successes / (1 + resource units); 1 unit = 10 000 tokens, $0.01 model cost or 1 minute of "
+                              "execution. A heuristic composite — read it with its components. RAM/VRAM/energy are measured system-wide "
+                              "(Control Center), not yet attributed per task."}
