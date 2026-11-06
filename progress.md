@@ -13,13 +13,15 @@
 | **DAEMON HYPERINTELLIGENCE**: audit + baseline, telemetry, memory-aware residency + resource modes, rules-first orchestrator (`/api/ai/ask`), deterministic solvers, L1/L2/L3/L4 caches, internet research (10 official sources, QUICK/STANDARD/DEEP, citations, contradictions), monitors, retention, Performance Engineering Agent, delegation report, Control Center + Research pages | `test_hyper.py`, measured before/after (docs/HYPERINTELLIGENCE.md §3), routing eval 30/30 + held-out 12/12, 13-scenario system benchmark |
 | **Cross-platform** (desktop, tablet, phone, installable PWA): same-origin API through the web server, live events over HTTP, mobile tab bar + page drawer, accessible dialogs, touch/keyboard/safe-area fixes, offline honesty, run scripts (`make dev`, `make dev-lan`, `scripts/health.sh`) | Playwright: unit, device workflows (desktop/iPad/iPhone/Android emulation), 27 pages × 11 sizes, axe, PWA, performance (docs/CROSS_PLATFORM.md); no physical device yet |
 | **Governed AI control plane** (docs/CONTROL_PLANE.md): policy decision/enforcement point with 5 approval categories and mandatory floors; approvals bound to arguments, expiring, single use, four eyes, revocable, delegable; governed governance changes; deny-by-default Tool Gateway (per agent/workflow/role/operation, user-bounded agents, scoped credentials, redaction, atomic budgets); Knowledge Vault classification + inherited collection access + verified deletion; classification-aware routing; runs + replay; release gates on prompt/model activation; model/tool budgets; AIR_GAPPED egress guard; 10 roles with separation of duties; hash-chained audit with triggers, verification, signed export, governed retention; runs/replay for tasks, Ask and G-sus runs; Governance & Audit page | `test_control_plane.py` (all 20 acceptance criteria), PostgreSQL smoke + concurrency checks, migrations 0006–0010 up/down/up on SQLite and PostgreSQL, Playwright (governance page on 4 devices, responsive + axe matrices) |
+| **Public launch** (docs/PUBLIC_LAUNCH.md): separate public demo (DEMO_MODE: temporary visitor sessions, sample data + sample vault, catalog-only workflows, action budgets, forced offline, setup disabled, scheduled reset), landing page, public status page, Demo Center with source labels, `/ready` `/api/version` `/api/status`, all-in-one image + start script, compose demo profile, Render Blueprint, manual deploy workflow, page CSP | demo suite 10/10 (local stack, image layout here, built container in CI), 15 backend tests, CI run 29 green incl. `demo-image`; **not deployed** (no hosting account here) |
 | DAEMON COST INTELLIGENCE: registry, credentials, routing, quota backoff, spend limits, caches, benchmarks, dashboard, proposals | `test_daemon.py`, real benchmark runs on two local models |
 | Backup / restore | round-trip + tamper refusal tested (docs/BACKUP_RECOVERY.md) |
 | Docs restructure | docs/ holds architecture, AI system, knowledge, agents, security, design system, decisions, testing, roadmap, DAEMON, cost, install, backup |
 
-Totals: 224 backend tests pass; ruff clean; frontend type-checks and builds; Playwright 72 passed, 4 skipped
-(device-conditional); migrations 0001–0010 verified upgrade/downgrade/upgrade on SQLite and PostgreSQL; PostgreSQL
-smoke passes; Independence Tests A–G pass with real local models (2026-11-06T05:10Z, after the control-plane changes).
+Totals: 239 backend tests pass (also in a clean virtualenv); ruff clean; Playwright 77 passed, 4 skipped (Chromium) and
+62 passed, 4 skipped (WebKit + Firefox, CI); public demo suite 10/10; migrations 0001–0010 verified on SQLite and
+PostgreSQL; PostgreSQL smoke passes; Independence Tests A–G pass with real local models (2026-11-06T05:10Z).
+CI was red from the cost-intelligence phase until 2026-11-06 (`cryptography` undeclared) — fixed; CI run 29 green.
 
 ## Measured facts worth remembering
 
@@ -41,7 +43,9 @@ smoke passes; Independence Tests A–G pass with real local models (2026-11-06T0
 * Live external connectors (YouTube, Reddit, eBay, Etsy, Shopify) — implemented against official APIs, never exercised
   live (no credentials here).
 * Anthropic models — adapter tested with fakes only; no key in this environment.
-* Docker images were never built here (no Docker daemon); compose file validated only.
+* Docker images are not built in this environment (no Docker daemon); CI builds and runs the all-in-one image and
+  validates the compose file (run 29). The private two-container images (backend/frontend Dockerfiles) are not built in CI yet.
+* The public demo is not deployed: no hosting account here (docs/PUBLIC_LAUNCH.md §11 lists the owner's steps).
 * Multimodal (speech, vision, OCR) — the orchestrator classifies image/audio requests and answers "unavailable" honestly.
 * General web search — Brave adapter exists but is off (no key); research uses the 10 official keyless APIs only.
 * Provider-verification research connector, LoRA/fine-tuning (needs GPU + training stack), multi-worker task queue

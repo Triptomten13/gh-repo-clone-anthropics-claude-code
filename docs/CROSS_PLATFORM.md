@@ -113,8 +113,8 @@ notches, or mobile networks. **No physical device has been used yet.**
 | iPad gen 7 (810×1080, touch) | e2e workflows, Chromium | **passed** (emulation) — real Safari: not run |
 | iPhone 13 (390×844, touch) | e2e workflows, Chromium | **passed** (emulation) — real Safari: not run |
 | Pixel 7 (412×915, touch) | e2e workflows, Chromium | **passed** (emulation) — real device: not run |
-| 320, 375, 390, 430, 768, 1024, 1280, 1440, 1920 px + 844×390 + 1180×820 | responsive matrix, 27 pages each | **passed** — 0 sideways scroll, nav reachable, 0 console errors |
-| WebKit (Safari engine), Firefox | CI job `e2e-webkit-firefox` | **not run yet** (browsers not installable here); informational until it passes |
+| 320, 375, 390, 430, 768, 1024, 1280, 1440, 1920 px + 844×390 + 1180×820 | responsive matrix, 28 app pages + 3 public pages each | **passed** — 0 sideways scroll, nav reachable, 0 console errors |
+| WebKit (Safari engine), Firefox | CI job `e2e-webkit-firefox` (GitHub Actions, Linux) | **passed** 2026-11-06 — 62 passed, 4 skipped (CI run 29); still engines on Linux, not Safari on iOS/macOS |
 | Windows / macOS desktop, Edge, real Safari, Android Firefox | manual | **not run** — checklist in §7 |
 
 Run locally: `make test-frontend` (starts its own stack on ports 8100/3100 with a throw-away database).

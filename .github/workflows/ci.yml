@@ -109,7 +109,11 @@ jobs:
       - name: start the public demo container
         run: |
           docker run -d --name demo -p 3000:3000 -e DEMO_MODE=1 -e DEMO_SESSIONS_PER_CLIENT_HOUR=200 -e API_RATE_PER_MIN=20000 demonkoncernen:ci
-          for i in $(seq 1 90); do curl -fsS http://127.0.0.1:3000/ready && break; sleep 2; done
+          for i in $(seq 1 90); do
+            curl -fsS http://127.0.0.1:3000/ready && break
+            [ "$(docker inspect -f '{{.State.Running}}' demo)" = "true" ] || { echo "container exited:"; docker logs demo 2>&1 | tail -n 60; exit 1; }
+            sleep 2
+          done
           curl -fsS http://127.0.0.1:3000/ready
           curl -fsS http://127.0.0.1:3000/api/version
       - uses: actions/setup-node@v4

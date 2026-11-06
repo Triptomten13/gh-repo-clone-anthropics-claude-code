@@ -151,4 +151,31 @@ workflow on the previous commit. The private Control Center is never deployed au
 
 ## 11. Readiness matrix (2026-11-06)
 
-See the final table in this section (kept current with each verification run).
+| Component | Status | Verified (evidence) |
+|---|---|---|
+| Frontend | **RUNNING LOCALLY** | `next build` in CI (run 29 ✓); main browser suite 77 passed / 4 skipped (Chromium, local); WebKit + Firefox 62 passed / 4 skipped (CI run 29); served by the container runtime on this machine |
+| Backend | **RUNNING LOCALLY** | pytest 239 passed (local, and in a clean virtualenv with only the declared requirements; CI run 29 ✓); `/ready`, `/api/version`, `/api/status` answer through the public port |
+| Database | **RUNNING LOCALLY** | SQLite (demo, dev) and PostgreSQL 16 (migrations 0001–0010 up/down/up; PostgreSQL smoke ✓ locally and in CI) |
+| Authentication | **RUNNING LOCALLY** | role/permission tests; demo sessions least-privilege; setup disabled on demo servers (tests) |
+| AI integration | **CONFIGURATION REQUIRED** | local models verified on this host (Independence Tests A–G, 2026-11-06T05:10Z); no external provider key here; the public demo runs without models by design and says so |
+| Agent runtime | **RUNNING LOCALLY** | sample agent execution passes in the demo suite (local stack, local container runtime, CI container) |
+| Workflow engine | **RUNNING LOCALLY** (partial) | G-sus plans + orchestrator with dependencies, approvals, traces; no declarative workflow designer (CONTROL_PLANE.md §5) |
+| Demo mode | **RUNNING LOCALLY** · image verified in CI | demo suite 10/10 PASS on the local demo stack, on `deploy/start.sh` in the image layout here, and against the built container in CI (`demo-image`, run 29 ✓); 15 backend tests |
+| Public URL | **BLOCKED** | no hosting account or deploy credentials in this environment; nothing deployed, no URL claimed. Remaining action below |
+| HTTPS | **CONFIGURATION REQUIRED** | automatic on Render; Caddy profile for self-hosting (not executed here) |
+| Desktop testing | **RUNNING LOCALLY** (emulated + CI engines) | Chromium desktop/laptop/1920 px; WebKit and Firefox desktop in CI; no physical Windows/macOS machine |
+| Mobile testing | **RUNNING LOCALLY** (emulation only) | iPhone 13, iPad, Pixel 7 emulation; 320–1920 px matrix incl. the public pages; **no physical device yet** |
+| Automated tests | **RUNNING LOCALLY** · CI green | local: 239 backend, 77 browser, 10 demo; CI run 29: backend, frontend, WebKit/Firefox, demo-image ✓ (Chromium job: see the CI run) |
+| Security review | **CONFIGURATION REQUIRED** | code-side review done (§9, threat model in SECURITY.md); deployment-side: set the protected `public-demo` environment's reviewers, keep `SECRET_KEY`s out of the repo, put the private instance behind VPN/TLS |
+
+### What remains for a public URL (owner actions, ~10 minutes)
+
+1. Create a Render account (free plan is enough for the demo) and connect GitHub with access to this repository.
+2. Render → **New → Blueprint** → select this repository and branch → it reads `render.yaml` → **Apply**. Render builds
+   the `Dockerfile`, generates `SECRET_KEY`, checks `/ready`, and gives the demo an `https://<name>.onrender.com` URL.
+3. Check it: `DEMO_BASE_URL=https://<name>.onrender.com make test-demo` (PASS/FAIL report), or open `/status`.
+4. Optional, for one-click redeploys from GitHub: copy the service's Deploy Hook into the repository secret
+   `RENDER_DEPLOY_HOOK_URL`, set the variable `DEMO_URL`, and protect the `public-demo` environment with reviewers;
+   then run **Actions → Deploy public demo**.
+
+Only then is the demo **LIVE AND VERIFIED** — after the suite passes against the real URL.
