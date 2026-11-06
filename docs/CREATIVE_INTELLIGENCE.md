@@ -103,9 +103,11 @@ models, roles, round, sources, critics, scores, requester, tournament id.
 (`wait: false` runs in the background; poll) · `GET /api/creative/tournaments[/{id}]` · `POST …/{id}/save` ·
 `GET /api/creative/models` · `POST /api/creative/benchmarks` · `GET /api/creative/providers` (registry, runtimes,
 24 h health per model) · `GET /api/creative/discovery` · `GET /api/creative/costs`. Agents use the **Creative
-Director** (task type `creative.tournament`). The **Creative Intelligence Center** (`/creative`) has tabs for
+Director** (task type `creative.tournament`). The **Creative Intelligence Center** (`/creative`, navigation entry
+"Creative Center" — Rocky Flare's `/flare` page already carries the name "Creative Intelligence") has tabs for
 tournaments (start, watch, compare candidates, critiques, synthesis, stop reason, usage, save), routing, model quality,
-providers & health, and costs.
+providers & health (approved for routing *and* usable now — an API model without its key is marked "missing
+credentials"), and costs (estimates are labelled ESTIMATE).
 
 ## 6. Acceptance criteria → tests (`backend/tests/test_creative.py`)
 

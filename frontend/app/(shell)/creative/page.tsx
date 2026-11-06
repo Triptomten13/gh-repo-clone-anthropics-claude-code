@@ -3,7 +3,7 @@
  *  Every number comes from the backend; a tournament runs on the server under its hard budget and stop conditions. */
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Button, Card, Empty, ErrorBanner, Field, PageHeader, SourceLabel, StatusBadge, Table } from "@/components/ui";
+import { Button, Card, Empty, Epistemic, ErrorBanner, Field, PageHeader, SourceLabel, StatusBadge, Table } from "@/components/ui";
 import { ago, api } from "@/lib/api";
 import { useApi } from "@/lib/hooks";
 
@@ -260,12 +260,19 @@ function Providers() {
       <ErrorBanner error={p.error || disc.error} />
       <Card title="Models this deployment can use" pad={false}>
         {p.data && (
-          <Table head={["Model", "Where", "Cost class", "Approved", "Calls 24 h", "Error rate", "p50 latency"]} label="Models">
-            {p.data.models.map((m: any) => (
+          <Table head={["Model", "Where", "Cost class", "Approved", "Usable now", "Calls 24 h", "Error rate", "p50 latency"]} label="Models">
+            {p.data.models.map((m: any) => {
+              // approved for routing is not the same as usable: an API model needs its provider's key on this server
+              const configured = p.data.runtimes.find((r: any) => r.provider === m.provider)?.configured ?? false;
+              const excluded = m.last_24h?.excluded ?? 0;
+              return (
               <tr key={m.id}><td className="font-mono text-[12px]">{m.id}</td><td>{m.locality}</td><td>{m.cost_class.replace("_", " ")}</td>
-                <td><StatusBadge status={m.approved ? "approved" : "unverified"} /></td><td className="num">{m.last_24h?.calls ?? 0}</td>
+                <td><StatusBadge status={m.approved ? "approved" : "unverified"} /></td>
+                <td><StatusBadge status={configured ? "configured" : "missing_credentials"} /></td>
+                <td className="num">{m.last_24h?.calls ?? 0}{excluded ? <span className="text-ink-3" title="not configured, paused, over a spend limit, breaker open or excluded by policy"> ({excluded} not sent)</span> : null}</td>
                 <td className="num">{m.last_24h?.error_rate != null ? `${Math.round(m.last_24h.error_rate * 100)} %` : "—"}</td>
-                <td className="num">{m.last_24h?.p50_latency_ms != null ? `${(m.last_24h.p50_latency_ms / 1000).toFixed(1)} s` : "—"}</td></tr>))}
+                <td className="num">{m.last_24h?.p50_latency_ms != null ? `${(m.last_24h.p50_latency_ms / 1000).toFixed(1)} s` : "—"}</td></tr>);
+            })}
           </Table>
         )}
       </Card>
@@ -302,14 +309,14 @@ function Costs() {
         {d && <Table head={["Where", "Calls", "Tokens", "USD"]} label="Usage by locality">
           {Object.entries(d.by_locality).map(([k, v]: [string, any]) => <tr key={k}><td>{k}</td><td className="num">{v.calls}</td><td className="num">{v.tokens}</td><td className="num">${v.usd.toFixed(4)}</td></tr>)}
         </Table>}
-        {d?.estimated_savings_usd != null && <p className="p-3 text-[12.5px] text-ink-2"><SourceLabel kind="simulated" /> <span className="ml-1">Estimated savings ${d.estimated_savings_usd.toFixed(4)} — {d.estimated_savings_note}</span></p>}
+        {d?.estimated_savings_usd != null && <p className="p-3 text-[12.5px] text-ink-2"><Epistemic kind="estimate" /> <span className="ml-1">Estimated savings ${d.estimated_savings_usd.toFixed(4)} — {d.estimated_savings_note}</span></p>}
       </Card>
       <Card title="Tournaments">
         {d && <dl className="grid grid-cols-2 gap-3 text-[13px]">
-          <div><dt className="text-ink-3">Run · accepted</dt><dd className="num">{d.tournaments.count} · {d.tournaments.accepted}</dd></div>
+          <div><dt className="text-ink-3">Run · reached target</dt><dd className="num">{d.tournaments.count} · {d.tournaments.accepted}</dd></div>
           <div><dt className="text-ink-3">Model calls · tokens</dt><dd className="num">{d.tournaments.calls} · {d.tournaments.tokens}</dd></div>
           <div><dt className="text-ink-3">Paid spend</dt><dd className="num">${d.tournaments.usd.toFixed(4)}</dd></div>
-          <div><dt className="text-ink-3">Per accepted result</dt><dd className="num">{d.tournaments.usd_per_accepted_result != null ? `$${d.tournaments.usd_per_accepted_result.toFixed(4)}` : "—"}</dd></div>
+          <div><dt className="text-ink-3">Paid USD per result at target</dt><dd className="num">{d.tournaments.usd_per_accepted_result != null ? `$${d.tournaments.usd_per_accepted_result.toFixed(4)}` : "—"}</dd></div>
           <div className="col-span-2"><dt className="text-ink-3">Average creative value per resource unit</dt><dd className="num">{d.tournaments.avg_creative_value_per_resource_unit ?? "—"}</dd></div>
         </dl>}
         <p className="mt-3 text-[12px] text-ink-3">Value per resource unit = final score ÷ (1 + tokens/10 000 + USD/0.01 + minutes). Local inference has no API price but uses electricity — see DAEMON CORE → Costs.</p>

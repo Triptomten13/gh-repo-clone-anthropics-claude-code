@@ -12,7 +12,7 @@ import { useIdentity } from "@/lib/identity";
 type NavItem = { href: string; label: string; icon: typeof Gauge };
 const GSUS: NavItem[] = [
   { href: "/chamber", label: "G-sus Chamber", icon: Sparkles },
-  { href: "/creative", label: "Creative Intelligence", icon: Trophy },
+  { href: "/creative", label: "Creative Center", icon: Trophy },  // not "Creative Intelligence": Rocky Flare (/flare) already uses that name
   { href: "/knowledge", label: "The Archive", icon: Library },
   { href: "/archivum", label: "Archivum", icon: BookOpen },
   { href: "/flare/collab", label: "The Council", icon: MessagesSquare },
@@ -110,15 +110,20 @@ function ShellFrame({ children }: { children: ReactNode }) {
     if (e.type === "kill_switch" || e.type === "task") status.reload();
     if (e.type === "approval") approvals.reload();
   });
-  const [drawer, setDrawer] = useState(false);
+  // The page finder / "More" drawer belongs to the page it was opened on, so navigating anywhere (a link in it, the back
+  // button) closes it. Derived, not closed by an effect on path change: that effect could run just after a Ctrl+K pressed
+  // right after a navigation and shut the finder the user had just opened.
+  const [drawerFor, setDrawerFor] = useState<string | null>(null);
+  const drawer = drawerFor !== null && drawerFor === path;
+  const openDrawer = () => setDrawerFor(window.location.pathname);
+  const closeDrawer = () => setDrawerFor(null);
   const [collapsed, setCollapsed] = useState(false);
   const [typing, setTyping] = useState(false);
   const [online, setOnline] = useState(true);
   useEffect(() => { try { setCollapsed(localStorage.getItem("dk.nav.collapsed") === "1"); } catch { /* storage unavailable */ } }, []);
-  useEffect(() => { setDrawer(false); }, [path]);
   useEffect(() => {
     // Ctrl/⌘+K: jump to any page (desktop); the same drawer is "More" on touch devices
-    const key = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setDrawer((d) => !d); } };
+    const key = (e: KeyboardEvent) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setDrawerFor((d) => (d !== null && d === window.location.pathname ? null : window.location.pathname)); } };
     // on touch screens the tab bar hides while a text field has focus, so it never sits on top of the keyboard / input
     const coarse = window.matchMedia("(pointer: coarse)");
     const isField = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || t.tagName === "TEXTAREA" || t.tagName === "SELECT" ||
@@ -201,7 +206,7 @@ function ShellFrame({ children }: { children: ReactNode }) {
               <Activity size={14} className={live === "live" ? "text-good" : "text-ink-3"} aria-hidden />
               <span className="sr-only">{LIVE_LABEL[live]}</span>
             </span>
-            <button onClick={() => setDrawer(true)} className="hidden items-center gap-2 rounded-md border border-line px-2.5 py-1 text-ink-3 hover:border-line-strong hover:text-ink-2 lg:inline-flex"
+            <button onClick={openDrawer} className="hidden items-center gap-2 rounded-md border border-line px-2.5 py-1 text-ink-3 hover:border-line-strong hover:text-ink-2 lg:inline-flex"
               aria-keyshortcuts="Control+K Meta+K">
               <Search size={13} aria-hidden /> Find a page <kbd className="rounded border border-line px-1 font-mono text-[10px]" aria-hidden>Ctrl K</kbd>
             </button>
@@ -242,7 +247,7 @@ function ShellFrame({ children }: { children: ReactNode }) {
             );
           })}
           <li className="flex-1">
-            <button onClick={() => setDrawer(true)} aria-haspopup="dialog" aria-expanded={drawer}
+            <button onClick={openDrawer} aria-haspopup="dialog" aria-expanded={drawer}
               className="relative flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] text-ink-3">
               <MoreHorizontal size={21} aria-hidden />More
               {pending > 0 && <span className="num absolute right-[calc(50%-20px)] top-1.5 rounded bg-violet px-1 text-[10px] font-semibold text-black" aria-label={`${pending} approvals pending`}>{pending}</span>}
@@ -251,7 +256,7 @@ function ShellFrame({ children }: { children: ReactNode }) {
         </ul>
       </nav>
 
-      {drawer && <NavDrawer path={path} pending={pending} live={live} onClose={() => setDrawer(false)} onSignOut={signOut} company={identity.company_name} demo={demo} />}
+      {drawer && <NavDrawer path={path} pending={pending} live={live} onClose={closeDrawer} onSignOut={signOut} company={identity.company_name} demo={demo} />}
     </div>
   );
 }
