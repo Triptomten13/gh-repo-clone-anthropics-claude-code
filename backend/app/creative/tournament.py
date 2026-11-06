@@ -98,6 +98,28 @@ def _hash(*parts: Any) -> str:
     return hashlib.sha256("|".join(str(p) for p in parts).encode()).hexdigest()
 
 
+def _comparable(a: Any, b: Any) -> tuple[float, float, str]:
+    """Scores that can be compared: both with critics → combined scores; otherwise rule-based scores only (a revision the
+    critics never saw must not be compared with a candidate they praised — found in a real run)."""
+    if (a.critiques or []) and (b.critiques or []):
+        return float(a.score or 0), float(b.score or 0), "combined"
+    return float(a.deterministic.get("score", 0)), float(b.deterministic.get("score", 0)), "rule-based"
+
+
+def _gain(new: Any, best: Any) -> float:
+    x, y, _ = _comparable(new, best)
+    return round(x - y, 4)
+
+
+def _worse(new: Any, best: Any) -> bool:
+    return _gain(new, best) < 0
+
+
+def _cmp_note(new: Any, best: Any) -> str:
+    x, y, how = _comparable(new, best)
+    return f"{how} {x:.3f} vs {y:.3f}"
+
+
 def _system(category: str, language: str) -> str:
     lang = "Swedish" if language == "sv" else "English"
     return (f"You are a {('songwriter' if category == 'songwriting' else 'poet' if category == 'poetry' else 'writer and expert')} "
@@ -132,6 +154,35 @@ def _visible_cached(db: Session, key: str, actor: str, target: float) -> Any:
         if (t.final_score or 0) >= target and t.result_entry_id and (t.created_by == actor or t.classification in ("PUBLIC", "INTERNAL")):
             return t
     return None
+
+
+def _history(db: Session, category: str, limit: int = 8) -> list[Any]:
+    from ..models import CreativeTournament
+
+    return list(db.scalars(select(CreativeTournament).where(CreativeTournament.category == category,
+                                                          CreativeTournament.status.in_(("completed", "stopped")))
+                           .order_by(CreativeTournament.id.desc()).limit(limit)))
+
+
+def unreliable_critics(db: Session, category: str) -> dict[str, str]:
+    """Critics whose replies could not be used in most of their recent calls (learned from usage['critics'])."""
+    calls: dict[str, list[int]] = {}
+    for t in _history(db, category):
+        for mid, st in ((t.usage or {}).get("critics") or {}).items():
+            c = calls.setdefault(mid, [0, 0])
+            c[0] += int(st.get("calls", 0))
+            c[1] += int(st.get("usable", 0))
+    return {mid: f"only {u} of {n} critiques usable in recent tournaments" for mid, (n, u) in calls.items() if n >= 2 and u / n < 0.5}
+
+
+def synthesis_track_record(db: Session, category: str, synthesizer: str) -> tuple[int, int]:
+    """(syntheses tried, accepted) by this model for this category in recent tournaments."""
+    from ..models import CreativeEntry
+
+    ids = [t.id for t in _history(db, category)]
+    rows = db.scalars(select(CreativeEntry).where(CreativeEntry.tournament_id.in_(ids or [-1]), CreativeEntry.role == "synthesis",
+                                                 CreativeEntry.model_id == synthesizer)).all()
+    return len(rows), sum(1 for e in rows if e.status == "ok")
 
 
 def run(db: Session, brief: str, *, user: Any | None = None, agent_id: str | None = None, workflow: str = "creative.tournament",
@@ -221,11 +272,20 @@ def prepare(db: Session, brief: str, *, user: Any | None = None, agent_id: str |
                              else mode, n=n, sensitivity=sensitivity, category=task["category"], allowed_cost_classes=allowed, router=router)
     ranked = choice["ranked"]
     contestants = [r["model"] for r in ranked[:n]]
+    bad = unreliable_critics(db, task["category"])  # learned: a critic whose replies cannot be parsed wastes calls
     critic_pool = [r["model"] for r in sorted(ranked, key=lambda r: r["quality"], reverse=True) if r["model"] not in contestants]
-    critics = (critic_pool + [m for m in sorted(contestants, key=lambda m: -next(r["quality"] for r in ranked if r["model"] == m))])[:b.critics]
+    critics = [m for m in (critic_pool + [m for m in sorted(contestants, key=lambda m: -next(r["quality"] for r in ranked if r["model"] == m))])
+               if m not in bad][:b.critics]
     synthesizer = max(ranked, key=lambda r: r["quality"])["model"] if ranked else None
+    if strategy == "AUTOMATIC" and strat == "TOURNAMENT" and synthesizer:
+        tried, accepted = synthesis_track_record(db, task["category"], synthesizer)
+        if tried >= 3 and accepted == 0:  # learned: synthesis has not paid off here — compare and keep the best instead
+            strat = "COMPARISON"
+            why += (f"; synthesis skipped: {synthesizer} produced no accepted synthesis in its last {tried} {task['category']} tournaments "
+                    "(saves calls)")
     t.strategy, t.status = strat, "ready"
     t.plan = {"why": why, "task": task, "contestants": contestants, "critics": critics, "synthesizer": synthesizer,
+              "critics_excluded": bad,
               "selection": choice["explanation"], "excluded": choice["excluded"][:20],
               "candidates_considered": [{k: r[k] for k in ("model", "score", "quality", "why")} for r in ranked[:8]],
               "ranked": [{"model": r["model"], "quality": r["quality"], "est_cost_usd": r["est_cost_usd"],
@@ -369,6 +429,8 @@ def execute(db: Session, t: Any, *, user: Any | None = None, agent_id: str | Non
             return t
 
         # ---- critics: each reviews all candidates in ONE call; never scores its own candidate
+        critic_stats: dict[str, dict[str, int]] = {}
+
         def judge(items: list[Any]) -> None:
             if not critics or not items:
                 return
@@ -387,6 +449,9 @@ def execute(db: Session, t: Any, *, user: Any | None = None, agent_id: str | Non
                 except Exception as ex:  # noqa: BLE001
                     obs.event("critique_failed", cm, {"error": str(ex)[:200]})
                     continue
+                st = critic_stats.setdefault(cm, {"calls": 0, "usable": 0})
+                st["calls"] += 1
+                st["usable"] += 1 if parsed else 0
                 for i, x in enumerate(items[:len(LABELS)]):
                     c = parsed.get(LABELS[i])
                     if c and x.model_id != cm:  # a critic never grades its own work
@@ -427,8 +492,8 @@ def execute(db: Session, t: Any, *, user: Any | None = None, agent_id: str | Non
                 judge([s])
                 if Q.is_concatenation(s.text, [x.text for x in top]):
                     s.status, s.error = "rejected", "concatenation of candidates, not a synthesis"
-                elif (s.score or 0) < (best.score or 0):  # the result is never worse than something already in hand
-                    s.status, s.error = "rejected", f"scored {s.score:.3f}, below the best candidate {best.score:.3f}"
+                elif _worse(s, best):  # the result is never worse than something already in hand
+                    s.status, s.error = "rejected", f"scored below the best candidate ({_cmp_note(s, best)})"
                 else:
                     best = s
                 obs.event("synthesis_decision", s.status, {"entry": s.id, "score": s.score, "best": best.id, "reason": s.error})
@@ -443,6 +508,9 @@ def execute(db: Session, t: Any, *, user: Any | None = None, agent_id: str | Non
             if not notes:
                 stop = "nothing specific left to fix"
                 break
+            if critics and m.refuse(*est(critics[0], best.text, 700), 1):
+                stop = "no budget left to judge a revision fairly — kept the best version"
+                break
             reviser = synthesizer if strat != "ITERATIVE" else contestants[0]
             prompt_r = (f"BRIEF:\n{brief}\n\nCURRENT VERSION:\n{best.text[:3000]}\n\nFix ONLY these problems and keep everything else "
                         "unchanged:\n- " + "\n- ".join(notes))
@@ -455,12 +523,13 @@ def execute(db: Session, t: Any, *, user: Any | None = None, agent_id: str | Non
                 stop = f"revision failed ({r2.error[:80]})"
                 break
             judge([r2])
-            gain = (r2.score or 0) - (best.score or 0)
-            obs.event("refinement", f"gain {gain:+.3f}", {"entry": r2.id, "score": r2.score, "previous": best.score})
+            gain = _gain(r2, best)
+            obs.event("refinement", f"gain {gain:+.3f}", {"entry": r2.id, "score": r2.score, "previous": best.score,
+                                                         "compared": _cmp_note(r2, best)})
             if gain > 0:
                 best = r2
             else:
-                r2.status, r2.error = "rejected", f"no improvement ({gain:+.3f})"
+                r2.status, r2.error = "rejected", f"no improvement ({_cmp_note(r2, best)})"
             db.commit()
             if (best.score or 0) >= quality_target:
                 stop = f"quality target {quality_target:.2f} reached after revision ({best.score:.2f})"
@@ -484,7 +553,8 @@ def execute(db: Session, t: Any, *, user: Any | None = None, agent_id: str | Non
         extra = max(1, u["calls"] - len(ok))
         t.usage = {**u, "rounds": 1 + rounds, "models": sorted({e.model_id for e in all_ok}), "first_round_best": first_best,
                    "creative_value_per_resource_unit": round((best.score or 0) / (1 + units), 4),
-                   "gain_per_extra_call": round(((best.score or 0) - first_best) / extra, 4), "resource_units": round(units, 3)}
+                   "gain_per_extra_call": round(((best.score or 0) - first_best) / extra, 4), "resource_units": round(units, 3),
+                   "critics": critic_stats}
         if t.status == "stopped":
             stop += f" — final score {best.score:.2f} is below the target {quality_target:.2f}: human review suggested"
         return t

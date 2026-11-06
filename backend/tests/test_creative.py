@@ -468,3 +468,60 @@ def test_an_output_that_echoes_the_brief_is_not_an_answer():
     real = Q.deterministic(GOOD, BRIEF, "songwriting")
     assert echo["score"] < 0.35 and any("repeats the brief" in n for n in echo["notes"])
     assert real["checks"]["original"] > 0.8 and real["score"] > 0.8
+
+
+# ------------------------------------------------------------------ learned from the real runs
+def test_scores_are_compared_like_for_like():
+    from types import SimpleNamespace as N
+
+    from app.creative import tournament as T
+
+    judged = N(score=0.81, critiques=[{"score": 0.9}], deterministic={"score": 0.70})
+    unjudged = N(score=0.75, critiques=[], deterministic={"score": 0.75})
+    assert T._gain(unjudged, judged) == 0.05  # rule score vs rule score — not 0.75 vs a critic-boosted 0.81
+    assert not T._worse(unjudged, judged)
+
+
+def _history_row(db, category: str, usage: dict, status: str = "stopped"):
+    from app.models import CreativeTournament
+
+    t = CreativeTournament(brief="x", category=category, status=status, usage=usage, plan={}, budget={})
+    db.add(t)
+    db.commit()
+    return t
+
+
+def test_critics_that_keep_failing_are_not_chosen_again(world):
+    from app.creative import tournament as T
+
+    db = world["db"]
+    for _ in range(2):
+        _history_row(db, "songwriting", {"critics": {"local:paster": {"calls": 2, "usable": 0}}})
+    assert "local:paster" in T.unreliable_critics(db, "songwriting")
+    t = _run(world, strategy="COMPARISON", budget={"max_calls": 6, "max_models": 1, "critics": 2})
+    assert "local:paster" not in t.plan["critics"] and "local:paster" in t.plan["critics_excluded"]
+    assert t.usage["critics"] and all(v["usable"] <= v["calls"] for v in t.usage["critics"].values())
+
+
+def test_automatic_skips_a_synthesis_that_has_not_paid_off(world):
+    from app.creative import tournament as T
+    from app.models import CreativeEntry
+
+    db = world["db"]
+    _profile(db, "local:poet-good", "songwriting", 0.95, "a1" * 8)
+    for _ in range(3):
+        h = _history_row(db, "songwriting", {})
+        db.add(CreativeEntry(tournament_id=h.id, role="synthesis", model_id="local:poet-good", status="rejected", text="x"))
+    db.commit()
+    assert T.synthesis_track_record(db, "songwriting", "local:poet-good") == (3, 0)
+    t = _run(world, strategy="AUTOMATIC", budget={"max_calls": 10, "max_models": 2, "critics": 1}, quality_target=0.99)
+    assert t.strategy == "COMPARISON" and "synthesis skipped" in t.plan["why"]
+    assert not [e for e in _entries(db, t) if e.role == "synthesis"]
+
+
+def test_a_revision_is_not_attempted_without_budget_to_judge_it(world):
+    # 2 candidates + 1 critique + (no synthesis: COMPARISON) = 3 calls; ITERATIVE with 1 model: 1 candidate + 1 critique = 2,
+    # a revision would need 1 call and its critique 1 more → with max_calls 3 it must stop instead
+    t = _run(world, strategy="ITERATIVE", budget={"max_calls": 3, "max_models": 1, "critics": 1, "max_rounds": 2}, quality_target=0.99)
+    assert "judge a revision fairly" in t.stop_reason
+    assert not [e for e in _entries(world["db"], t) if e.role == "revision"]
