@@ -46,6 +46,7 @@ INTENTS: list[tuple[str, str]] = [
     ("campaign", r"\b(campaigns?|ads|advert\w*|kampanj\w*|annons\w*)"),
     ("market_scan", r"\b(trends?|market scan|scan the market|marknadsskanning|trender)\b"),
     ("canon_check", r"\b(canon|lore|contradictions?|archivum|kanon|motsägelse\w*)"),
+    ("creative_writing", r"\b(song|lyrics|poem|poetry|haiku|jingle|slogans?|taglines?|låt(text)?|sångtext|dikt|refräng|visa)\b"),
     ("archive_question", r"(\?\s*$|^\s*(what|who|when|where|why|how|explain|describe|vad|vem|när|var|varför|hur|förklara|beskriv)\b|\barchive\b|\bsources?\b|\barkiv\w*|\bkäll\w*)"),
 ]
 NEEDS_PRODUCT = {"product_evaluation", "brand_creation", "council", "discussion", "think_sideways", "campaign"}
@@ -147,6 +148,9 @@ def plan(db: Session, run: GsusRun) -> list[dict[str, Any]]:
     if "market_scan" in intents:
         scan = add("Market scan (configured sources)", "task", "intel.scan_market", {"rev": marker})
         add("Trend analysis", "task", "trend.analyze", {"rev": marker}, [scan])
+    if "creative_writing" in intents:  # DAEMON CREATIVE INTELLIGENCE: several models, independent critics, synthesis, hard budget
+        add("Creative tournament (models compete, critics judge, synthesis)", "task", "creative.tournament",
+            {"brief": run.objective, "budget": {"max_calls": 8, "max_models": 3, "critics": 2, "max_rounds": 1}})
     if "canon_check" in intents:
         add("Canon contradiction check", "canon_check")
     if "archive_question" in intents:

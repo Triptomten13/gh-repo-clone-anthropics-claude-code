@@ -434,3 +434,16 @@ def test_api_permissions_and_agents_cannot_approve_providers(world, client):
     assert v.post("/api/creative/tournaments", json={"brief": BRIEF, "wait": True}).status_code == 403
     assert v.get("/api/creative/models").status_code == 200
     assert client.get("/api/creative/discovery").json()["validation_path"]
+
+
+def test_gsus_delegates_a_song_brief_to_a_creative_tournament(world):
+    from app.gsus import engine as gsus
+    from app.models import CreativeTournament
+
+    db = world["db"]
+    run = gsus.start(db, "Skriv en låt om vinterns första snö i byn, med vers och refräng", "gsus", {}, "creative-admin@example.com")
+    steps = gsus._steps(db, run)
+    step = next(s for s in steps if s.task_type == "creative.tournament")
+    assert step.status == "completed", step.summary
+    ct = db.query(CreativeTournament).order_by(CreativeTournament.id.desc()).first()
+    assert ct.agent_id == "creative_director" and ct.result_entry_id and ct.usage["calls"] <= 8

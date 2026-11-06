@@ -22,6 +22,8 @@ human-approved `Approval` for each action. Admins can change levels in the Agent
 | Self-Improvement (`self_improvement`) | operations | 1 | `system.self_evaluate` | no | Forecast MAPE, agent success/failure rates, improvement *proposals* only |
 | Performance Engineering (`perf_engineer`) | operations | 1 | `perf.analyze` (daily) | no | Measured optimisation *proposals* from telemetry: slow routes, N+1 queries, cache hit rates, model reload churn, context-budget overruns, failing sources/agents — each with its baseline and a verification step; never applied automatically |
 
+| Creative Director (`creative_director`) | creative | 2 | `creative.tournament` | yes (several) | Runs Creative Tournaments: several models write candidates, independent critics judge, a synthesis combines the best, targeted revisions — under a hard budget and stop conditions; paid spend above the autonomous limit needs an approval (docs/CREATIVE_INTELLIGENCE.md). G-sus delegates song/poem/slogan briefs to it |
+
 ## Rocky Flare agents (`backend/app/agents/flare_agents.py`)
 
 | Agent (id) | Level | Task types | What it does |

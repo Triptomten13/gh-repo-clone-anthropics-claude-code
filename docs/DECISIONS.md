@@ -2,6 +2,17 @@
 
 Short records of decisions that shape the system. Newest first.
 
+### D-023 · 2026-11-06 · Creative Tournament Mode on the existing router, with budgets and stop conditions first
+Multi-model creative work (candidates → independent critics → synthesis → targeted revision) is built on the existing
+router and policy: one per-model policy check shared with tier routing, `complete_on` for a chosen model, the platform's
+budgets and traces on every call — no second provider layer. Every tournament has a hard budget and explicit stop
+conditions (quality target, budget, time, diminishing returns, rounds) and hard caps (6 contestants, 3 critics, 40
+calls): more models are never used just because they exist. Quality is ≥ 60 % rule-based checks so model opinions are
+never the only evidence; a critic never grades its own output; a synthesis that is a paste-up or scores below the best
+candidate is rejected. Paid spend above a small autonomous limit needs a human approval; making a provider routable is
+a four-eyes governance change agents can never make. Revisit: research-assisted creation, splitting one task across
+specialist models, a human rating UI, online discovery of new models.
+
 ### D-022 · 2026-11-06 · The control plane lives inside the application, enforced in code paths, not prompts
 Governance (policy decisions, approvals, tool grants, Vault access, routing by classification, budgets, gates, egress,
 audit chain) is a set of backend modules every consequential path calls — not a separate gateway service and not
