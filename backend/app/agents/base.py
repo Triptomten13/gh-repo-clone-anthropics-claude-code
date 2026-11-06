@@ -61,7 +61,7 @@ class AgentContext:
 
             user = self.db.scalars(select(User).where(User.email == self.task.requested_by[5:])).first()
         try:
-            return G.invoke(self.db, name, args, user=user, agent_id=self.agent_row.id, workflow=self.task.type, run_id=self.task.id,
+            return G.invoke(self.db, name, args, user=user, agent_id=self.agent_row.id, workflow=self.task.type, task_id=self.task.id,
                             approval_id=approval_id)["result"]
         except G.GatewayDenied as e:
             raise Blocked(f"tool {name}: {e}") from e

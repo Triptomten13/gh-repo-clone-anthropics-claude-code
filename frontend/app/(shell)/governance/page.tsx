@@ -3,7 +3,7 @@
  *  runs & replay, evaluation gates, audit & compliance, deployment & egress, budgets, roles. Every number and row
  *  comes from the API; governed changes show their "pending second approval" state instead of pretending to apply. */
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDialog } from "@/components/dialog";
 import { Button, Card, Empty, ErrorBanner, PageHeader, StatusBadge, Table } from "@/components/ui";
 import { ago, api, API_URL, getToken } from "@/lib/api";
@@ -26,7 +26,12 @@ function Pending({ res }: { res: any }) {
 
 export default function Governance() {
   const [tab, setTab] = useState<string>("policies");
-  useEffect(() => { const h = window.location.hash.slice(1); if (TABS.some(([id]) => id === h)) setTab(h); }, []);
+  const [runId, setRunId] = useState<number | null>(null);
+  useEffect(() => {
+    const [h, arg] = window.location.hash.slice(1).split("/");  // e.g. #runs/42 opens that run's replay
+    if (TABS.some(([id]) => id === h)) setTab(h);
+    if (h === "runs" && arg && /^\d+$/.test(arg)) setRunId(Number(arg));
+  }, []);
   const pick = (t: string) => { setTab(t); history.replaceState(null, "", `#${t}`); };
   return (
     <>
@@ -37,7 +42,7 @@ export default function Governance() {
         {TABS.map(([id, name]) => <button key={id} role="tab" aria-selected={tab === id} onClick={() => pick(id)}
           className={`min-h-9 rounded-md border px-3 text-[12.5px] ${tab === id ? "border-violet bg-violet/10 text-ink" : "border-line text-ink-3 hover:text-ink-2"}`}>{name}</button>)}
       </div>
-      {tab === "policies" ? <Policies /> : tab === "tools" ? <Tools /> : tab === "runs" ? <Runs /> : tab === "gates" ? <Gates /> :
+      {tab === "policies" ? <Policies /> : tab === "tools" ? <Tools /> : tab === "runs" ? <Runs initial={runId} /> : tab === "gates" ? <Gates /> :
         tab === "audit" ? <Audit /> : tab === "deployment" ? <Deployment /> : tab === "budgets" ? <Budgets /> : <Roles />}
     </>
   );
@@ -112,9 +117,14 @@ function Tools() {
   );
 }
 
-function Runs() {
+function Runs({ initial }: { initial: number | null }) {
   const runs = useApi<any[]>("/api/runs?limit=80");
-  const [sel, setSel] = useState<number | null>(null);
+  const [sel, setSel] = useState<number | null>(initial);
+  const replayRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (initial) setSel(initial); }, [initial]);
+  // one column below xl: a chosen run's replay moves above the list (its place no longer depends on how long the list
+  // is or when it loads) and is scrolled to
+  useEffect(() => { if (sel && !window.matchMedia("(min-width: 1280px)").matches) replayRef.current?.scrollIntoView({ block: "start" }); }, [sel]);
   const rep = useApi<any>(sel ? `/api/runs/${sel}/replay` : null, [sel]);
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -124,9 +134,9 @@ function Runs() {
           <tr key={r.id} className={sel === r.id ? "bg-surface-2" : ""}><td><button className="font-mono text-violet hover:underline" onClick={() => setSel(r.id)}>#{r.id}</button></td>
             <td>{r.kind}</td><td className="text-[12px]">{r.workflow}{r.agent_id && <span className="text-ink-3"> · {r.agent_id}</span>}</td><td><StatusBadge status={r.status} /></td>
             <td className="text-ink-3">{ago(r.started_at)}</td><td className="num">${(r.cost_usd ?? 0).toFixed(4)}</td></tr>))}</Table>
-          : <div className="p-4"><Empty title="No runs yet">Tasks and Ask requests create runs.</Empty></div>}
+          : <div className="p-4"><Empty title="No runs yet">Tasks, Ask requests and G-sus runs create runs.</Empty></div>}
       </Card>
-      <Card title={sel ? `Replay · run #${sel}` : "Replay"}>
+      <div ref={replayRef} className={`min-w-0 scroll-mt-20 ${sel ? "order-first xl:order-none" : ""}`}><Card title={sel ? `Replay · run #${sel}` : "Replay"}>
         {!sel ? <Empty title="Select a run" /> : rep.data ? (<>
           <p className="mb-3 text-[12px] text-ink-3">{rep.data.replay_kind}. Policy version {rep.data.run.policy_version || "—"}.</p>
           <ol className="space-y-2">{rep.data.events.map((e: any) => (
@@ -134,9 +144,14 @@ function Runs() {
               <div className="flex flex-wrap items-center gap-2"><span className="num text-ink-3">{e.seq}</span><span className="font-mono text-cyan">{e.type}</span><span>{e.name}</span>
                 {e.duration_ms != null && <span className="num ml-auto text-[11px] text-ink-3">{e.duration_ms} ms</span>}</div>
               <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-all font-mono text-[11px] text-ink-3">{JSON.stringify(e.data, null, 1)}</pre></li>))}</ol>
+          {(rep.data.run.parent_id || rep.data.children?.length > 0) && <div className="mt-3 flex flex-wrap items-center gap-2 text-[12px]">
+            {rep.data.run.parent_id && <button className="font-mono text-violet hover:underline" onClick={() => setSel(rep.data.run.parent_id)}>← parent run #{rep.data.run.parent_id}</button>}
+            {rep.data.children?.length > 0 && <span className="text-ink-3">child runs:</span>}
+            {rep.data.children?.map((c: any) => <button key={c.id} className="font-mono text-violet hover:underline" onClick={() => setSel(c.id)}>#{c.id} {c.workflow}</button>)}
+          </div>}
           {rep.data.model_calls.length > 0 && <p className="mt-3 text-[12px] text-ink-3">{rep.data.model_calls.length} model attempt(s) · {rep.data.tool_invocations.length} tool call(s) · {rep.data.approvals.length} approval(s) linked.</p>}
         </>) : <ErrorBanner error={rep.error} />}
-      </Card>
+      </Card></div>
     </div>
   );
 }

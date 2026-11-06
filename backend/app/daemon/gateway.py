@@ -27,11 +27,7 @@ def prompt_hash(system: str, prompt: str) -> str:
 def complete(db: Session, *, system: str, prompt: str, tier: str = "standard", schema: dict | None = None, max_tokens: int = 2048,
              sensitivity: str = "normal", profile: str | None = None, cacheable: bool = False, agent_id: str = "", purpose: str = "api",
              workflow: str = "", project: str = "", task_id: int | None = None, run_id: int | None = None) -> dict[str, Any]:
-    from ..governance.observability import current_run
-
-    if run_id is None:
-        run_id = current_run.get()  # traced into the run this call belongs to
-    st = state.load(db)
+    st = state.load(db)  # the observability run is attached by tracing.record (trace_id); run_id stays a G-sus run
     prof = (profile or st["profile"]).upper()
     ph = prompt_hash(system, prompt)
     key = request_key(system, prompt, schema, tier, max_tokens)

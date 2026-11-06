@@ -1,7 +1,7 @@
 """DAEMON OBSERVABILITY CENTER — durable execution records (runs) and their ordered events.
 
-Every task execution and every /api/ai/ask request opens a RUN; policy decisions, model attempts (with the routing
-exclusions that explain the choice), retrievals (document/chunk references and classification — not the text),
+Every task execution, every /api/ai/ask request and every G-sus run opens a RUN (a G-sus run's step tasks become its
+children); policy decisions, model attempts (with the routing exclusions that explain the choice), retrievals (document/chunk references and classification — not the text),
 tool invocations, approval requests, attempts, retries, escalation and the final output are appended as EVENTS.
 Events are buffered per run in memory (sequence numbers assigned there) and written in their OWN transaction only at
 points where the traced work holds no database write lock: after every attempt (the worker's session is closed), at
@@ -21,7 +21,7 @@ import threading
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select, update
 
 current_run: contextvars.ContextVar[int | None] = contextvars.ContextVar("current_run", default=None)
 SECRET_HINTS = ("password", "secret", "token", "api_key", "apikey", "authorization", "credential", "cookie")
@@ -119,12 +119,42 @@ def finish(run_id: int, status: str, *, output: Any = None, error: str | None = 
         s.close()
 
 
-def run_of_task(db, task_id: int | None) -> int | None:
-    if not task_id:
-        return None
+def run_of_ref(db, ref: str) -> int | None:
     from ..models import Run
 
-    return db.scalar(select(Run.id).where(Run.ref == f"task:{task_id}").order_by(Run.id.desc()).limit(1))
+    return db.scalar(select(Run.id).where(Run.ref == ref).order_by(Run.id.desc()).limit(1))
+
+
+def run_of_task(db, task_id: int | None) -> int | None:
+    return run_of_ref(db, f"task:{task_id}") if task_id else None
+
+
+def reopen(run_id: int) -> None:
+    """A run that paused (a G-sus run waiting for an approval) continues: running again, sequence numbers continue."""
+    from ..models import Run, RunEvent
+
+    s = _session()
+    try:
+        r = s.get(Run, run_id)
+        if r is None:
+            return
+        r.status, r.finished_at = "running", None
+        last = s.scalar(select(func.max(RunEvent.seq)).where(RunEvent.run_id == run_id)) or 0
+        s.commit()
+    finally:
+        s.close()
+    with _lock:
+        _seq[run_id] = max(_seq.get(run_id, 0), int(last), max((e["seq"] for e in _buf.get(run_id, [])), default=0))
+
+
+def link_children(db, parent_id: int, task_ids: list[int]) -> None:
+    """Explicitly attach the runs of these tasks to `parent_id` (in the caller's transaction). Explicit on purpose: the
+    orchestrator's drain also runs OTHER people's queued tasks, so "whatever run is current" would mislink them."""
+    from ..models import Run
+
+    refs = [f"task:{t}" for t in task_ids if t]
+    if refs:
+        db.execute(update(Run).where(Run.ref.in_(refs), Run.parent_id.is_(None), Run.id != parent_id).values(parent_id=parent_id))
 
 
 def replay(db, run_id: int) -> dict[str, Any]:
@@ -138,13 +168,24 @@ def replay(db, run_id: int) -> dict[str, Any]:
     cols = lambda o: {c.key: getattr(o, c.key) for c in o.__table__.columns}  # noqa: E731
     events = [cols(e) for e in db.scalars(select(RunEvent).where(RunEvent.run_id == run_id).order_by(RunEvent.seq))]
     task_id = int(r.ref.split(":", 1)[1]) if r.ref.startswith("task:") else None
-    calls = db.scalars(select(LLMCall).where((LLMCall.run_id == run_id) | ((LLMCall.task_id == task_id) if task_id else False)).order_by(LLMCall.id)).all()
-    tools = db.scalars(select(ToolInvocation).where(ToolInvocation.run_id.in_([run_id] + ([task_id] if task_id else []))).order_by(ToolInvocation.id)).all()
+    gsus_id = int(r.ref.split(":", 1)[1]) if r.ref.startswith("gsus:") else None
+    # links are unambiguous: trace_id = this run; task_id = this task; llm_calls.run_id = this G-sus run
+    call_links = [LLMCall.trace_id == run_id] + ([LLMCall.task_id == task_id] if task_id else []) + ([LLMCall.run_id == gsus_id] if gsus_id else [])
+    calls = db.scalars(select(LLMCall).where(or_(*call_links)).order_by(LLMCall.id)).all()
+    tool_links = [ToolInvocation.trace_id == run_id] + ([ToolInvocation.task_id == task_id] if task_id else [])
+    tools = db.scalars(select(ToolInvocation).where(or_(*tool_links)).order_by(ToolInvocation.id)).all()
     approvals = [cols(a) for a in db.scalars(select(Approval).where(Approval.id.in_(
         [e["data"].get("approval_id") for e in events if isinstance(e["data"], dict) and e["data"].get("approval_id")] or [-1])))]
-    audit = db.scalars(select(AuditLog).where(AuditLog.target.in_([f"run:{run_id}"] + ([f"task:{task_id}"] if task_id else []))).order_by(AuditLog.id)).all()
+    targets = [f"run:{run_id}"] + ([f"task:{task_id}"] if task_id else []) + ([f"gsus_run:{gsus_id}"] if gsus_id else [])
+    audit = db.scalars(select(AuditLog).where(AuditLog.target.in_(targets)).order_by(AuditLog.id)).all()
     children = [cols(c) for c in db.scalars(select(Run).where(Run.parent_id == run_id).order_by(Run.id))]
-    return {"run": cols(r), "events": events, "children": children,
+    steps = []
+    if gsus_id:
+        from ..models import GsusStep
+
+        steps = [{k: getattr(st, k) for k in ("ordinal", "title", "kind", "task_type", "status", "summary", "task_id", "approval_id", "depends_on")}
+                 for st in db.scalars(select(GsusStep).where(GsusStep.run_id == gsus_id).order_by(GsusStep.ordinal))]
+    return {"run": cols(r), "events": events, "children": children, "steps": steps,
             "model_calls": [{k: getattr(c, k) for k in ("id", "created_at", "provider", "model", "tier", "status", "input_tokens", "output_tokens",
                                                         "cost_usd", "latency_ms", "error", "purpose")} for c in calls],
             "tool_invocations": [cols(t) for t in tools], "approvals": approvals,

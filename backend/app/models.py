@@ -378,7 +378,8 @@ class ToolInvocation(Base):
     agent_id: Mapped[str] = mapped_column(String(64), default="", index=True)
     user_email: Mapped[str] = mapped_column(String(255), default="", index=True)
     workflow: Mapped[str] = mapped_column(String(96), default="")
-    run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    task_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)   # the agent task that asked
+    trace_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # observability run (runs.id)
     grant_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     decision: Mapped[str] = mapped_column(String(24))  # allowed | denied | approval_required | prohibited
     category: Mapped[int] = mapped_column(Integer, default=1)
@@ -744,7 +745,8 @@ class LLMCall(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     task_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
-    run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    run_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # G-sus run (gsus_runs.id)
+    trace_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)  # observability run (runs.id)
     agent_id: Mapped[str] = mapped_column(String(64), default="", index=True)
     purpose: Mapped[str] = mapped_column(String(64), default="")
     provider: Mapped[str] = mapped_column(String(32), index=True)

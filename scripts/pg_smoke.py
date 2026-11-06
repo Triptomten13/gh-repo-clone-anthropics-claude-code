@@ -70,6 +70,12 @@ with TestClient(app) as c:
         print(f"{r.status_code} G-sus run → {r.json().get('status')}")
         if r.status_code != 200 or r.json().get("status") != "completed":
             failures.append(("gsus", r.text[:300]))
+            continue
+        tr = r.json().get("trace_run_id")
+        rp = c.get(f"/api/runs/{tr}/replay").json() if tr else {}
+        print(f"  G-sus trace #{tr}: {len(rp.get('events', []))} events, {len(rp.get('children', []))} child runs, status {rp.get('run', {}).get('status')}")
+        if not tr or rp.get("run", {}).get("status") != "succeeded" or not rp.get("events"):
+            failures.append(("gsus trace", str(rp)[:300]))
     for method, path, body in [("patch", "/api/daemon/settings", {"profile": "ECO"}), ("post", "/api/daemon/proposals/generate", None),
                                ("post", "/api/daemon/selftest?generate=false", None), ("post", "/api/ai/embeddings", {"texts": ["smoke"]}),
                                ("post", "/api/daemon/finetune/datasets", {"name": "smoke", "contains_private_data": True}),

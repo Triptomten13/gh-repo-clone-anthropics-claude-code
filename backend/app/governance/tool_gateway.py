@@ -27,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from ..models import Agent, BudgetRule, ToolGrant, ToolInvocation, User
 from . import core as gov
+from . import observability
 from .policy import ApprovalRequired, Category, PolicyDenied, Request, enforce
 
 OPERATIONS = ("READ", "CREATE", "UPDATE", "DELETE", "EXECUTE", "ADMINISTER")
@@ -267,7 +268,7 @@ def _redact_output(out: Any, secrets: list[str]) -> Any:
 
 
 def invoke(db: Session, tool: str, args: dict[str, Any], *, user: User | None = None, agent_id: str | None = None,
-           workflow: str | None = None, run_id: int | None = None, approval_id: int | None = None,
+           workflow: str | None = None, task_id: int | None = None, approval_id: int | None = None,
            classification: str = "INTERNAL", request_approval: bool = True) -> dict[str, Any]:
     """Run a tool through every check. Returns {"status", "result"?, "invocation_id", "decision"}; raises GatewayDenied."""
     t0 = time.monotonic()
@@ -275,7 +276,8 @@ def invoke(db: Session, tool: str, args: dict[str, Any], *, user: User | None = 
     t = TOOLS.get(tool)
     op = t.operation if t else "?"
     rec = ToolInvocation(tool=tool, operation=op, agent_id=agent_id or "", user_email=user.email if user else "", workflow=workflow or "",
-                         run_id=run_id, decision="denied", status="denied", args_redacted=_redact_args(args), approval_id=approval_id)
+                         task_id=task_id, trace_id=observability.current_run.get(), decision="denied", status="denied",
+                         args_redacted=_redact_args(args), approval_id=approval_id)
 
     def finish(status: str, decision: str, reason: str = "", category: int = 1, grant: ToolGrant | None = None, summary: str = "") -> None:
         rec.status, rec.decision, rec.reason, rec.category = status, decision, reason[:2000], category
@@ -285,8 +287,6 @@ def invoke(db: Session, tool: str, args: dict[str, Any], *, user: User | None = 
         db.flush()
         gov.audit(db, user.email if user else f"agent:{agent_id}", "tool.invoke", f"tool:{tool}.{op}", invocation=rec.id, status=status,
                   decision=decision, agent=agent_id, workflow=workflow, reason=reason[:300])
-        from . import observability
-
         observability.event("tool", f"{tool}.{op}", {"invocation_id": rec.id, "status": status, "decision": decision, "approval_id": rec.approval_id,
                                                       "reason": reason[:300]}, duration_ms=rec.latency_ms)
 

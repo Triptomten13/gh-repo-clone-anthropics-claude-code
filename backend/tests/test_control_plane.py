@@ -966,3 +966,64 @@ def test_efficiency_score_rewards_success_not_cheapness(client, fresh_db):
     rep = {a["agent"]: a for a in client.get("/api/agents/efficiency").json()["agents"]}
     assert rep["good"]["ies"] > 0 and rep["cheapfail"]["ies"] == 0 and rep["cheapfail"]["ies_components"]["cost_usd"] == 0
     db.close()
+
+
+# ------------------------------------------------------------------ G-sus runs are workflows too (criterion 10)
+def test_10_gsus_runs_are_traced_with_their_delegated_tasks_as_children(client, fresh_db):
+    client.post("/api/demo")
+    r = client.post("/api/gsus/runs", json={"objective": "Evaluate the winter commuter pannier and create brand concepts"}).json()
+    assert r["status"] == "completed" and r["trace_run_id"], r
+    rep = client.get(f"/api/runs/{r['trace_run_id']}/replay").json()
+    assert rep["run"]["kind"] == "gsus" and rep["run"]["ref"] == f"gsus:{r['id']}" and rep["run"]["status"] == "succeeded"
+    assert rep["run"]["user_email"] == "admin@example.com"
+    types = [e["type"] for e in rep["events"]]
+    assert types[0] == "plan" and types[-1] == "answer" and types.count("step") >= 2, types
+    seqs = [e["seq"] for e in rep["events"]]
+    assert seqs == sorted(set(seqs))
+    task_ids = {s["task_id"] for s in r["steps"] if s["task_id"]}
+    assert task_ids and {f"task:{t}" for t in task_ids} <= {c["ref"] for c in rep["children"]}
+    assert [s["title"] for s in rep["steps"]] == [s["title"] for s in r["steps"]]
+    # each child is the delegated task's own trace, with this run as its parent
+    child = rep["children"][0]
+    sub = client.get(f"/api/runs/{child['id']}/replay").json()
+    assert sub["run"]["parent_id"] == r["trace_run_id"] and sub["events"]
+
+
+def test_10_a_gsus_run_waiting_for_approval_continues_the_same_trace(client, fresh_db, approver):
+    client.post("/api/demo")
+    g = client.post("/api/gsus/runs", json={"objective": "Launch the hand-crank emergency radio"}).json()
+    assert g["status"] == "waiting_for_approval"
+    tr = g["trace_run_id"]
+    first = client.get(f"/api/runs/{tr}/replay").json()
+    assert first["run"]["status"] == "waiting_for_approval"
+    gate = next(s for s in g["steps"] if s["kind"] == "approval_gate")
+    assert any(a["id"] == gate["approval_id"] for a in first["approvals"])
+    assert approver.post(f"/api/approvals/{gate['approval_id']}/decide", json={"approve": False, "note": "not yet"}).status_code == 200
+    done = client.post(f"/api/gsus/runs/{g['id']}/resume").json()
+    assert done["status"] == "completed" and done["trace_run_id"] == tr  # same trace, not a new one
+    rep = client.get(f"/api/runs/{tr}/replay").json()
+    assert rep["run"]["status"] == "succeeded"
+    seqs = [e["seq"] for e in rep["events"]]
+    assert seqs == sorted(set(seqs)) and len(seqs) > len(first["events"])  # no sequence number reused after reopening
+    assert any(e["type"] == "approval" and e["data"].get("decided_by") == "approver@example.com" for e in rep["events"])
+
+
+def test_replay_links_records_by_their_own_run_not_by_a_coincident_number(fresh_db):
+    """Before 0010, llm_calls.run_id meant a G-sus run OR a trace, and tool_invocations.run_id held a task id — a
+    replay of trace N could show G-sus run N's model calls and task N's tool calls."""
+    from app.governance import observability as obs
+    from app.models import LLMCall, ToolInvocation
+
+    rid = obs.start("ask", "")
+    s = fresh_db.SessionLocal()
+    try:
+        s.add(LLMCall(run_id=rid, provider="local", model="someone-elses-gsus-run", status="ok"))
+        s.add(ToolInvocation(tool="calc", operation="READ", task_id=rid, decision="allowed", status="ok", args_redacted={}))
+        s.add(LLMCall(trace_id=rid, provider="local", model="this-run", status="ok"))
+        s.add(ToolInvocation(tool="time.now", operation="READ", trace_id=rid, decision="allowed", status="ok", args_redacted={}))
+        s.commit()
+        rep = obs.replay(s, rid)
+    finally:
+        s.close()
+    assert [c["model"] for c in rep["model_calls"]] == ["this-run"]
+    assert [t["tool"] for t in rep["tool_invocations"]] == ["time.now"]

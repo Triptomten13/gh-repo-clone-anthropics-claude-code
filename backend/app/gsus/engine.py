@@ -8,11 +8,17 @@ and labelled creative output kept apart).
 
 G-sus never executes high-impact actions itself and never grants permissions: approval
 gates record a human decision; the responsible module performs the action afterwards.
+
+Every run is traced (DAEMON OBSERVABILITY): one `runs` row (kind "gsus", ref "gsus:<id>", parent = the run that
+started it, e.g. an /api/ai/ask request), events for the plan, each step, retrievals, approvals and the answer, and
+the runs of its delegated tasks attached as children. A run that waits for an approval is reopened on resume.
 """
 from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from typing import Any
 
@@ -24,8 +30,9 @@ from ..ai import tracing
 from ..ai.llm import LLMRefused, LLMUnavailable, get_provider
 from ..ai.providers import tokenize
 from ..governance import core as gov
+from ..governance import observability as obs
 from ..knowledge import canon, search
-from ..models import AgentMessage, Approval, CollaborationSession, Document, GsusRun, GsusStep, Product, Task
+from ..models import AgentMessage, Approval, CollaborationSession, Document, GsusRun, GsusStep, LLMCall, Product, Task
 from ..security import untrusted
 from . import modes as MODES
 
@@ -162,10 +169,51 @@ def start(db: Session, objective: str, mode: str, overrides: dict[str, Any], act
         db.add(GsusStep(run_id=run.id, ordinal=st["ordinal"], title=st["title"], kind=st["kind"], task_type=st["task_type"],
                         payload=st["payload"], depends_on=st["depends_on"]))
     gov.audit(db, actor, "gsus.run", f"gsus_run:{run.id}", intents=run.intent, steps=len(steps))
-    db.commit()
-    if run.status != "needs_clarification":
-        execute(db, run)
+    db.commit()  # before the trace opens: the trace writes in its own transaction and must not wait on this one
+    with traced(db, run):
+        obs.event("plan", f"{len(steps)} step(s)", {"intents": run.intent, "status": run.status, "steps": [
+            {k: st[k] for k in ("ordinal", "title", "kind", "task_type", "depends_on")} for st in steps]})
+        if run.status != "needs_clarification":
+            execute(db, run)
     return run
+
+
+_TRACE_STATUS = {"completed": "succeeded"}
+
+
+@contextmanager
+def traced(db: Session, run: GsusRun) -> Iterator[int]:
+    """Open (or reopen) this run's trace, make it current, and close it with the run's state. Call with no write
+    transaction open on `db`."""
+    rid = obs.run_of_ref(db, f"gsus:{run.id}")
+    if rid is None:
+        rid = obs.start("gsus", f"gsus:{run.id}", workflow="gsus" if run.mode == "gsus" else f"gsus.{run.mode}", agent_id="gsus",
+                        user_email=(run.created_by or "").removeprefix("user:"), parent_id=obs.current_run.get(),
+                        input={"objective": run.objective, "mode": run.mode, "settings": run.settings})
+    else:
+        obs.reopen(rid)
+    token = obs.current_run.set(rid)
+    try:
+        yield rid
+    except Exception as e:
+        db.rollback()
+        obs.event("error", type(e).__name__, {"error": str(e)[:500]})
+        obs.finish(rid, "failed", error=f"{type(e).__name__}: {e}")
+        raise
+    else:
+        db.commit()
+        calls = db.scalars(select(LLMCall).where(LLMCall.run_id == run.id)).all()
+        obs.finish(rid, _TRACE_STATUS.get(run.status, run.status), output={"answer": run.answer, "answer_method": run.answer_method,
+                   "verification": run.verification, "contradictions": run.contradictions, "citations": len(run.citations or [])},
+                   tokens_in=sum(c.input_tokens for c in calls), tokens_out=sum(c.output_tokens for c in calls),
+                   cost_usd=sum(c.cost_usd for c in calls))
+    finally:
+        obs.current_run.reset(token)
+
+
+def _step_event(st: GsusStep) -> None:
+    obs.event("step", st.title, {"ordinal": st.ordinal, "kind": st.kind, "task_type": st.task_type, "status": st.status,
+                                 "task_id": st.task_id, "approval_id": st.approval_id, "summary": (st.summary or "")[:500]})
 
 
 def _steps(db: Session, run: GsusRun) -> list[GsusStep]:
@@ -197,6 +245,11 @@ def execute(db: Session, run: GsusRun) -> GsusRun:
             continue
         st.task_id, st.status = t.id, "running"
     db.commit()
+    for st in steps:
+        if st.kind == "task" and st.status != "pending":
+            _step_event(st)
+    if (rid := obs.current_run.get()) is not None:
+        obs.flush(rid)  # nothing is held open on `db` here
     orch.drain(500)
     db.expire_all()
     # 2) collect task results
@@ -207,6 +260,7 @@ def execute(db: Session, run: GsusRun) -> GsusRun:
             st.status = {"succeeded": "completed", "blocked": "blocked", "failed": "failed", "cancelled": "cancelled"}.get(t.status, st.status)
             st.summary = (msg.summary if msg else t.error or t.status)[:2000]
             st.output = _digest(db, st, t)
+            _step_event(st)
     # 3) inline steps: canon, retrieval, approval gates
     for st in _steps(db, run):
         if st.status != "pending":
@@ -233,11 +287,27 @@ def execute(db: Session, run: GsusRun) -> GsusRun:
                                      f"Requested by G-sus on behalf of {run.created_by}. Objective: {run.objective}", {"gsus_run": run.id, **st.payload})
             st.approval_id, st.status = a.id, "waiting_for_approval"
             st.summary = f"approval #{a.id} ({st.payload['action']}) pending — G-sus will not perform this action itself"
+        if st.status != "pending":
+            _step_event(st)
+    if (rid := obs.current_run.get()) is not None:
+        obs.link_children(db, rid, [st.task_id for st in _steps(db, run) if st.task_id])
     db.commit()
     return _finish(db, run)
 
 
 def resume(db: Session, run: GsusRun) -> GsusRun:
+    with traced(db, run):
+        _resume(db, run)
+    return run
+
+
+def cancelled(db: Session, run: GsusRun, actor: str) -> None:
+    """Record a cancellation in the run's trace (after the cancellation is committed)."""
+    with traced(db, run):
+        obs.event("cancelled", f"cancelled by {actor}", {"status": run.status})
+
+
+def _resume(db: Session, run: GsusRun) -> GsusRun:
     for st in _steps(db, run):
         if st.status == "waiting_for_approval" and st.approval_id:
             a = db.get(Approval, st.approval_id)
@@ -247,6 +317,10 @@ def resume(db: Session, run: GsusRun) -> GsusRun:
                               f"(e.g. Brand Portfolio activation, Campaign launch), never by G-sus.")
             elif a.status == "rejected":
                 st.status, st.summary = "cancelled", f"rejected by {a.decided_by}: {a.decision_note}"
+            else:
+                continue
+            obs.event("approval", f"approval #{a.id} {a.status}", {"approval_id": a.id, "decided_by": a.decided_by, "step": st.title})
+            _step_event(st)
     db.commit()
     return _finish(db, run)
 
@@ -268,6 +342,9 @@ def _finish(db: Session, run: GsusRun) -> GsusRun:
         hard_fail = [s for s in steps if s.kind != "synthesis" and s.status in ("failed",)]
         run.status = "failed" if hard_fail and len(hard_fail) == len([s for s in steps if s.kind != "synthesis"]) else "completed"
         run.finished_at = datetime.now(UTC)
+        obs.event("answer", run.answer_method or "", {"status": run.status, "method": run.answer_method,
+                                                       "contradictions": len(run.contradictions or []), "citations": len(citations),
+                                                       "verification": run.verification})
     db.commit()
     return run
 

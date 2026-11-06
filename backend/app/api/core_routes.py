@@ -630,7 +630,10 @@ class RunIn(BaseModel):
 def _run_out(db: Session, r: GsusRun) -> dict[str, Any]:
     steps = db.scalars(select(GsusStep).where(GsusStep.run_id == r.id).order_by(GsusStep.ordinal)).all()
     calls = db.scalars(select(LLMCall).where(LLMCall.run_id == r.id)).all()
-    return {**row(r), "steps": [row(s) for s in steps], "ai_cost_usd": round(sum(c.cost_usd for c in calls), 6), "ai_calls": len(calls)}
+    from ..governance.observability import run_of_ref
+
+    return {**row(r), "steps": [row(s) for s in steps], "ai_cost_usd": round(sum(c.cost_usd for c in calls), 6), "ai_calls": len(calls),
+            "trace_run_id": run_of_ref(db, f"gsus:{r.id}")}
 
 
 @router.post("/gsus/runs")
@@ -673,6 +676,7 @@ def gsus_cancel(rid: int, db: Session = Depends(get_db), user: User = Depends(op
     r.status, r.finished_at = "cancelled", datetime.now(UTC)
     gov.audit(db, user.email, "gsus.cancel", f"gsus_run:{rid}")
     db.commit()
+    gsus.cancelled(db, r, user.email)
     return _run_out(db, r)
 
 

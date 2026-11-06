@@ -7,7 +7,7 @@ import { useApi } from "@/lib/hooks";
 
 type Step = { id: number; ordinal: number; title: string; kind: string; task_type: string; status: string; summary: string; depends_on: number[]; approval_id: number | null; task_id: number | null };
 type Run = { id: number; objective: string; mode: string; status: string; intent: string; clarification: string; answer: string; answer_method: string;
-  citations: any[]; contradictions: { between: string; detail: string }[]; verification: any; steps: Step[]; ai_cost_usd: number; ai_calls: number; created_at: string };
+  citations: any[]; contradictions: { between: string; detail: string }[]; verification: any; steps: Step[]; ai_cost_usd: number; ai_calls: number; created_at: string; trace_run_id?: number | null };
 
 const STEP_STATUS: Record<string, string> = { completed: "succeeded", running: "running", pending: "queued", waiting_for_approval: "pending", blocked: "blocked", failed: "failed", cancelled: "cancelled" };
 const EXAMPLES = ["Evaluate the winter commuter pannier and create brand concepts", "What do the sources say about the Babylonian exile?",
@@ -118,6 +118,7 @@ function RunView({ run, onResume, onCancel }: { run: Run; onResume: () => void; 
         </ol>
       )}
       {run.status === "waiting_for_approval" && <div className="mb-3 flex gap-2"><Button variant="primary" onClick={onResume}>Resume after decision</Button><Button variant="danger" onClick={onCancel}>Cancel run</Button></div>}
+      {run.trace_run_id && <p className="mb-3 text-[12px]"><Link href={`/governance#runs/${run.trace_run_id}`} className="text-violet hover:underline">Trace &amp; replay · run #{run.trace_run_id} →</Link></p>}
       {run.contradictions?.length > 0 && (
         <div className="mb-3 rounded-md border border-serious/40 bg-serious/5 p-3">
           <div className="mb-1 font-mono text-[10.5px] uppercase tracking-[0.14em] text-serious">Contradictions & tensions</div>

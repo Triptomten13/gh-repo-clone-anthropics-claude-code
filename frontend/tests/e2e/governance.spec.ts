@@ -22,3 +22,17 @@ test("governance: verify the audit chain, export it, replay a run, read the role
   await page.getByRole("tab", { name: "Identity & roles" }).click();
   await expect(page.getByText("approval.decide").first()).toBeVisible();
 });
+
+test("a G-sus run links to its own trace, which opens straight into the replay", async ({ page }) => {
+  await openShell(page, "/chamber");
+  await page.locator("#objective").fill("Do something nice");  // too vague: G-sus asks instead of guessing — and the run is still traced
+  await page.getByRole("button", { name: "Ask G-sus" }).click();
+  const link = page.getByRole("link", { name: /Trace & replay · run #\d+/ });
+  await expect(link).toBeVisible();
+  const id = (await link.textContent())!.match(/#(\d+)/)![1];
+  await link.click();
+  await expect(page).toHaveURL(new RegExp(`/governance#runs/${id}$`));
+  await expect(page.getByText(`Replay · run #${id}`)).toBeVisible();
+  await expect(page.getByText("not a re-execution")).toBeVisible();
+  await expect(page.locator("li").filter({ hasText: /^1\s*plan/ }).first()).toBeVisible();
+});
