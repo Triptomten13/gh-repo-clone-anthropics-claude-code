@@ -56,7 +56,8 @@ PROHIBITED = ["audit.modify", "audit.delete", "permissions.self_grant", "budget.
 FLOORS = {"tool:*.DELETE": Category.APPROVAL_REQUIRED, "tool:*.EXECUTE.external": Category.APPROVAL_REQUIRED,
           "tool:*.ADMINISTER": Category.RESTRICTED, "policy.*": Category.RESTRICTED, "tools.grant": Category.RESTRICTED,
           "tools.revoke": Category.SUPERVISED, "budget.*": Category.RESTRICTED, "gates.*": Category.RESTRICTED,
-          "knowledge.reclassify": Category.SUPERVISED, "knowledge.delete": Category.APPROVAL_REQUIRED}
+          "knowledge.reclassify": Category.SUPERVISED, "knowledge.declassify": Category.RESTRICTED,
+          "knowledge.delete": Category.APPROVAL_REQUIRED}
 
 
 class PolicyDenied(Exception):

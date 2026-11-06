@@ -173,11 +173,15 @@ def answer(db: Any, user: Any, question: str, *, research_depth: str | None = No
     if p.strategy == "archive":
         from ..knowledge.search import grounded_answer
 
-        g = grounded_answer(db, question, k=6, llm=None)
+        g = grounded_answer(db, question, k=6, llm=None, user=user)
         cites = g.get("citations") or []
         trace.append({"step": "archive", "citations": len(cites), "supported": g.get("grounding", {}).get("supported")})
         if cites and g.get("answer") and g.get("grounding", {}).get("supported", True):
-            semantic_cache.store(db, question, g["answer"], category=c.category, sources=cites, verified=True, ttl_days=7)
+            from ..knowledge.vault import readable_ids
+
+            ids = {x["document_id"] for x in cites}
+            if readable_ids(db, None, list(ids)) == ids:  # shared cache only for answers anyone may read
+                semantic_cache.store(db, question, g["answer"], category=c.category, sources=cites, verified=True, ttl_days=7)
             return done(answer=g["answer"], sources=cites, evidence="internal Archive (grounded, extractive)", model_calls=0, cost_usd=0.0)
         if not st["offline_mode"] and c.category == "simple_fact":
             p = Plan("research", research_depth="quick", reason="nothing in the Archive — QUICK external lookup")

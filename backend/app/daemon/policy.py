@@ -26,7 +26,8 @@ PROFILE_INFO: dict[str, dict[str, Any]] = {
     "LOW_MEMORY": {"summary": "one resident model, short context, small models first — entered automatically under memory pressure", "max_tokens": 512},
 }
 LOCAL_TIER_SLOTS = {"fast": ["eco", "chat"], "standard": ["chat", "eco"], "deep": ["deep", "chat"], "local": ["chat", "eco"]}
-PRIVATE = {"private", "sensitive", "personal"}
+PRIVATE = {"private", "sensitive", "personal", "highly_sensitive"}  # never to an external provider
+LOCAL_ONLY = {"highly_sensitive"}  # not even a self-hosted LAN worker: in-process models only
 
 
 @dataclass
@@ -108,6 +109,9 @@ def plan(tier: str, providers: dict[str, Any], *, sensitivity: str = "normal", p
                 continue
         elif loc == "lan" and sensitivity == "sensitive":
             excluded.append({**rec, "status": "excluded_privacy"})
+            continue
+        if loc != "local" and sensitivity in LOCAL_ONLY:  # after the external/LAN rules, for every remaining non-local candidate
+            excluded.append({**rec, "status": "excluded_classification"})
             continue
         reason = quota.blocked_reason(pid)
         if reason:

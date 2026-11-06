@@ -745,6 +745,23 @@ class Document(Base):
     char_count: Mapped[int] = mapped_column(Integer, default=0)
     injection_flags: Mapped[list[str]] = mapped_column(JSON, default=list)
     owner_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # DAEMON KNOWLEDGE VAULT access (migration 0008): who may retrieve this document — checked before any content
+    # reaches a person, an agent or a model (knowledge/vault.py)
+    classification: Mapped[str] = mapped_column(String(24), default="INTERNAL", server_default="INTERNAL", index=True)
+    collection: Mapped[str] = mapped_column(String(96), default="general", server_default="general", index=True)
+    access: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # {"roles": [...], "users": [...]} — explicit readers
+
+
+class Collection(Base):
+    """A group of documents with inherited access: a document's readers = its own list ∪ the collection's, and its
+    effective classification = the higher of the two."""
+    __tablename__ = "collections"
+    name: Mapped[str] = mapped_column(String(96), primary_key=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    classification: Mapped[str] = mapped_column(String(24), default="INTERNAL")
+    access: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    owner: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class DocumentChunk(Base):

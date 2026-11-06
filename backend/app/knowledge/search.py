@@ -22,7 +22,7 @@ EVIDENCE_LABEL = {"historical_fact": "historical fact", "primary_source": "prima
                   "fiction_canon": "fictional canon (internal worldbuilding)", "unclassified": "unclassified source"}
 
 
-def _candidates(db: Session, filters: dict[str, Any]) -> list[tuple[DocumentChunk, Document]]:
+def _candidates(db: Session, filters: dict[str, Any], user: Any = None) -> list[tuple[DocumentChunk, Document]]:
     q = select(DocumentChunk, Document).join(Document, Document.id == DocumentChunk.document_id).where(Document.status == "ready")
     if filters.get("doc_type"):
         q = q.where(Document.doc_type == filters["doc_type"])
@@ -34,7 +34,10 @@ def _candidates(db: Session, filters: dict[str, Any]) -> list[tuple[DocumentChun
     rows = list(db.execute(q).all())
     if filters.get("tag"):
         rows = [r for r in rows if filters["tag"] in (r[1].tags or [])]
-    return rows
+    from .vault import readable_ids
+
+    allowed = readable_ids(db, user, list({d.id for _c, d in rows}))  # authorisation BEFORE scoring — nothing else sees them
+    return [r for r in rows if r[1].id in allowed]
 
 
 def _snippet(text: str, terms: set[str], width: int = 260) -> str:
@@ -50,7 +53,10 @@ def _hit(c: DocumentChunk, d: Document, score: float, terms: set[str]) -> dict[s
             "start_char": c.start_char, "end_char": c.end_char, "snippet": _snippet(c.text, terms), "text": c.text,
             "score": round(score, 5), "evidence_class": d.evidence_class, "evidence_label": EVIDENCE_LABEL[d.evidence_class],
             "source": d.source, "source_url": d.source_url, "author": d.author, "created_date": d.created_date,
-            "injection_risk": c.injection_risk, "citation": f"[{d.uid[:8]}§{c.ordinal}]"}
+            "injection_risk": c.injection_risk, "citation": f"[{d.uid[:8]}§{c.ordinal}]", "classification": d.classification,
+            "provenance": {"document_uid": d.uid, "version": d.version, "owner_id": d.owner_id, "classification": d.classification,
+                           "collection": d.collection, "imported_at": d.imported_at, "extraction": d.doc_type or d.mime,
+                           "embedding_model": c.embedding_model, "source": d.source, "source_url": d.source_url}}
 
 
 def search(db: Session, query: str, k: int = 8, mode: str = "hybrid", filters: dict[str, Any] | None = None, user: Any = None) -> list[dict[str, Any]]:
@@ -58,11 +64,14 @@ def search(db: Session, query: str, k: int = 8, mode: str = "hybrid", filters: d
 
     ix = index.get(db)
     if ix is None:
-        return _search_scan(db, query, k, mode, filters)
-    return _search_indexed(db, ix, query, k, mode, filters or {})
+        return _search_scan(db, query, k, mode, filters, user=user)
+    hits = _search_indexed(db, ix, query, k, mode, filters or {}, user=user)
+    for h in hits:
+        h["provenance"]["index_version"] = ix.token or "initial"
+    return hits
 
 
-def _allowed_docs(db: Session, filters: dict[str, Any]) -> list[int]:
+def _allowed_docs(db: Session, filters: dict[str, Any], user: Any = None) -> list[int]:
     """Document visibility is decided live in SQL on every query (status, deletion, filters) — never cached."""
     q = select(Document.id, Document.tags).where(Document.status == "ready")
     if filters.get("doc_type"):
@@ -72,17 +81,21 @@ def _allowed_docs(db: Session, filters: dict[str, Any]) -> list[int]:
         q = q.where(Document.evidence_class.in_(ev if isinstance(ev, list) else [ev]))
     if filters.get("document_ids"):
         q = q.where(Document.id.in_(filters["document_ids"]))
-    return [i for i, tags in db.execute(q).all() if not filters.get("tag") or filters["tag"] in (tags or [])]
+    ids = [i for i, tags in db.execute(q).all() if not filters.get("tag") or filters["tag"] in (tags or [])]
+    from .vault import readable_ids
+
+    allowed = readable_ids(db, user, ids)  # authorisation BEFORE scoring: unreadable chunks never enter ranking or context
+    return [i for i in ids if i in allowed]
 
 
-def _search_indexed(db: Session, ix: Any, query: str, k: int, mode: str, filters: dict[str, Any]) -> list[dict[str, Any]]:
+def _search_indexed(db: Session, ix: Any, query: str, k: int, mode: str, filters: dict[str, Any], user: Any = None) -> list[dict[str, Any]]:
     import numpy as np
 
     from . import index
 
     if not query.strip():
         return []
-    mask = ix.alive & np.isin(ix.doc, np.asarray(_allowed_docs(db, filters), dtype=np.int64))
+    mask = ix.alive & np.isin(ix.doc, np.asarray(_allowed_docs(db, filters, user), dtype=np.int64))
     if not mask.any():
         return []
     terms = set(tokenize(query))
@@ -106,9 +119,9 @@ def _search_indexed(db: Session, ix: Any, query: str, k: int, mode: str, filters
     return [_hit(*rows[cid], score, terms) for cid, (_i, score) in zip(ids, top, strict=True) if cid in rows]
 
 
-def _search_scan(db: Session, query: str, k: int = 8, mode: str = "hybrid", filters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+def _search_scan(db: Session, query: str, k: int = 8, mode: str = "hybrid", filters: dict[str, Any] | None = None, user: Any = None) -> list[dict[str, Any]]:
     """Reference implementation (and fallback without numpy): loads and scores every candidate chunk."""
-    rows = _candidates(db, filters or {})
+    rows = _candidates(db, filters or {}, user)
     if not rows or not query.strip():
         return []
     qtok = tokenize(query)
@@ -156,10 +169,25 @@ def related_documents(db: Session, doc_id: int, k: int = 5) -> list[dict[str, An
 
 
 def grounded_answer(db: Session, question: str, k: int = 6, filters: dict[str, Any] | None = None, llm: Any | None = None,
-                    mode_prompt: str = "", strictness: float = 0.8) -> dict[str, Any]:
+                    mode_prompt: str = "", strictness: float = 0.8, user: Any = None) -> dict[str, Any]:
     """Answer only from retrieved archive passages. Without an LLM: extractive answer grouped by evidence class.
     With an LLM: sources are wrapped as untrusted data; every [n] citation is verified to exist."""
-    hits = search(db, question, k=k, filters=filters)
+    hits = search(db, question, k=k, filters=filters, user=user)
+    if llm is not None:
+        # the retrieved context decides where it may be processed: CONFIDENTIAL+ never reaches an external model.
+        # A model function that cannot receive the classification is not used at all (fail closed → extractive).
+        import inspect
+
+        from .vault import max_classification, sensitivity_for
+
+        sens = sensitivity_for(max_classification(db, list({h["document_id"] for h in hits})))
+        if "sensitivity" in inspect.signature(llm).parameters:
+            base = llm
+
+            def llm(system: str, prompt: str, _f: Any = base, _s: str = sens) -> Any:
+                return _f(system, prompt, sensitivity=_s)
+        elif sens != "normal":
+            llm = None
     if not hits:
         return {"answer": "The Archive holds no passages relevant to this question. Nothing will be invented to fill the gap.",
                 "citations": [], "method": "extractive", "grounding": {"supported": False, "reason": "no sources"}}

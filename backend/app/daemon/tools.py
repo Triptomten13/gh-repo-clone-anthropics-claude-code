@@ -62,7 +62,7 @@ def _calc(expr: str) -> float:
 def _archive_search(db: Session, user: User, query: str, k: int = 5) -> Any:
     from ..knowledge.search import search
 
-    return search(db, query, k=k)
+    return search(db, query, k=k, user=user)
 
 
 def _memory_recall(db: Session, user: User, query: str) -> Any:

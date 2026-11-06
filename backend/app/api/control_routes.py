@@ -317,3 +317,81 @@ def tools_invoke(tool: str, b: InvokeIn, db: Session = Depends(get_db), user: Us
 
     G.ensure_default_grants(db)
     return gateway_response(db, lambda: G.invoke(db, tool, b.args, user=user, approval_id=b.approval_id))
+
+
+# ------------------------------------------------------------------ knowledge vault: classification and access
+class AccessIn(BaseModel):
+    classification: Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED", "HIGHLY_SENSITIVE"] | None = None
+    collection: str | None = Field(None, max_length=96)
+    access: dict[str, list[str]] | None = None
+    approval_id: int | None = None
+
+
+@router.patch("/vault/documents/{did}/access")
+def vault_document_access(did: int, b: AccessIn, db: Session = Depends(get_db), user: User = Depends(require_permission("knowledge.admin"))):
+    """Narrowing access applies at once; WIDENING it (lower classification, more readers) is RESTRICTED — a second
+    person approves exactly this change. Cached answers quoting the document are purged either way."""
+    from ..daemon import semantic_cache
+    from ..knowledge import vault
+    from ..models import Collection, Document
+
+    d = db.get(Document, did)
+    if d is None:
+        raise HTTPException(404, "document not found")
+    cols = {c.name: c for c in db.scalars(select(Collection))}
+    old_cls, old_acc = vault.effective(d.classification, d.access, cols.get(d.collection))
+    new_doc_cls = b.classification or d.classification
+    new_doc_acc = b.access if b.access is not None else (d.access or {})
+    new_cls, new_acc = vault.effective(new_doc_cls, new_doc_acc, cols.get(b.collection or d.collection))
+    payload = {"document": did, "classification": new_doc_cls, "collection": b.collection or d.collection, "access": new_doc_acc}
+    if vault.widens(old_cls, old_acc, new_cls, new_acc):
+        pending = _governed(db, user, "knowledge.declassify", payload, b.approval_id, f"Widen access to document {did} ({old_cls} → {new_cls})")
+        if pending is not None:
+            return pending
+    d.classification, d.access, d.collection = new_doc_cls, new_doc_acc, b.collection or d.collection
+    purged = semantic_cache.purge_document(db, did)
+    gov.audit(db, user.email, "knowledge.access", f"document:{did}", before={"classification": old_cls, "access": old_acc},
+              after={"classification": new_cls, "access": new_acc}, collection=d.collection, cache_purged=purged, approval=b.approval_id)
+    db.commit()
+    return {"status": "applied", "document": did, "classification": new_cls, "access": new_acc, "collection": d.collection, "cache_purged": purged}
+
+
+class CollectionIn(BaseModel):
+    name: str = Field(min_length=1, max_length=96, pattern=r"^[a-z0-9_.-]+$")
+    description: str = ""
+    classification: Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED", "HIGHLY_SENSITIVE"] = "INTERNAL"
+    access: dict[str, list[str]] = {}
+    approval_id: int | None = None
+
+
+@router.get("/vault/collections")
+def vault_collections(db: Session = Depends(get_db), _: User = Depends(require_permission("knowledge.read"))):
+    from ..models import Collection, Document
+
+    counts = dict(db.execute(select(Document.collection, func.count(Document.id)).group_by(Document.collection)).all())
+    return [{**_cols(c), "documents": counts.get(c.name, 0)} for c in db.scalars(select(Collection).order_by(Collection.name))] + \
+        ([{"name": "general", "classification": "INTERNAL", "access": {}, "documents": counts.get("general", 0), "implicit": True}]
+         if db.get(Collection, "general") is None else [])
+
+
+@router.post("/vault/collections")
+def vault_collection_upsert(c: CollectionIn, db: Session = Depends(get_db), user: User = Depends(require_permission("knowledge.admin"))):
+    from ..daemon import semantic_cache
+    from ..knowledge import vault
+    from ..models import Collection, Document
+
+    row = db.get(Collection, c.name)
+    payload = c.model_dump(exclude={"approval_id"})
+    if row is not None and vault.widens(row.classification, row.access, c.classification, c.access):
+        pending = _governed(db, user, "knowledge.declassify", payload, c.approval_id, f"Widen access to collection {c.name}")
+        if pending is not None:
+            return pending
+    if row is None:
+        row = Collection(name=c.name, owner=user.email)
+        db.add(row)
+    row.description, row.classification, row.access = c.description, c.classification, c.access
+    purged = sum(semantic_cache.purge_document(db, did) for (did,) in db.execute(select(Document.id).where(Document.collection == c.name)))
+    gov.audit(db, user.email, "knowledge.collection", f"collection:{c.name}", classification=c.classification, access=c.access,
+              cache_purged=purged, approval=c.approval_id)
+    db.commit()
+    return {"status": "applied", "collection": _cols(row)}

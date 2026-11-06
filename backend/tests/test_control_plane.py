@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import select, text
 
+from app.daemon import state
 from app.governance import audit_chain
 from app.governance import core as gov
 
@@ -568,3 +569,183 @@ def test_tool_grants_need_a_second_person_and_revocation_is_immediate(client, fr
     with pytest.raises(G.GatewayDenied, match="deny by default"):
         G.invoke(db, "calc", {"expression": "3*3"}, agent_id=agent)
     db.close()
+
+
+# ------------------------------------------------------------------ knowledge vault (criteria 5, 6) + classification routing (7, 13)
+def _put(client, title, text, classification="INTERNAL", access=None, collection="general"):
+    r = client.post("/api/archive/text", json={"title": title, "text": text, "evidence_class": "primary_source", "classification": classification,
+                                               "access": access or {}, "collection": collection})
+    assert r.status_code == 200, r.text
+    return r.json()["id"]
+
+
+def _search_titles(c, q):
+    return {h["title"] for h in c.post("/api/archive/search", json={"query": q, "mode": "keyword", "k": 20}).json()["results"]}
+
+
+def test_05_retrieval_never_returns_documents_outside_the_users_permissions(client, fresh_db):
+    viewer, operator, sec = (_login_as(client, r) for r in ("viewer", "operator", "security_admin"))
+    _put(client, "Open memo", "Quarterly lantern plan for every team.")
+    _put(client, "Board memo", "Quarterly lantern margins, board only.", "CONFIDENTIAL", {"roles": ["operator"]})
+    _put(client, "Merger memo", "Quarterly lantern acquisition talks.", "RESTRICTED", {"users": ["operator@example.com"]})
+    hs = _put(client, "Personnel file", "Quarterly lantern salary review.", "HIGHLY_SENSITIVE")
+    assert _search_titles(viewer, "quarterly lantern") == {"Open memo"}
+    assert _search_titles(operator, "quarterly lantern") == {"Open memo", "Board memo", "Merger memo"}
+    assert _search_titles(sec, "quarterly lantern") == {"Open memo", "Board memo", "Merger memo"}  # knowledge admin, not HIGHLY_SENSITIVE
+    assert _search_titles(client, "quarterly lantern") >= {"Personnel file"}  # the owner
+    assert sec.get(f"/api/archive/documents/{hs}").status_code == 404  # not even administrators — and no hint it exists
+    assert viewer.get(f"/api/archive/documents/{hs}").status_code == 404
+    assert {d["title"] for d in viewer.get("/api/archive/documents").json()} == {"Open memo"}
+    names = {e["name"] for e in viewer.get("/api/archive/entities").json()}
+    assert names == {e["name"] for e in viewer.get("/api/archive/entities").json()}  # entities only from readable documents
+    asked = viewer.post("/api/archive/ask", json={"question": "quarterly lantern"}).json()
+    assert all(c["title"] == "Open memo" for c in asked["citations"])
+
+
+def test_05_agents_and_the_system_read_no_more_than_their_user(client, fresh_db):
+    from app.knowledge import search
+
+    _put(client, "Open plan", "Depot inventory of compasses.")
+    _put(client, "Secret plan", "Depot inventory of compasses, confidential.", "CONFIDENTIAL")
+    db = fresh_db.SessionLocal()
+    titles = lambda hits: {h["title"] for h in hits}  # noqa: E731
+    assert titles(search.search(db, "depot compasses", user=None)) == {"Open plan"}  # system / agent without a user
+    agent = _agent_id(db)
+    _grant(db, agent, "archive.search", "READ")
+    client.post("/api/auth/users", json={"email": "v2@example.com", "password": "correct-horse-battery", "role": "viewer"})
+    G.ensure_default_grants(db)
+    db.commit()
+    viewer = _user(db, "v2@example.com")
+    res = G.invoke(db, "archive.search", {"query": "depot compasses"}, agent_id=agent, user=viewer)["result"]
+    assert {r["title"] for r in res} == {"Open plan"}
+    db.close()
+
+
+def test_05_widening_access_needs_a_second_person_narrowing_does_not(client, fresh_db, approver):
+    sec = _login_as(client, "security_admin")
+    viewer = _login_as(client, "viewer")
+    did = _put(client, "Pricing sheet", "Wholesale lantern prices.", "CONFIDENTIAL")
+    r = sec.patch(f"/api/vault/documents/{did}/access", json={"classification": "INTERNAL"})
+    assert r.status_code == 202 and r.json()["category"] == "RESTRICTED"
+    assert _search_titles(viewer, "wholesale lantern") == set()  # nothing changed yet
+    approver.post(f"/api/approvals/{r.json()['approval_id']}/decide", json={"approve": True})
+    assert sec.patch(f"/api/vault/documents/{did}/access", json={"classification": "INTERNAL", "approval_id": r.json()["approval_id"]}).status_code == 200
+    assert _search_titles(viewer, "wholesale lantern") == {"Pricing sheet"}
+    narrow = sec.patch(f"/api/vault/documents/{did}/access", json={"classification": "RESTRICTED"})
+    assert narrow.status_code == 200  # tightening never waits
+    assert _search_titles(viewer, "wholesale lantern") == set()
+
+
+def test_05_collection_access_is_inherited(client, fresh_db, approver):
+    sec = _login_as(client, "security_admin")
+    viewer = _login_as(client, "viewer")
+    assert sec.post("/api/vault/collections", json={"name": "legal", "classification": "CONFIDENTIAL", "access": {"roles": ["security_admin"]}}).status_code == 200
+    _put(client, "Contract draft", "Supplier contract for tents.", collection="legal")  # the document itself says INTERNAL
+    assert _search_titles(viewer, "supplier contract tents") == set()
+    assert _search_titles(sec, "supplier contract tents") == {"Contract draft"}
+
+
+def test_06_deleted_documents_never_come_back_from_retrieval(client, fresh_db):
+    from app.knowledge import search
+    from app.models import DocumentChunk
+
+    did = _put(client, "Doomed", "The obsidian astrolabe is stored in vault seven.")
+    q = "What does our archive say about the obsidian astrolabe?"
+    assert client.post("/api/ai/ask", json={"question": q}).json()["sources"]
+    assert client.post("/api/ai/ask", json={"question": q}).json().get("cached")
+    out = client.delete(f"/api/archive/documents/{did}?confirm=true").json()
+    assert out["verified"] and out["chunks_removed"] >= 1
+    db = fresh_db.SessionLocal()
+    assert db.scalar(select(__import__("sqlalchemy").func.count(DocumentChunk.id)).where(DocumentChunk.document_id == did)) == 0
+    for mode in ("keyword", "semantic", "hybrid"):
+        assert search.search(db, "obsidian astrolabe vault", mode=mode, user=_user(db)) == []
+        assert search._search_scan(db, "obsidian astrolabe vault", mode=mode, user=_user(db)) == []
+    db.close()
+    after = client.post("/api/ai/ask", json={"question": q}).json()
+    assert not after.get("cached") and "vault seven" not in str(after.get("answer"))
+
+
+def test_retrieved_passages_carry_full_provenance(client, fresh_db):
+    _put(client, "Ledger", "Lantern ledger for March.")
+    h = client.post("/api/archive/search", json={"query": "lantern ledger", "mode": "keyword"}).json()["results"][0]
+    p = h["provenance"]
+    assert {"document_uid", "version", "owner_id", "classification", "collection", "imported_at", "extraction", "embedding_model", "index_version"} <= set(p)
+    assert p["classification"] == "INTERNAL" and p["embedding_model"]
+
+
+class _Prov:
+    def __init__(self, pid, locality, fail=None):
+        from app.ai.providers import Completion
+
+        self.id, self.locality, self.fail, self.calls, self._C = pid, locality, fail, [], Completion
+
+    def configured(self):
+        return True
+
+    def health(self):
+        return {"configured": True}
+
+    def complete(self, *, model, system, prompt, schema, effort, max_tokens):
+        from app.ai.providers import ProviderUnavailable
+
+        self.calls.append(prompt[:40])
+        if self.fail:
+            raise ProviderUnavailable(self.fail)
+        return self._C("answer [1]", None, self.id, model, 10, 5, 0.0, 3)
+
+
+def test_07_13_restricted_context_never_reaches_an_external_model_not_even_as_fallback(client, fresh_db, monkeypatch):
+    from app.ai.llm import LLMUnavailable
+    from app.ai.router import LLMRouter
+    from app.knowledge import search
+
+    monkeypatch.delenv("MODEL_CHAIN_STANDARD", raising=False)
+    _put(client, "Open note", "Harbour lanterns are blue.")
+    _put(client, "Restricted note", "Harbour lanterns secret supplier list.", "RESTRICTED", {"users": ["admin@example.com"]})
+    db = fresh_db.SessionLocal()
+    admin = _user(db)
+    for cls_q, expect_external in (("harbour lanterns blue", True), ("harbour lanterns secret supplier", False)):
+        local, ext = _Prov("local", "local", fail="local model crashed"), _Prov("anthropic", "external")
+        router = LLMRouter({"local": local, "anthropic": ext})
+
+        def llm(system, prompt, sensitivity="normal", _r=router):
+            return _r.complete(system=system, prompt=prompt, tier="standard", sensitivity=sensitivity)
+
+        filters = {"document_ids": [h["document_id"] for h in search.search(db, cls_q, user=admin, mode="keyword", k=1)]}
+        try:
+            search.grounded_answer(db, cls_q, llm=llm, user=admin, filters=filters, k=1)
+            reached = True
+        except LLMUnavailable as e:
+            reached = False
+            assert any(a["status"] == "excluded_privacy" for a in e.attempts)
+        assert local.calls, "the local model is always tried first"
+        assert bool(ext.calls) == expect_external == reached, (cls_q, ext.calls)
+    db.close()
+
+
+def test_07_highly_sensitive_stays_in_process(fresh_db, monkeypatch):
+    from app.daemon import policy as routing
+
+    monkeypatch.delenv("MODEL_CHAIN_STANDARD", raising=False)
+    provs = {"local": _Prov("local", "local"), "worker:lan-box": _Prov("worker:lan-box", "lan"), "anthropic": _Prov("anthropic", "external")}
+    cands, excluded = routing.plan("standard", provs, sensitivity="highly_sensitive")
+    assert {c.locality for c in cands} == {"local"}
+    assert {e["status"] for e in excluded} >= {"excluded_privacy", "excluded_classification"}
+    cands, _ = routing.plan("standard", provs, sensitivity="private")  # CONFIDENTIAL: self-hosted LAN allowed
+    assert "external" not in {c.locality for c in cands} and "lan" in {c.locality for c in cands}
+    cands, _ = routing.plan("standard", provs, sensitivity="sensitive")  # RESTRICTED: this machine only
+    assert {c.locality for c in cands} == {"local"}
+
+
+def test_external_disabled_switch_still_excludes_external_models(fresh_db, monkeypatch):
+    """Regression: the classification rule must not short-circuit the operator's 'external providers off' switch."""
+    from app.daemon import policy as routing
+
+    monkeypatch.delenv("MODEL_CHAIN_STANDARD", raising=False)
+    s = fresh_db.SessionLocal()
+    state.update(s, external_allowed=False)
+    s.commit()
+    s.close()
+    cands, excluded = routing.plan("standard", {"local": _Prov("local", "local"), "anthropic": _Prov("anthropic", "external")})
+    assert "external" not in {c.locality for c in cands}
+    assert any(e["status"] == "excluded_external_disabled" for e in excluded)

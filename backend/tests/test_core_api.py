@@ -135,13 +135,13 @@ def test_gsus_archive_research_with_citations_and_fiction_labels(client):
 class FakeLLM:
     name = "fake"
 
-    def complete(self, *, system, prompt, tier="standard", schema=None, max_tokens=16000):
+    def complete(self, *, system, prompt, tier="standard", schema=None, max_tokens=16000, sensitivity="normal"):
         txt = "Jerusalem fell to Nebuchadnezzar II [1]. In the internal canon an astrolabe was hidden [2]. See also [9]."
         return llm.LLMResult(txt, None, "fake-model", 300, 40, 0.0012, provider="fake",
                              attempts=[{"provider": "fake", "model": "fake-model", "status": "ok", "input_tokens": 300, "output_tokens": 40,
                                         "cost_usd": 0.0012, "latency_ms": 5}])
 
-    def stream(self, *, system, prompt, tier="standard", max_tokens=16000):
+    def stream(self, *, system, prompt, tier="standard", max_tokens=16000, sensitivity="normal"):
         yield from ["Ex ", "nihilo"]
 
 

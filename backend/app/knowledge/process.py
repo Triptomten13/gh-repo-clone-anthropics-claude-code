@@ -156,6 +156,8 @@ def ingest(db: Session, ex: Extracted, meta: dict[str, Any], raw: bytes | None =
                    description=meta.get("description", ""), source=meta.get("source", ""), source_url=meta.get("source_url", ""),
                    author=meta.get("author", ""), created_date=meta.get("created_date", ""), doc_type=ex.doc_type, mime=ex.mime,
                    tags=meta.get("tags", []), categories=meta.get("categories", []), evidence_class=ev, content_hash=h, simhash=sh,
+                   classification=meta.get("classification") or "INTERNAL", collection=meta.get("collection") or "general",
+                   access=meta.get("access") or {},
                    size_bytes=len(raw or ex.text.encode()), char_count=len(ex.text), owner_id=owner_id, status="processing",
                    version=(parent.version + 1) if parent else 1, parent_id=parent.id if parent else None,
                    injection_flags=detect(ex.text), error="; ".join(ex.notes))

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
@@ -115,15 +115,21 @@ def _meta(title: str, description: str, source: str, source_url: str, author: st
 async def archive_upload(file: UploadFile = File(...), title: str = Form(""), description: str = Form(""), source: str = Form(""),
                          source_url: str = Form(""), author: str = Form(""), created_date: str = Form(""), tags: str = Form(""),
                          categories: str = Form(""), evidence_class: str = Form("unclassified"), parent_id: int | None = Form(None),
+                         classification: str = Form("INTERNAL"), collection: str = Form("general"),
                          db: Session = Depends(get_db), user: User = Depends(operator)):
+    from ..knowledge.vault import CLASSIFICATIONS
+
+    if classification not in CLASSIFICATIONS:
+        raise HTTPException(422, f"classification must be one of {CLASSIFICATIONS}")
     data = await file.read()
     try:
         ex = extract(file.filename or "upload", data)
     except ExtractionError as e:
         raise HTTPException(415, str(e)) from e
     parent = db.get(Document, parent_id) if parent_id else None
-    doc = process.ingest(db, ex, _meta(title, description, source, source_url, author, created_date, tags, categories, evidence_class,
-                                       file.filename or "upload"), raw=data, owner_id=user.id, parent=parent)
+    doc = process.ingest(db, ex, {**_meta(title, description, source, source_url, author, created_date, tags, categories, evidence_class,
+                                          file.filename or "upload"), "classification": classification, "collection": collection[:96]},
+                         raw=data, owner_id=user.id, parent=parent)
     gov.audit(db, user.email, "archive.upload", f"document:{doc.id}", status=doc.status, injection_flags=doc.injection_flags)
     db.commit()
     return _doc_out(doc, db)
@@ -142,6 +148,9 @@ class TextDoc(BaseModel):
     evidence_class: str = "unclassified"
     doc_type: str = "txt"
     parent_id: int | None = None
+    classification: Literal["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED", "HIGHLY_SENSITIVE"] = "INTERNAL"
+    collection: str = Field("general", max_length=96)
+    access: dict[str, list[str]] = {}
 
 
 @router.post("/archive/text")
@@ -161,7 +170,7 @@ def archive_text(body: TextDoc, db: Session = Depends(get_db), user: User = Depe
 @router.get("/archive/documents")
 def archive_list(q: str | None = None, doc_type: str | None = None, evidence_class: str | None = None, tag: str | None = None,
                  status: str | None = None, latest_only: bool = True, limit: int = Query(200, le=1000),
-                 db: Session = Depends(get_db), _: User = Depends(current_user)):
+                 db: Session = Depends(get_db), user: User = Depends(current_user)):
     stmt = select(Document).order_by(Document.id.desc())
     if q:
         stmt = stmt.where(Document.title.ilike(f"%{q}%") | Document.description.ilike(f"%{q}%") | Document.author.ilike(f"%{q}%"))
@@ -172,6 +181,10 @@ def archive_list(q: str | None = None, doc_type: str | None = None, evidence_cla
     if status:
         stmt = stmt.where(Document.status == status)
     docs = db.scalars(stmt.limit(limit)).all()
+    from ..knowledge.vault import readable_ids
+
+    allowed = readable_ids(db, user, [d.id for d in docs])
+    docs = [d for d in docs if d.id in allowed]
     if tag:
         docs = [d for d in docs if tag in (d.tags or [])]
     if latest_only:
@@ -185,19 +198,28 @@ def archive_list(q: str | None = None, doc_type: str | None = None, evidence_cla
 
 
 @router.get("/archive/documents/{did}")
-def archive_get(did: int, offset: int = 0, db: Session = Depends(get_db), _: User = Depends(current_user)):
-    d = _404(db.get(Document, did), "document")
+def archive_get(did: int, offset: int = 0, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    from ..knowledge.vault import check_read, readable_ids
+
+    try:
+        d = check_read(db, user, did)
+    except LookupError:
+        raise HTTPException(404, "document not found") from None
     chunks = db.scalars(select(DocumentChunk).where(DocumentChunk.document_id == did).order_by(DocumentChunk.ordinal).offset(offset).limit(50)).all()
     rels = db.scalars(select(DocumentRelation).where((DocumentRelation.source_id == did) | (DocumentRelation.target_id == did))).all()
+    visible = readable_ids(db, user, list({r.target_id if r.source_id == did else r.source_id for r in rels}))
+    rels = [r for r in rels if (r.target_id if r.source_id == did else r.source_id) in visible]
     ents = db.execute(select(Entity, EntityMention.count).join(EntityMention, EntityMention.entity_id == Entity.id)
                       .where(EntityMention.document_id == did)).all()
     versions = db.scalars(select(Document).where(Document.lineage_id == d.lineage_id).order_by(Document.version)).all()
+    vis = readable_ids(db, user, [v.id for v in versions])
+    versions = [v for v in versions if v.id in vis]
     return {**_doc_out(d, db), "chunks_page": [row(c, {"embedding"}) for c in chunks],
             "relations": [{**row(r), "other_title": (db.get(Document, r.target_id if r.source_id == did else r.source_id) or d).title} for r in rels],
             "entities": [{"id": e.id, "name": e.name, "kind": e.kind, "mentions": n} for e, n in ents],
             "annotations": [row(a) for a in db.scalars(select(Annotation).where(Annotation.document_id == did).order_by(Annotation.id))],
             "versions": [{"id": v.id, "version": v.version, "imported_at": v.imported_at, "status": v.status} for v in versions],
-            "related": search.related_documents(db, did)}
+            "related": [r for r in search.related_documents(db, did) if r["document_id"] in readable_ids(db, user, [r["document_id"]])]}
 
 
 class DocPatch(BaseModel):
@@ -248,8 +270,8 @@ class SearchIn(BaseModel):
 
 
 @router.post("/archive/search")
-def archive_search(body: SearchIn, db: Session = Depends(get_db), _: User = Depends(current_user)):
-    hits = search.search(db, body.query, body.k, body.mode, body.filters)
+def archive_search(body: SearchIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    hits = search.search(db, body.query, body.k, body.mode, body.filters, user=user)
     for h in hits:
         h.pop("text", None)
     return {"query": body.query, "mode": body.mode, "results": hits}
@@ -272,16 +294,16 @@ def archive_ask(body: AskIn, db: Session = Depends(get_db), user: User = Depends
         if provider.name == "none":
             raise HTTPException(409, "no AI provider configured — use the extractive answer (use_llm=false)")
 
-        def llm(system: str, prompt: str):
+        def llm(system: str, prompt: str, sensitivity: str = "normal"):
             try:
-                res = provider.complete(system=system, prompt=prompt, tier=gmodes.DEPTH_TIER[settings["depth"]])
+                res = provider.complete(system=system, prompt=prompt, tier=gmodes.DEPTH_TIER[settings["depth"]], sensitivity=sensitivity)
             except (LLMUnavailable, LLMRefused) as e:
                 tracing.record(db, getattr(e, "attempts", []), agent_id="gsus", purpose="archive.ask")
                 raise HTTPException(503, str(e)) from e
             tracing.record(db, getattr(res, "attempts", []), agent_id="gsus", purpose="archive.ask", fallback_result=res)
             return res
     ans = search.grounded_answer(db, body.question, filters=body.filters, llm=llm, mode_prompt=gmodes.system_prompt(settings),
-                                 strictness=settings["strictness"])
+                                 strictness=settings["strictness"], user=user)
     ans.pop("llm_result", None)
     db.commit()
     return ans
@@ -323,16 +345,23 @@ def archive_annotate(did: int, body: AnnotationIn, db: Session = Depends(get_db)
 
 
 @router.get("/archive/entities")
-def archive_entities(db: Session = Depends(get_db), _: User = Depends(current_user)):
-    rows = db.execute(select(Entity, func.count(EntityMention.id)).join(EntityMention, EntityMention.entity_id == Entity.id, isouter=True)
+def archive_entities(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    from ..knowledge.vault import readable_ids
+
+    allowed = readable_ids(db, user)
+    rows = db.execute(select(Entity, func.count(EntityMention.id)).join(EntityMention, EntityMention.entity_id == Entity.id)
+                      .where(EntityMention.document_id.in_(allowed or [-1]))
                       .group_by(Entity.id).order_by(func.count(EntityMention.id).desc())).all()
     return [{"id": e.id, "name": e.name, "kind": e.kind, "aliases": e.aliases, "documents": n} for e, n in rows]
 
 
 @router.get("/archive/graph")
-def archive_graph(limit: int = Query(60, le=300), db: Session = Depends(get_db), _: User = Depends(current_user)):
-    ments = db.scalars(select(EntityMention).limit(2000)).all()
-    docs = {d.id: d for d in db.scalars(select(Document).where(Document.status == "ready")).all()}
+def archive_graph(limit: int = Query(60, le=300), db: Session = Depends(get_db), user: User = Depends(current_user)):
+    from ..knowledge.vault import readable_ids
+
+    allowed = readable_ids(db, user)
+    ments = db.scalars(select(EntityMention).where(EntityMention.document_id.in_(allowed or [-1])).limit(2000)).all()
+    docs = {d.id: d for d in db.scalars(select(Document).where(Document.status == "ready", Document.id.in_(allowed or [-1]))).all()}
     ents = {e.id: e for e in db.scalars(select(Entity)).all()}
     nodes, edges = {}, []
     for m in ments[:limit * 4]:
@@ -663,7 +692,10 @@ def gsus_chat(body: ChatIn, db: Session = Depends(get_db), user: User = Depends(
     provider = get_provider()
     if provider.name == "none" or not hasattr(provider, "stream"):
         raise HTTPException(409, "no streaming-capable AI provider configured (set ANTHROPIC_API_KEY or OLLAMA_BASE_URL)")
-    hits = search.search(db, body.message, k=5) if body.use_archive else []
+    hits = search.search(db, body.message, k=5, user=user) if body.use_archive else []
+    from ..knowledge.vault import max_classification, sensitivity_for
+
+    sensitivity = sensitivity_for(max_classification(db, list({h["document_id"] for h in hits})))  # the context decides
     context = "\n".join(untrusted.wrap(h["text"], str(i + 1), h["title"], h["evidence_label"]) for i, h in enumerate(hits))
     system = gmodes.system_prompt(settings) + " " + untrusted.GUARD
     prompt = body.message + (f"\n\nArchive context (cite as [n]):\n{context}" if context else "")
@@ -674,7 +706,7 @@ def gsus_chat(body: ChatIn, db: Session = Depends(get_db), user: User = Depends(
         yield f"event: sources\ndata: {json.dumps(sources)}\n\n"
         status, err, chars = "ok", "", 0
         try:
-            for chunk in provider.stream(system=system, prompt=prompt, tier=tier):
+            for chunk in provider.stream(system=system, prompt=prompt, tier=tier, sensitivity=sensitivity):
                 chars += len(chunk)
                 yield f"data: {json.dumps({'text': chunk})}\n\n"
         except (LLMUnavailable, LLMRefused) as e:

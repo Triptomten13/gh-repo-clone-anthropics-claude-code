@@ -219,9 +219,9 @@ def execute(db: Session, run: GsusRun) -> GsusRun:
             llm = _llm_fn(db, run) if run.settings.get("use_llm") else None
             try:
                 ans = search.grounded_answer(db, st.payload["question"], llm=llm, mode_prompt=MODES.system_prompt(run.settings),
-                                             strictness=run.settings["strictness"])
+                                             strictness=run.settings["strictness"], user=_run_user(db, run))
             except (LLMUnavailable, LLMRefused):
-                ans = search.grounded_answer(db, st.payload["question"])
+                ans = search.grounded_answer(db, st.payload["question"], user=_run_user(db, run))
             ans.pop("llm_result", None)
             st.status, st.output = "completed", ans
             st.summary = f"{len(ans['citations'])} cited passage(s); method {ans['method']}"
@@ -331,15 +331,22 @@ def verify(steps: list[GsusStep]) -> dict[str, Any]:
 
 
 # ----------------------------------------------------------------------------- answer
+def _run_user(db: Session, run: GsusRun):
+    """Retrieval inside a run uses the permissions of the person who started it (agents never read more than them)."""
+    from ..models import User
+
+    return db.scalars(select(User).where(User.email == (run.created_by or "").removeprefix("user:"))).first()
+
+
 def _llm_fn(db: Session, run: GsusRun):
     provider = get_provider()
     if getattr(provider, "name", "none") == "none":
         return None
     tier = MODES.DEPTH_TIER[run.settings["depth"]]
 
-    def call(system: str, prompt: str):
+    def call(system: str, prompt: str, sensitivity: str = "normal"):
         try:
-            res = provider.complete(system=system, prompt=prompt, tier=tier)
+            res = provider.complete(system=system, prompt=prompt, tier=tier, sensitivity=sensitivity)
         except (LLMUnavailable, LLMRefused) as e:
             tracing.record(db, getattr(e, "attempts", []), run_id=run.id, agent_id="gsus", purpose="answer")
             raise

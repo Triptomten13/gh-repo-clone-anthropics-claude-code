@@ -97,7 +97,7 @@ def test_live_streams_forbid_proxy_transforms(client, live_server):
     class StreamingFake:
         name = "fake"
 
-        def stream(self, *, system, prompt, tier="standard", max_tokens=16000):
+        def stream(self, *, system, prompt, tier="standard", max_tokens=16000, sensitivity="normal"):
             yield from ["Ex ", "nihilo"]
 
     llm.set_provider(StreamingFake())
