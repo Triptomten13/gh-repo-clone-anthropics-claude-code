@@ -320,10 +320,14 @@ function NavDrawer({ path, pending, live, onClose, onSignOut, company, demo = fa
             <span className="sr-only">Find a page</span>
             <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" aria-hidden />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find a page…" autoFocus={fine} className="w-full pl-9"
-              onKeyDown={(e) => { if (e.key === "Enter") { const a = ref.current?.querySelector<HTMLAnchorElement>("nav a"); a?.click(); } }} />
+              onKeyDown={(e) => { if (e.key === "Enter") { const a = ref.current?.querySelector<HTMLAnchorElement>("nav a, [data-results] a"); a?.click(); } }} />
           </label>
+          <p className="mt-1 px-1 text-[11px] text-ink-3">Two letters or more also search agents, tasks, runs, approvals, documents, products, models…</p>
         </div>
-        <nav aria-label="All pages" className="flex-1 overflow-y-auto overscroll-contain px-2 pb-3"><NavGroups path={path} pending={pending} filter={q} demo={demo} /></nav>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-2 pb-3">
+          <nav aria-label="All pages"><NavGroups path={path} pending={pending} filter={q} demo={demo} /></nav>
+          {!demo && <SearchResults q={q} />}
+        </div>
         <div className="flex items-center gap-3 border-t border-line px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-[12px] text-ink-3">
           <Activity size={13} className={live === "live" ? "text-good" : "text-ink-3"} aria-hidden />
           <span className="flex-1">{LIVE_LABEL[live]}</span>
@@ -332,6 +336,43 @@ function NavDrawer({ path, pending, live, onClose, onSignOut, company, demo = fa
         </div>
       </div>
     </dialog>
+  );
+}
+
+const KIND_LABEL: Record<string, string> = { agent: "Agents", task: "Tasks", run: "Runs", approval: "Approvals", document: "Documents", product: "Products",
+  experiment: "Experiments", research: "Research", tournament: "Creative", model: "Models", audit: "Audit trail" };
+
+/** Records matching the query, from every module the signed-in person may read (the server applies each module's own
+ *  permission, and the Knowledge Vault's read check for documents). Debounced; stale answers are dropped. */
+function SearchResults({ q }: { q: string }) {
+  const [res, setRes] = useState<{ q: string; results: any[] } | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const term = q.trim();
+  useEffect(() => {
+    if (term.length < 2) { setRes(null); return; }
+    let live = true;
+    const t = setTimeout(async () => {
+      try { const r = await api<{ q: string; results: any[] }>(`/api/search?q=${encodeURIComponent(term)}`); if (live) { setRes(r); setErr(null); } }
+      catch (e) { if (live) setErr((e as Error).message); }
+    }, 250);
+    return () => { live = false; clearTimeout(t); };
+  }, [term]);
+  if (term.length < 2) return null;
+  if (err) return <p className="px-3 pt-2 text-[12px] text-warning">Search failed: {err}</p>;
+  if (!res || res.q !== term) return <p className="px-3 pt-2 text-[12px] text-ink-3" aria-live="polite">Searching…</p>;
+  if (!res.results.length) return <p className="px-3 pt-2 text-[12px] text-ink-3" aria-live="polite">No records match “{term}”.</p>;
+  const groups = res.results.reduce((m: Record<string, any[]>, r) => { (m[r.kind] ||= []).push(r); return m; }, {});
+  return (
+    <section data-results aria-label="Search results" className="mt-2 border-t border-line pt-2">
+      {Object.entries(groups).map(([kind, rows]) => (
+        <div key={kind} className="mb-2">
+          <div className="px-3 pb-1 pt-1 font-mono text-[9.5px] uppercase tracking-[0.22em] text-cyan">{KIND_LABEL[kind] ?? kind}</div>
+          <ul>{rows.map((r) => (
+            <li key={`${kind}-${r.id}`}><Link prefetch={false} href={r.href} className="block rounded-md px-3 py-1.5 hover:bg-surface-2 pointer-coarse:py-2.5">
+              <div className="truncate text-[13px] text-ink">{r.title}</div>{r.sub && <div className="truncate text-[11.5px] text-ink-3">{r.sub}</div>}</Link></li>))}</ul>
+        </div>
+      ))}
+    </section>
   );
 }
 

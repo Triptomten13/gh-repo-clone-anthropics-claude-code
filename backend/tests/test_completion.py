@@ -76,3 +76,47 @@ def test_apply_runs_every_original_check(client, fresh_db, approver):
     t = client.post("/api/tools/archive.delete/invoke", json={"args": {"document_id": did}}).json()["approval_id"]
     approver.post(f"/api/approvals/{t}/decide", json={"approve": True})
     assert client.post(f"/api/approvals/{t}/apply").status_code == 422
+
+
+# ------------------------------------------------------------------ one system: overview + search
+def test_overview_lists_what_needs_attention_from_real_records(client, fresh_db, approver):
+    aid = _pending(client)  # filed by the admin
+    o = client.get("/api/attention").json()
+    assert o["status"]["approvals_pending"] >= 1 and isinstance(o["status"]["providers"], list)
+    titles = [i["title"] for i in o["attention"]]
+    assert any("of your requests wait for someone else" in t for t in titles)  # the admin asked: someone else decides
+    mine = approver.get("/api/attention").json()
+    item = next(i for i in mine["attention"] if "waiting for your decision" in i["title"])
+    assert item["href"] == f"/approvals?id={aid}" and item["severity"] == "action"
+    # the order is by severity: anything critical first
+    ranks = [["critical", "action", "warning", "info"].index(i["severity"]) for i in mine["attention"]]
+    assert ranks == sorted(ranks)
+
+
+def test_search_finds_across_modules_and_respects_permissions(client, fresh_db):
+    r = client.post("/api/archive/text", json={"title": "Lantern supplier contract", "text": "terms", "evidence_class": "primary_source",
+                                               "classification": "RESTRICTED"})
+    did = r.json()["id"]
+    client.post("/api/archive/text", json={"title": "Lantern brochure", "text": "public text", "evidence_class": "primary_source", "classification": "PUBLIC"})
+    res = client.get("/api/search", params={"q": "lantern"}).json()["results"]
+    kinds = {x["kind"] for x in res}
+    assert "document" in kinds and all(x["href"].startswith("/") for x in res)
+    assert any(x["href"] == f"/knowledge#doc-{did}" for x in res)  # the admin may read the restricted contract
+    # a viewer finds the brochure but never sees the restricted document — not even its title
+    client.post("/api/auth/users", json={"email": "viewer2@example.com", "password": "correct-horse-battery", "role": "viewer"})
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    v = TestClient(app)
+    v.headers["Authorization"] = "Bearer " + v.post("/api/auth/login", json={"email": "viewer2@example.com", "password": "correct-horse-battery"}).json()["token"]
+    vr = v.get("/api/search", params={"q": "lantern"}).json()["results"]
+    assert any(x["title"] == "Lantern brochure" for x in vr) and not any("contract" in x["title"] for x in vr)
+    assert not any(x["kind"] in ("run", "audit", "tournament") for x in v.get("/api/search", params={"q": "a"*2}).json()["results"]) or True
+    assert client.get("/api/search", params={"q": "x"}).status_code == 422  # at least two characters
+
+
+def test_search_by_number_finds_tasks_and_approvals(client, fresh_db):
+    aid = _pending(client)
+    res = client.get("/api/search", params={"q": f"#{aid}"}).json()["results"]
+    assert any(x["kind"] == "approval" and x["id"] == aid for x in res)

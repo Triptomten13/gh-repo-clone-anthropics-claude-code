@@ -35,6 +35,7 @@ function Tournaments() {
   const list = useApi<any[]>("/api/creative/tournaments");
   const ov = useApi<any>("/api/creative/overview");
   const [sel, setSel] = useState<number | null>(null);
+  useEffect(() => { const m = /^#t-(\d+)$/.exec(window.location.hash); if (m) setSel(Number(m[1])); }, []);  // deep link from search
   const [brief, setBrief] = useState("");
   const [adv, setAdv] = useState(false);
   const [f, setF] = useState({ strategy: "AUTOMATIC", mode: "FREE_FIRST", quality_target: 0.75, max_calls: 8, max_models: 3, critics: 2, max_rounds: 1,

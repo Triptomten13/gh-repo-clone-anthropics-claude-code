@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openShell } from "../helpers";
+import { isCompact, openShell } from "../helpers";
 
 // Journeys that only existed in the API before the completion round (docs/COMPLETION_AUDIT.md §2.1).
 
@@ -84,4 +84,31 @@ test("Archive: collections and per-document access are managed where the documen
   await page.getByLabel("Name (a-z, 0-9, . _ -)").fill(name);
   await page.getByRole("button", { name: "Create / update" }).click();
   await expect(page.getByRole("cell", { name }).first()).toBeVisible();
+});
+
+test("one search across the organisation: a record is found and opened where it is handled", async ({ page }) => {
+  await openShell(page, "/");
+  const h = await adminApi(page);
+  const title = `Searchable lantern dossier ${Date.now() % 1000000}`;
+  const doc = await (await page.request.post("/api/archive/text", { headers: h, data: { title, text: "x", evidence_class: "primary_source" } })).json();
+  if (isCompact(page)) { await page.getByRole("navigation", { name: "Primary" }).getByRole("button", { name: "More" }).click(); }
+  else { await page.keyboard.press("Control+k"); }
+  const finder = page.getByRole("dialog", { name: "All pages" });
+  await finder.getByPlaceholder("Find a page…").fill(title);
+  const results = finder.getByRole("region", { name: "Search results" });
+  await results.getByRole("link", { name: new RegExp(title) }).click();
+  await expect(page).toHaveURL(new RegExp(`/knowledge#doc-${doc.id}$`));
+  await expect(page.getByRole("heading", { name: title })).toBeVisible();
+});
+
+test("the command center lists what needs attention and leads to it", async ({ page }) => {
+  await openShell(page, "/");
+  const h = await adminApi(page);
+  const doc = await (await page.request.post("/api/archive/text", { headers: h, data: { title: "attention doc", text: "x", evidence_class: "primary_source" } })).json();
+  await page.request.post("/api/tools/archive.delete/invoke", { headers: h, data: { args: { document_id: doc.id } } }); // files an approval
+  await page.reload();
+  await expect(page.getByText(/of your requests wait for someone else/)).toBeVisible();
+  await expect(page.getByText("Models today")).toBeVisible();
+  await page.getByRole("link", { name: /of your requests wait for someone else/ }).click();
+  await expect(page).toHaveURL(/\/approvals$/);
 });

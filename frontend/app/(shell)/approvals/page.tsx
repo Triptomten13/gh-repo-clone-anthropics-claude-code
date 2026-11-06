@@ -94,7 +94,7 @@ function Approvals() {
                 <tr key={a.id} id={`approval-${a.id}`} className={`align-top ${a.id === focus ? "bg-surface-2" : ""}`}>
                   <td className="min-w-[16rem]">
                     <div className="font-medium"><span className="font-mono text-[12px] text-violet">#{a.id}</span> {a.title}</div>
-                    <div className="font-mono text-[11.5px] text-ink-3">{a.action}{from && <> · <Link className="text-violet hover:underline" href={from.href}>{from.label}</Link></>}</div>
+                    <div className="font-mono text-[11.5px] text-ink-3">{a.action}{from && <> · <Link className="text-violet underline underline-offset-2" href={from.href}>{from.label}</Link></>}</div>
                     <details className="max-w-lg"><summary className="cursor-pointer text-[12px] text-ink-3">details</summary>
                       <pre className="whitespace-pre-wrap text-[12px] text-ink-2">{a.description}</pre></details>
                   </td>

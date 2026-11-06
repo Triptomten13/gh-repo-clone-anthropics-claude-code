@@ -21,6 +21,7 @@ from .api.control_routes import router as control_router
 from .api.hyper_routes import router as hyper_router
 from .api.public_routes import router as public_router
 from .api.creative_routes import router as creative_router
+from .api.overview_routes import router as overview_router
 from .api.flare_routes import router as flare_router
 from .api.routes import router
 from .api.streaming import STREAM_HEADERS
@@ -95,6 +96,7 @@ app.include_router(control_router)
 app.include_router(hyper_router)
 app.include_router(public_router)
 app.include_router(creative_router)
+app.include_router(overview_router)
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",

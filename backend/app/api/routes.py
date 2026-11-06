@@ -302,8 +302,11 @@ def get_task(task_id: int, db: Session = Depends(get_db), _: User = Depends(curr
     t = db.get(Task, task_id)
     if not t:
         raise HTTPException(404)
+    from ..models import Run
+
     children = db.scalars(select(Task.id).where(Task.parent_id == task_id)).all()
-    return {**row(t), "children": children}
+    run_id = db.scalar(select(Run.id).where(Run.ref == f"task:{task_id}").order_by(Run.id.desc()).limit(1))  # its trace, if it ran
+    return {**row(t), "children": children, "run_id": run_id}
 
 
 @router.get("/task-types")

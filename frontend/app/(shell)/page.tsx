@@ -1,7 +1,9 @@
 "use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { RevenueProfitChart } from "@/components/charts";
 import { Card, DemoBadge, Empty, ErrorBanner, PageHeader, ScoreBar, Stat, StatusBadge } from "@/components/ui";
+import { CommandCenter } from "@/components/command-center";
 import { ago, fmt, sek } from "@/lib/api";
 import { useApi, useRefreshOn } from "@/lib/hooks";
 
@@ -19,11 +21,18 @@ export default function OverviewPage() {
   const fin = useApi<{ daily: any[] }>("/api/finance/summary?days=60");
   useRefreshOn(["task", "approval"], () => { ov.reload(); fin.reload(); });
   const d = ov.data;
+  // a per-device preference (non-sensitive): someone who does not run the shops can keep the overview to operations
+  const [showBusiness, setShowBusiness] = useState(true);
+  useEffect(() => { try { setShowBusiness(localStorage.getItem("dk.home.business") !== "0"); } catch { /* storage unavailable */ } }, []);
+  const toggleBusiness = () => setShowBusiness((v) => { try { localStorage.setItem("dk.home.business", v ? "0" : "1"); } catch { /* ignore */ } return !v; });
   return (
     <>
-      <PageHeader kicker="Executive overview" title="Operating picture" />
+      <PageHeader kicker="Command center" title="Operating picture">
+        <button className="text-[12px] text-ink-3 hover:text-ink-2" aria-pressed={!showBusiness} onClick={() => toggleBusiness()}>{showBusiness ? "Hide business figures" : "Show business figures"}</button>
+      </PageHeader>
+      <CommandCenter />
       <ErrorBanner error={ov.error} />
-      {d && (
+      {d && showBusiness && (
         <>
           {d.finance.contains_demo_data && (
             <div className="mb-4 rounded-md border border-violet-dim bg-violet/5 px-3 py-2 text-[12.5px] text-ink-2">

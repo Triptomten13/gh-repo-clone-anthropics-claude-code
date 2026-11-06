@@ -14,7 +14,7 @@ test("navigate with this device's controls (tab bar + More on touch, sidebar + C
     const drawer = page.getByRole("dialog", { name: "All pages" });
     await expect(drawer).toBeVisible();
     await drawer.getByPlaceholder("Find a page…").fill("agent");
-    await expect(drawer.getByRole("link")).toHaveCount(1);
+    await expect(drawer.getByRole("navigation", { name: "All pages" }).getByRole("link")).toHaveCount(1);
     await drawer.getByRole("link", { name: "Agent Registry" }).click();
     await expect(page).toHaveURL(/\/agents$/);
     await expect(drawer).toBeHidden();

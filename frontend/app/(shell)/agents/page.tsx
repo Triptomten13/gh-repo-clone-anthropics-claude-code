@@ -1,5 +1,6 @@
 "use client";
-import { Fragment, useState } from "react";
+import Link from "next/link";
+import { Fragment, useEffect, useState } from "react";
 import { Button, Card, Empty, Epistemic, ErrorBanner, Field, Json, PageHeader, StatusBadge, Table } from "@/components/ui";
 import { ago, api } from "@/lib/api";
 import { useApi, useRefreshOn } from "@/lib/hooks";
@@ -8,7 +9,15 @@ const LEVELS = ["0 research", "1 analysis", "2 drafting", "3 internal ops", "4 p
 
 export default function AgentsPage() {
   const agents = useApi<any[]>("/api/agents");
-  const tasks = useApi<any[]>("/api/tasks?limit=60");
+  // deep links: ?agent=<id> narrows the queue to one agent; ?task=<id> opens that task (from search, alerts, approvals)
+  const [focusAgent, setFocusAgent] = useState<string | null>(null);
+  const [focusTask, setFocusTask] = useState<number | null>(null);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    setFocusAgent(p.get("agent")); setFocusTask(Number(p.get("task")) || null);
+  }, []);
+  useEffect(() => { if (focusAgent) document.getElementById(`agent-${focusAgent}`)?.scrollIntoView({ block: "center" }); }, [focusAgent, agents.data]);
+  const tasks = useApi<any[]>(`/api/tasks?limit=60${focusAgent ? `&agent_id=${encodeURIComponent(focusAgent)}` : ""}`, [focusAgent]);
   const msgs = useApi<any[]>("/api/messages?limit=40");
   const types = useApi<Record<string, string>>("/api/task-types");
   const { events, connected } = useRefreshOn(["task"], () => { agents.reload(); tasks.reload(); msgs.reload(); });
@@ -16,6 +25,7 @@ export default function AgentsPage() {
   const [ttype, setTtype] = useState("");
   const [payload, setPayload] = useState("{}");
   const [open, setOpen] = useState<number | null>(null);
+  const clearFocus = () => { setFocusAgent(null); setFocusTask(null); history.replaceState(null, "", "/agents"); };
 
   const patch = async (id: string, body: Record<string, unknown>) => {
     try { await api(`/api/agents/${id}`, { method: "PATCH", json: body }); agents.reload(); } catch (e) { setErr((e as Error).message); }
@@ -31,12 +41,13 @@ export default function AgentsPage() {
         <span className={`text-[12px] ${connected ? "text-good" : "text-ink-3"}`}>● {connected ? "live" : "offline"}</span>
       </PageHeader>
       <ErrorBanner error={err || agents.error} />
+      {focusTask && <Card title={`Task #${focusTask}`} className="mb-4" action={<button className="text-[12px] text-ink-3 hover:text-ink" onClick={clearFocus}>close</button>}><TaskDetail id={focusTask} /></Card>}
 
       <Card title="Agents" pad={false}>
         <Table head={["Agent", "Division", "Level", "Status", "Queue", "OK / blocked / failed", "Tokens today / budget", "Cost (USD)", "Last active", ""]}>
           {(agents.data ?? []).map((a) => (
-            <tr key={a.id}>
-              <td><div className="font-medium">{a.name}</div><div className="max-w-72 truncate text-[11.5px] text-ink-3" title={a.description}>{a.description}</div></td>
+            <tr key={a.id} id={`agent-${a.id}`} className={focusAgent === a.id ? "bg-surface-2" : ""}>
+              <td><div className="font-medium"><button className="text-left hover:text-violet" title="Show this agent's tasks" onClick={() => { setFocusAgent(a.id); history.replaceState(null, "", `/agents?agent=${a.id}`); }}>{a.name}</button></div><div className="max-w-72 truncate text-[11.5px] text-ink-3" title={a.description}>{a.description}</div></td>
               <td className="text-ink-2">{a.division}</td>
               <td>
                 <select value={a.permission_level} onChange={(e) => patch(a.id, { permission_level: Number(e.target.value) })} title="Admin only; audited. Levels 4–5 always need human approval per action.">
@@ -56,7 +67,8 @@ export default function AgentsPage() {
       </Card>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Card title="Task queue" className="xl:col-span-2" pad={false}>
+        <Card title={focusAgent ? `Task queue · ${focusAgent}` : "Task queue"} className="xl:col-span-2" pad={false}
+          action={focusAgent ? <button className="text-[12px] text-violet hover:underline" onClick={clearFocus}>show all agents</button> : undefined}>
           {tasks.data?.length ? (
             <Table head={["#", "Type", "Agent", "Status", "Depth", "Prio", "Tries", "Tokens", "Created", ""]}>
               {tasks.data.map((t) => (
@@ -113,12 +125,23 @@ export default function AgentsPage() {
 
 function TaskDetail({ id }: { id: number }) {
   const t = useApi<any>(`/api/tasks/${id}`, [id]);
+  if (t.error) return <ErrorBanner error={t.error} />;
   if (!t.data) return null;
+  const x = t.data;
   return (
+    <>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-[12px]">
+      <StatusBadge status={x.status} /><span className="font-mono text-ink-2">{x.type}</span>
+      <Link className="text-violet underline underline-offset-2" href={`/agents?agent=${x.agent_id}`}>agent {x.agent_id}</Link>
+      {x.run_id && <Link className="text-violet underline underline-offset-2" href={`/governance#runs/${x.run_id}`}>trace & replay · run #{x.run_id}</Link>}
+      {x.parent_id && <Link className="text-violet underline underline-offset-2" href={`/agents?task=${x.parent_id}`}>parent task #{x.parent_id}</Link>}
+      {x.children.map((c: number) => <Link key={c} className="text-violet underline underline-offset-2" href={`/agents?task=${c}`}>child #{c}</Link>)}
+    </div>
     <div className="grid grid-cols-1 gap-3 py-2 md:grid-cols-2">
       <div><div className="mb-1 text-[11px] text-ink-3">payload</div><Json value={t.data.payload} /></div>
       <div><div className="mb-1 text-[11px] text-ink-3">{t.data.error ? "error" : "result"}{t.data.children.length ? ` · spawned ${t.data.children.join(", ")}` : ""}</div>
         {t.data.error ? <pre className="whitespace-pre-wrap rounded-md bg-bg p-3 font-mono text-[11.5px] text-[#f3a5a5]">{t.data.error}</pre> : <Json value={t.data.result} />}</div>
     </div>
+    </>
   );
 }
