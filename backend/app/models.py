@@ -390,6 +390,65 @@ class ToolInvocation(Base):
     latency_ms: Mapped[int] = mapped_column(Integer, default=0)
 
 
+class Run(Base):
+    """DAEMON OBSERVABILITY: one durable record per execution (task, ask request, G-sus run, tool call)."""
+    __tablename__ = "runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(24), index=True)  # task | ask | gsus | tool
+    ref: Mapped[str] = mapped_column(String(64), default="", index=True)  # task:12, gsus:3 …
+    parent_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    workflow: Mapped[str] = mapped_column(String(96), default="")
+    agent_id: Mapped[str] = mapped_column(String(64), default="", index=True)
+    user_email: Mapped[str] = mapped_column(String(255), default="", index=True)
+    status: Mapped[str] = mapped_column(String(24), default="running", index=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    input: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    output: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    error: Mapped[str] = mapped_column(Text, default="")
+    tokens_in: Mapped[int] = mapped_column(Integer, default=0)
+    tokens_out: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    policy_version: Mapped[str] = mapped_column(String(32), default="")
+
+
+class RunEvent(Base):
+    __tablename__ = "run_events"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    run_id: Mapped[int] = mapped_column(Integer, index=True)
+    seq: Mapped[int] = mapped_column(Integer)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    type: Mapped[str] = mapped_column(String(24))  # attempt | policy | model | retrieval | tool | approval | retry | escalation | output | error
+    name: Mapped[str] = mapped_column(String(160), default="")
+    data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class ReleaseGate(Base):
+    """DAEMON EVALUATION LAB: a threshold an evaluation must meet before a change of `target_kind` may go live."""
+    __tablename__ = "release_gates"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    target_kind: Mapped[str] = mapped_column(String(24), index=True)  # prompt | model | workflow | agent | tool | retrieval | policy
+    suite: Mapped[str] = mapped_column(String(64))
+    min_score: Mapped[float] = mapped_column(Float)
+    mandatory: Mapped[bool] = mapped_column(Boolean, default=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default=sa_true())
+    created_by: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class GateRun(Base):
+    __tablename__ = "gate_runs"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    target_kind: Mapped[str] = mapped_column(String(24), index=True)
+    target_ref: Mapped[str] = mapped_column(String(160))
+    results: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    passed: Mapped[bool] = mapped_column(Boolean)
+    blocking: Mapped[list[str]] = mapped_column(JSON, default=list)
+    created_by: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
 class UsageCounter(Base):
     """Atomic usage counters (compare-and-set): a limit is taken with ONE conditional UPDATE, so concurrent requests
     can never both pass a check-then-act race (SQLite and PostgreSQL alike)."""

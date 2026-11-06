@@ -64,11 +64,24 @@ def search(db: Session, query: str, k: int = 8, mode: str = "hybrid", filters: d
 
     ix = index.get(db)
     if ix is None:
-        return _search_scan(db, query, k, mode, filters, user=user)
+        hits = _search_scan(db, query, k, mode, filters, user=user)
+        _trace(hits, mode, user)
+        return hits
     hits = _search_indexed(db, ix, query, k, mode, filters or {}, user=user)
     for h in hits:
         h["provenance"]["index_version"] = ix.token or "initial"
+    _trace(hits, mode, user)
     return hits
+
+
+def _trace(hits: list[dict[str, Any]], mode: str, user: Any) -> None:
+    from ..governance import observability
+
+    if observability.current_run.get():
+        observability.event("retrieval", "archive.search", {"mode": mode, "as_user": getattr(user, "email", None),
+                                                           "documents": sorted({h["document_id"] for h in hits}), "chunks": [h["chunk_id"] for h in hits],
+                                                           "classifications": sorted({h["classification"] for h in hits}),
+                                                           "index_version": hits[0]["provenance"].get("index_version") if hits else None})
 
 
 def _allowed_docs(db: Session, filters: dict[str, Any], user: Any = None) -> list[int]:

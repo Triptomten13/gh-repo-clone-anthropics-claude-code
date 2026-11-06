@@ -90,11 +90,20 @@ class AgentContext:
         budget = agent.context_budget if agent else CONTEXT_BUDGET.get(self.agent_row.model_tier, 12000)
         if est > budget:  # measured and surfaced (never silently truncated: that could drop evidence)
             telemetry.event("context_over_budget", agent=self.agent_row.id, task=self.task.type, est_tokens=est, budget=budget)
+        from ..governance import budgets
+
+        user = (self.task.requested_by or "").removeprefix("user:") if (self.task.requested_by or "").startswith("user:") else None
+        try:
+            hold = budgets.reserve(self.db, user_email=user, agent_id=self.agent_row.id, workflow=self.task.type, est_tokens=est + 1024)
+        except budgets.BudgetExceeded as e:
+            raise Blocked(str(e)) from e
         try:
             res = get_provider().complete(system=system, prompt=prompt, schema=schema, tier=tier or self.agent_row.model_tier)
         except (LLMUnavailable, LLMRefused) as e:
+            budgets.release(self.db, hold)
             tracing.record(self.db, getattr(e, "attempts", []), task_id=self.task.id, agent_id=self.agent_row.id, purpose=purpose or self.task.type)
             raise Blocked(str(e)) from e
+        budgets.settle(self.db, hold, tokens=res.input_tokens + res.output_tokens, usd=res.cost_usd)
         tracing.record(self.db, getattr(res, "attempts", []), task_id=self.task.id, agent_id=self.agent_row.id,
                        purpose=purpose or self.task.type, fallback_result=res)
         self.tokens += res.input_tokens + res.output_tokens

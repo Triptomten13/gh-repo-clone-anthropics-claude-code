@@ -395,3 +395,204 @@ def vault_collection_upsert(c: CollectionIn, db: Session = Depends(get_db), user
               cache_purged=purged, approval=c.approval_id)
     db.commit()
     return {"status": "applied", "collection": _cols(row)}
+
+
+# ------------------------------------------------------------------ observability: runs + replay
+@router.get("/runs")
+def runs_list(kind: str | None = None, status: str | None = None, agent: str | None = None, limit: int = Query(100, le=1000),
+              db: Session = Depends(get_db), _: User = Depends(require_permission("runs.read"))):
+    from ..models import Run
+
+    q = select(Run).order_by(Run.id.desc()).limit(limit)
+    for col, v in (("kind", kind), ("status", status), ("agent_id", agent)):
+        if v:
+            q = q.where(getattr(Run, col) == v)
+    return [_cols(r) for r in db.scalars(q)]
+
+
+@router.get("/runs/{rid}/replay")
+def runs_replay(rid: int, db: Session = Depends(get_db), user: User = Depends(require_permission("runs.read"))):
+    from ..governance import observability
+
+    try:
+        out = observability.replay(db, rid)
+    except LookupError:
+        raise HTTPException(404, "run not found") from None
+    gov.audit(db, user.email, "runs.replay", f"run:{rid}")
+    db.commit()
+    return out
+
+
+# ------------------------------------------------------------------ resource & cost: hard budgets
+class BudgetIn(BaseModel):
+    scope_kind: Literal["user", "agent", "workflow", "global"]
+    scope_id: str = Field("*", max_length=96)
+    metric: Literal["usd", "tokens", "model_calls", "tool_calls"]
+    period: Literal["day", "month"] = "day"
+    limit: float = Field(gt=0)
+    approval_id: int | None = None
+
+
+@router.get("/budgets")
+def budgets_list(db: Session = Depends(get_db), _: User = Depends(require_permission("policy.read"))):
+    from ..governance import usage
+    from ..models import BudgetRule
+
+    out = []
+    for r in db.scalars(select(BudgetRule).order_by(BudgetRule.id)):
+        used = usage.used(db, f"budget:{r.id}:{r.scope_id}") if r.period == "day" else None
+        out.append({**_cols(r), "used_today": used})
+    return out
+
+
+@router.post("/budgets")
+def budgets_create(b: BudgetIn, db: Session = Depends(get_db), user: User = Depends(require_permission("system.configure"))):
+    from ..models import BudgetRule
+
+    payload = b.model_dump(exclude={"approval_id"})
+    pending = _governed(db, user, "budget.change", payload, b.approval_id, f"Budget: {b.scope_kind} {b.scope_id} {b.metric} ≤ {b.limit:g}/{b.period}")
+    if pending is not None:
+        return pending
+    row = BudgetRule(**payload, created_by=user.email)
+    db.add(row)
+    db.flush()
+    gov.audit(db, user.email, "budget.change", f"budget:{row.id}", budget=payload, approval=b.approval_id)
+    db.commit()
+    return {"status": "applied", "budget": _cols(row)}
+
+
+@router.delete("/budgets/{bid}")
+def budgets_disable(bid: int, approval_id: int | None = None, db: Session = Depends(get_db), user: User = Depends(require_permission("system.configure"))):
+    """Removing a limit loosens control, so it is governed like creating one."""
+    from ..models import BudgetRule
+
+    r = db.get(BudgetRule, bid)
+    if r is None:
+        raise HTTPException(404)
+    pending = _governed(db, user, "budget.change", {"disable": bid}, approval_id, f"Remove budget #{bid}")
+    if pending is not None:
+        return pending
+    r.enabled = False
+    gov.audit(db, user.email, "budget.disable", f"budget:{bid}", approval=approval_id)
+    db.commit()
+    return {"status": "disabled", "budget": bid}
+
+
+# ------------------------------------------------------------------ deployment manager: profiles + egress
+class DeploymentIn(BaseModel):
+    profile: Literal["LOCAL_DEVELOPMENT", "SELF_HOSTED", "PRIVATE_NETWORK", "CUSTOMER_VPC", "ON_PREMISE", "AIR_GAPPED"]
+    egress_allowlist: list[str] = []
+    allow_private_networks: bool = True
+    approval_id: int | None = None
+
+
+OFFLINE_FEATURES = {
+    "works offline / air-gapped": ["local models (chat, eco, deep reasoning, embeddings)", "Knowledge Vault ingest, search, ask", "agents and workflows",
+                                   "policy, approvals, tool gateway (internal tools)", "audit, export, verification", "runs and replay",
+                                   "evaluation suites and release gates", "Control Center, telemetry"],
+    "needs outbound network": ["external AI providers", "internet research and monitors", "web.fetch, email.send tools",
+                               "model downloads (use verified import packages instead)", "commerce connectors"],
+}
+
+
+@router.get("/deployment")
+def deployment(db: Session = Depends(get_db), _: User = Depends(require_permission("policy.read"))):
+    from ..daemon import state
+    from ..governance import egress
+
+    st = state.load(db)
+    return {"deployment": st.get("deployment") or {"profile": "SELF_HOSTED", "egress_allowlist": [], "allow_private_networks": True},
+            "offline_mode": st["offline_mode"], "profiles": egress.PROFILES, "egress": egress.report(), "features": OFFLINE_FEATURES}
+
+
+@router.post("/deployment")
+def deployment_set(d: DeploymentIn, db: Session = Depends(get_db), user: User = Depends(require_permission("system.configure"))):
+    """Tightening (→ AIR_GAPPED, fewer allow-list entries) applies at once; loosening is RESTRICTED (second person)."""
+    from ..daemon import state
+    from ..governance import egress
+
+    st = state.load(db)
+    cur = st.get("deployment") or {"profile": "SELF_HOSTED", "egress_allowlist": [], "allow_private_networks": True}
+    loosens = (cur["profile"] == "AIR_GAPPED" and d.profile != "AIR_GAPPED") or bool(set(d.egress_allowlist) - set(cur.get("egress_allowlist", []))) \
+        or (d.allow_private_networks and not cur.get("allow_private_networks", True))
+    payload = d.model_dump(exclude={"approval_id"})
+    if loosens:
+        pending = _governed(db, user, "deploy.loosen_egress", payload, d.approval_id, f"Loosen deployment egress → {d.profile}")
+        if pending is not None:
+            return pending
+    changes: dict[str, Any] = {"deployment": payload}
+    if d.profile == "AIR_GAPPED":
+        changes["offline_mode"] = True  # never a silent fall back to cloud services
+    state.update(db, **changes)
+    egress.invalidate()
+    gov.audit(db, user.email, "deploy.profile", "deployment", before=cur, after=payload, approval=d.approval_id)
+    db.commit()
+    return {"status": "applied", "deployment": payload, "offline_mode": state.load(db)["offline_mode"]}
+
+
+@router.get("/deployment/egress/verify")
+def deployment_verify(db: Session = Depends(get_db), user: User = Depends(require_permission("audit.verify"))):
+    from ..governance import egress
+
+    out = {"probe": egress.probe(), "report": egress.report()}
+    gov.audit(db, user.email, "deploy.egress_verify", "deployment", blocked=out["probe"]["blocked"], enforcing=out["report"]["enforcing"])
+    db.commit()
+    return out
+
+
+# ------------------------------------------------------------------ evaluation lab: release gates
+class GateIn(BaseModel):
+    target_kind: Literal["prompt", "model", "workflow", "agent", "tool", "retrieval", "policy"]
+    suite: str = Field(min_length=3, max_length=64)
+    min_score: float = Field(ge=0, le=1)
+    mandatory: bool = True
+    approval_id: int | None = None
+
+
+class GateCheckIn(BaseModel):
+    target_kind: Literal["prompt", "model", "workflow", "agent", "tool", "retrieval", "policy"]
+    target_ref: str = Field(min_length=1, max_length=160)
+
+
+@router.get("/gates")
+def gates_list(db: Session = Depends(get_db), _: User = Depends(require_permission("policy.read"))):
+    from ..governance import gates
+    from ..models import GateRun, ReleaseGate
+
+    gates.ensure_defaults(db)
+    db.commit()
+    return {"gates": [_cols(g) for g in db.scalars(select(ReleaseGate).order_by(ReleaseGate.target_kind, ReleaseGate.id))],
+            "runs": [_cols(r) for r in db.scalars(select(GateRun).order_by(GateRun.id.desc()).limit(50))],
+            "suites": sorted(gates.suites()) + ["benchmark_accuracy"]}
+
+
+@router.post("/gates")
+def gates_upsert(g: GateIn, db: Session = Depends(get_db), user: User = Depends(require_permission("gates.write"))):
+    from ..models import ReleaseGate
+
+    payload = g.model_dump(exclude={"approval_id"})
+    pending = _governed(db, user, "gates.change", payload, g.approval_id, f"Release gate {g.target_kind}/{g.suite} ≥ {g.min_score}")
+    if pending is not None:
+        return pending
+    row = db.scalars(select(ReleaseGate).where(ReleaseGate.target_kind == g.target_kind, ReleaseGate.suite == g.suite)).first()
+    if row is None:
+        row = ReleaseGate(target_kind=g.target_kind, suite=g.suite, created_by=user.email, min_score=g.min_score)
+        db.add(row)
+    row.min_score, row.mandatory, row.enabled = g.min_score, g.mandatory, True
+    db.flush()
+    gov.audit(db, user.email, "gates.change", f"gate:{row.id}", gate=payload, approval=g.approval_id)
+    db.commit()
+    return {"status": "applied", "gate": _cols(row)}
+
+
+@router.post("/gates/check")
+def gates_check(c: GateCheckIn, db: Session = Depends(get_db), user: User = Depends(require_permission("eval.run"))):
+    from ..governance import gates
+
+    try:
+        run = gates.check(db, c.target_kind, c.target_ref, user.email)
+    except gates.GateFailed as e:
+        db.commit()
+        return {"passed": False, "gate_run": _cols(e.run)}
+    db.commit()
+    return {"passed": True, "gate_run": _cols(run)}

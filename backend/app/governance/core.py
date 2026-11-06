@@ -104,6 +104,9 @@ def request_approval(db: Session, action: str, title: str, requested_by: str, de
     db.add(a)
     db.flush()
     audit(db, requested_by, "approval.requested", f"approval:{a.id}", approval_action=action, title=title, amount_sek=amount_sek)
+    from . import observability
+
+    observability.event("approval", action, {"approval_id": a.id, "title": title, "requested_by": requested_by})
     bus.publish({"type": "approval", "id": a.id, "status": a.status, "title": title})
     return a
 

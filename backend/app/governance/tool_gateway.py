@@ -285,6 +285,10 @@ def invoke(db: Session, tool: str, args: dict[str, Any], *, user: User | None = 
         db.flush()
         gov.audit(db, user.email if user else f"agent:{agent_id}", "tool.invoke", f"tool:{tool}.{op}", invocation=rec.id, status=status,
                   decision=decision, agent=agent_id, workflow=workflow, reason=reason[:300])
+        from . import observability
+
+        observability.event("tool", f"{tool}.{op}", {"invocation_id": rec.id, "status": status, "decision": decision, "approval_id": rec.approval_id,
+                                                      "reason": reason[:300]}, duration_ms=rec.latency_ms)
 
     try:
         if t is None:

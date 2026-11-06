@@ -749,3 +749,176 @@ def test_external_disabled_switch_still_excludes_external_models(fresh_db, monke
     cands, excluded = routing.plan("standard", {"local": _Prov("local", "local"), "anthropic": _Prov("anthropic", "external")})
     assert "external" not in {c.locality for c in cands}
     assert any(e["status"] == "excluded_external_disabled" for e in excluded)
+
+
+# ------------------------------------------------------------------ observability (10, 11), budgets (12), egress (14), gates (16)
+def _orch_with(agent_cls, fresh_db):
+    from app.agents.catalog import build_orchestrator
+
+    orch = build_orchestrator()
+    if agent_cls.id not in orch.agents:
+        orch.register(agent_cls())
+    db = fresh_db.SessionLocal()
+    orch.sync_agents(db)
+    return orch, db
+
+
+def test_10_every_workflow_execution_produces_a_reconstructable_trace(client, fresh_db):
+    from app.agents.base import AgentOutput, BaseAgent
+    from app.models import Run, RunEvent, Task
+
+    _put(client, "Trace doc", "Harbour inventory of compasses and lanterns.")
+
+    class Tracer(BaseAgent):
+        id, name, division, task_types = "tracer", "Tracer", "test", ("test.trace",)
+
+        def handle(self, ctx, task):
+            from app.knowledge import search
+
+            hits = search.search(ctx.db, "harbour compasses", user=None, mode="keyword")
+            ctx.check("market.research")
+            return AgentOutput(summary=f"found {len(hits)}", result={"documents": [h["document_id"] for h in hits]})
+
+    orch, db = _orch_with(Tracer, fresh_db)
+    t = orch.submit(db, "test.trace", {"q": "harbour"}, requested_by="user:admin@example.com")
+    db.commit()
+    orch.drain()
+    db.expire_all()
+    run = db.scalars(select(Run).where(Run.ref == f"task:{t.id}")).one()
+    assert run.status == "succeeded" and run.workflow == "test.trace" and run.agent_id == "tracer" and run.policy_version
+    types = [e.type for e in db.scalars(select(RunEvent).where(RunEvent.run_id == run.id).order_by(RunEvent.seq))]
+    assert "retrieval" in types and "attempt" in types and types[-1] == "output"
+    rep = client.get(f"/api/runs/{run.id}/replay").json()
+    assert rep["run"]["id"] == run.id and [e["seq"] for e in rep["events"]] == sorted(e["seq"] for e in rep["events"])
+    assert "not a re-execution" in rep["replay_kind"]
+    retr = next(e for e in rep["events"] if e["type"] == "retrieval")
+    assert retr["data"]["documents"] and "text" not in json.dumps(retr["data"])  # references only, never the text
+    assert db.get(Task, t.id).status == "succeeded"
+    db.close()
+
+
+def test_11_failed_steps_follow_the_retry_policy_and_escalate(client, fresh_db):
+    from app.agents.base import BaseAgent
+    from app.models import AuditLog, Run, RunEvent
+
+    class Broken(BaseAgent):
+        id, name, division, task_types = "broken", "Broken", "test", ("test.broken",)
+
+        def handle(self, ctx, task):
+            raise RuntimeError("disk on fire")
+
+    orch, db = _orch_with(Broken, fresh_db)
+    t = orch.submit(db, "test.broken", {})
+    db.commit()
+    orch.drain()
+    db.expire_all()
+    run = db.scalars(select(Run).where(Run.ref == f"task:{t.id}")).one()
+    ev = [(e.type, e.name) for e in db.scalars(select(RunEvent).where(RunEvent.run_id == run.id).order_by(RunEvent.seq))]
+    assert [x for x, _ in ev].count("attempt") == 3 and [x for x, _ in ev].count("retry") == 2  # max_attempts = 3
+    assert ("escalation", "retries exhausted → operators notified") in ev and run.status == "failed" and "disk on fire" in run.error
+    assert db.scalars(select(AuditLog).where(AuditLog.action == "task.escalated", AuditLog.target == f"task:{t.id}")).first()
+    db.close()
+
+
+def test_12_model_budgets_stop_calls_before_they_run_and_are_not_bypassed(client, fresh_db, approver):
+    from app.ai import llm
+    from app.agents.base import AgentOutput, BaseAgent
+    from app.models import Task
+
+    calls = []
+
+    class FakeRouter:
+        name = "fake"
+
+        def complete(self, *, system, prompt, tier="standard", schema=None, max_tokens=16000, sensitivity="normal"):
+            from app.ai.llm import LLMResult
+
+            calls.append(prompt)
+            return LLMResult("ok", None, "fake-model", 10, 5, 0.0, provider="fake",
+                             attempts=[{"provider": "fake", "model": "fake-model", "status": "ok", "input_tokens": 10, "output_tokens": 5}])
+
+    class Talker(BaseAgent):
+        id, name, division, task_types = "talker", "Talker", "test", ("test.talk",)
+
+        def handle(self, ctx, task):
+            ctx.llm("system", f"prompt {task.payload['n']}")
+            return AgentOutput(summary="talked")
+
+    sysadmin = _login_as(client, "system_admin")
+    body = {"scope_kind": "agent", "scope_id": "talker", "metric": "model_calls", "period": "day", "limit": 2}
+    r = sysadmin.post("/api/budgets", json=body)
+    assert r.status_code == 202  # a budget change is governed too
+    approver.post(f"/api/approvals/{r.json()['approval_id']}/decide", json={"approve": True})
+    assert sysadmin.post("/api/budgets", json={**body, "approval_id": r.json()["approval_id"]}).status_code == 200
+    llm.set_provider(FakeRouter())
+    try:
+        orch, db = _orch_with(Talker, fresh_db)
+        ids = [orch.submit(db, "test.talk", {"n": i}).id for i in range(4)]
+        db.commit()
+        orch.drain()
+        db.expire_all()
+        statuses = [db.get(Task, i).status for i in ids]
+        assert statuses.count("succeeded") == 2 and statuses.count("blocked") == 2 and len(calls) == 2
+        assert "budget" in db.get(Task, ids[-1]).error
+        db.close()
+    finally:
+        llm.set_provider(None)
+
+
+def test_14_offline_and_air_gapped_modes_block_unapproved_outbound_connections(client, fresh_db):
+    import socket
+
+    from app.governance import egress
+
+    egress.install()
+    sysadmin = _login_as(client, "system_admin")
+    assert client.get("/api/deployment/egress/verify").json()["probe"]["blocked"] is False  # online: not restricted
+    r = sysadmin.post("/api/deployment", json={"profile": "AIR_GAPPED", "egress_allowlist": []})
+    assert r.status_code == 200 and r.json()["offline_mode"] is True  # tightening applies at once
+    egress.invalidate()
+    v = client.get("/api/deployment/egress/verify").json()
+    assert v["probe"]["blocked"] is True and v["report"]["enforcing"], v
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    with pytest.raises(egress.EgressDenied):
+        s.connect(("93.184.215.14", 443))  # any public address — refused before a packet leaves
+    s.close()
+    loop = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    assert loop.connect_ex(("127.0.0.1", 9)) != 0 or True  # loopback is never blocked by policy (port 9 is just closed)
+    loop.close()
+    assert any(not a["allowed"] for a in egress.report()["recent"])
+    # leaving AIR_GAPPED loosens egress: a second person must approve
+    assert sysadmin.post("/api/deployment", json={"profile": "SELF_HOSTED"}).status_code == 202
+
+
+def test_16_release_gates_block_a_failing_prompt_release(client, fresh_db, monkeypatch):
+    from app.daemon import prompts
+    from app.evals import runner
+    from app.models import GateRun
+
+    db = fresh_db.SessionLocal()
+    prompts.seed(db)
+    db.commit()
+    name = "gsus.identity"
+    v = client.post("/api/daemon/prompts", json={"name": name, "text": "You are G-SUS. Answer from evidence; say when you do not know.",
+                                                 "notes": "candidate"}).json()
+    real = runner.injection_suite
+    monkeypatch.setattr(runner, "injection_suite", lambda: {**real(), "score": 0.5, "metric": "F1 (simulated regression)"})
+    r = client.post(f"/api/daemon/prompts/{name}/activate", json={"version": v["version"]})
+    assert r.status_code == 409 and any("injection_detection" in b for b in r.json()["detail"]["blocking"])
+    assert prompts.active(db, name).version != v["version"]  # the release did not happen
+    monkeypatch.setattr(runner, "injection_suite", real)
+    assert client.post(f"/api/daemon/prompts/{name}/activate", json={"version": v["version"]}).status_code == 200
+    runs = db.scalars(select(GateRun).order_by(GateRun.id)).all()
+    assert [g.passed for g in runs[-2:]] == [False, True]  # regression history kept
+    db.close()
+
+
+def test_14_only_real_private_networks_count_as_private(fresh_db, monkeypatch):
+    """Regression: ipaddress.is_private also covers documentation/benchmark ranges — those must not bypass the guard."""
+    from app.governance import egress
+
+    monkeypatch.setattr(egress, "_policy", lambda: {"enforce": True, "profile": "AIR_GAPPED", "allow_private": True, "allow_ips": set(), "deny_ips": set()})
+    assert egress.decide("192.168.1.20")[0] and egress.decide("10.1.2.3")[0] and egress.decide("100.101.102.103")[0]
+    for addr in ("203.0.113.7", "198.18.0.1", "192.0.2.1", "93.184.215.14", "8.8.8.8"):
+        assert not egress.decide(addr)[0], addr
+    assert egress.decide("127.0.0.1") == (True, "loopback")

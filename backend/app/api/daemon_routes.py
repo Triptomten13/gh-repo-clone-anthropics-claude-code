@@ -396,6 +396,13 @@ class ActivateIn(BaseModel):
 
 @router.post("/daemon/library/activate")
 def d_activate(a: ActivateIn, db: Session = Depends(get_db), user: User = Depends(admin)):
+    from ..governance import gates
+
+    try:
+        gates.check(db, "model", f"{a.slot}@{a.key}", user.email)  # release gate before a model goes live
+    except gates.GateFailed as e:
+        db.commit()
+        raise HTTPException(409, {"error": "release gate failed", "blocking": e.run.blocking, "gate_run": e.run.id}) from None
     try:
         return library.activate(db, a.slot, a.key, user.email)
     except library.LibraryError as e:
@@ -456,6 +463,13 @@ class PromptActivate(BaseModel):
 
 @router.post("/daemon/prompts/{name}/activate")
 def d_prompt_activate(name: str, a: PromptActivate, db: Session = Depends(get_db), user: User = Depends(admin)):
+    from ..governance import gates
+
+    try:
+        gates.check(db, "prompt", f"{name}@v{a.version}", user.email)  # release gate before a prompt version goes live
+    except gates.GateFailed as e:
+        db.commit()
+        raise HTTPException(409, {"error": "release gate failed", "blocking": e.run.blocking, "gate_run": e.run.id}) from None
     try:
         v = prompts.activate_version(db, name, a.version, user.email)
     except LookupError as e:

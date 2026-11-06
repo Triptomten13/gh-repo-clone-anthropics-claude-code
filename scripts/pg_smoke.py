@@ -30,11 +30,41 @@ with TestClient(app) as c:
                  "/api/daemon/library", "/api/daemon/providers", "/api/daemon/settings", "/api/daemon/prompts", "/api/daemon/tools",
                  "/api/daemon/credentials", "/api/daemon/benchmarks", "/api/daemon/workers", "/api/daemon/finetune/feasibility",
                  "/api/control/overview", "/api/control/routes", "/api/control/history", "/api/research", "/api/monitors", "/api/monitors/events",
-                 "/api/agents/efficiency"]:
+                 "/api/agents/efficiency", "/api/audit/records", "/api/audit/verify", "/api/policies", "/api/policies/history", "/api/tools",
+                 "/api/tools/grants", "/api/tools/invocations", "/api/runs", "/api/budgets", "/api/gates", "/api/deployment",
+                 "/api/vault/collections", "/api/rbac/roles"]:
         r = c.get(path)
         print(f"{r.status_code} GET {path}")
         if r.status_code != 200:
             failures.append((path, r.text[:300]))
+    # control plane on PostgreSQL: tool gateway (atomic counters, ON CONFLICT), governed change, export, replay, gates
+    r = c.post("/api/tools/calc/invoke", json={"args": {"expression": "6*7"}})
+    print(f"{r.status_code} tool gateway calc → {r.json().get('result')}")
+    if r.status_code != 200 or r.json().get("result") != 42:
+        failures.append(("tool gateway", r.text[:300]))
+    r = c.post("/api/policies", json={"key": "smoke.rule", "action": "tool:web.fetch.READ", "category": 2, "reason": "smoke"})
+    print(f"{r.status_code} governed policy change → {r.json().get('status')}")
+    if r.status_code != 202:
+        failures.append(("governed policy change", r.text[:300]))
+    r = c.get("/api/audit/export?fmt=zip")
+    print(f"{r.status_code} audit export ({len(r.content)} bytes)")
+    from app.governance import audit_chain as _ac
+    if r.status_code != 200 or not _ac.verify_export(r.content)["ok"]:
+        failures.append(("audit export", str(r.status_code)))
+    r = c.post("/api/gates/check", json={"target_kind": "prompt", "target_ref": "smoke@v1"})
+    print(f"{r.status_code} release gate check → passed={r.json().get('passed')}")
+    if r.status_code != 200:
+        failures.append(("gate check", r.text[:300]))
+    r = c.post("/api/ai/ask", json={"question": "25% of 480"})
+    rid = r.json().get("run_id")
+    rp = c.get(f"/api/runs/{rid}/replay")
+    print(f"{rp.status_code} run replay → {len(rp.json().get('events', []))} events")
+    if rp.status_code != 200:
+        failures.append(("replay", rp.text[:300]))
+    v = c.get("/api/audit/verify").json()
+    print(f"audit chain on PostgreSQL: ok={v['ok']} checked={v['checked']}")
+    if not v["ok"]:
+        failures.append(("audit chain", v.get("reason")))
     for body in ({"objective": "Evaluate the winter commuter pannier and convene a council"}, {"objective": "What happened to Jerusalem?", "mode": "archivist"}):
         r = c.post("/api/gsus/runs", json=body)
         print(f"{r.status_code} G-sus run → {r.json().get('status')}")

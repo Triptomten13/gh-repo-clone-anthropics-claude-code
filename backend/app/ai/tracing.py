@@ -31,7 +31,11 @@ def record(db: Session, attempts: list[dict], *, task_id: int | None = None, run
         "provider": getattr(fallback_result, "provider", "") or "custom", "model": fallback_result.model, "status": "ok",
         "input_tokens": fallback_result.input_tokens, "output_tokens": fallback_result.output_tokens, "cost_usd": fallback_result.cost_usd,
         "latency_ms": getattr(fallback_result, "latency_ms", 0)}])
+    from ..governance import observability
+
     for a in rows:
+        observability.event("model", f"{a.get('provider', '')}:{a.get('model', '')}", {k: a.get(k) for k in (
+            "provider", "model", "tier", "status", "input_tokens", "output_tokens", "cost_usd", "latency_ms", "error", "locality")} | {"purpose": purpose})
         db.add(LLMCall(task_id=task_id, run_id=run_id, agent_id=agent_id, purpose=purpose, provider=a.get("provider", ""),
                        model=a.get("model", ""), tier=a.get("tier", ""), status=a.get("status", ""), input_tokens=a.get("input_tokens", 0),
                        output_tokens=a.get("output_tokens", 0), cost_usd=a.get("cost_usd", 0.0), latency_ms=a.get("latency_ms", 0),

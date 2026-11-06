@@ -11,7 +11,9 @@ Guarantees (spec section 20):
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import hashlib
+import time
 import json
 import logging
 import threading
@@ -175,17 +177,30 @@ class Orchestrator:
             task.status, task.started_at = TaskStatus.running.value, datetime.now(UTC)
             db.commit()
             gov.bus.publish({"type": "task", "id": task.id, "task_type": task.type, "agent": task.agent_id, "status": "running"})
+            from ..governance import observability as obs
 
+            run_id = obs.start("task", f"task:{task.id}", workflow=task.type, agent_id=task.agent_id,
+                               user_email=(task.requested_by or "").removeprefix("user:"),
+                               parent_id=obs.run_of_task(db, task.parent_id), input={"payload": task.payload, "priority": task.priority,
+                                                                                      "requested_by": task.requested_by, "max_attempts": task.max_attempts,
+                                                                                      "timeout_s": task.timeout_s})
+            token = obs.current_run.set(run_id)
             status, out, err, tokens, cost = TaskStatus.failed.value, None, None, 0, 0.0
             with ThreadPoolExecutor(max_workers=1) as pool:
                 while task.attempts < task.max_attempts:
                     task.attempts += 1
                     db.commit()
-                    fut = pool.submit(self._execute_once, task_id)
+                    if task.attempts > 1:
+                        obs.event("retry", f"attempt {task.attempts}/{task.max_attempts}", {"previous_error": (err or "")[:500]})
+                    t0 = time.monotonic()
+                    fut = pool.submit(contextvars.copy_context().run, self._execute_once, task_id)  # the run follows the work
                     try:
                         status, out, err, t_used, c_used = fut.result(timeout=task.timeout_s)
                     except FutTimeout:
                         status, out, err, t_used, c_used = TaskStatus.failed.value, None, f"timeout after {task.timeout_s}s", 0, 0.0
+                    obs.event("attempt", f"attempt {task.attempts}", {"status": status, "error": (err or "")[:500], "tokens": t_used, "cost_usd": c_used},
+                              duration_ms=int((time.monotonic() - t0) * 1000))
+                    obs.flush(run_id)  # the worker's session is closed here: no lock to wait for
                     tokens += t_used
                     cost += c_used
                     if status != TaskStatus.failed.value:
@@ -218,7 +233,16 @@ class Orchestrator:
                 row.tasks_failed += 1
                 db.add(AgentMessage(agent_id=row.id, task_id=task.id, kind="error", summary=(err or "")[:500],
                                     confidence=1.0, epistemic="verified"))
+            if status == TaskStatus.failed.value and task.attempts >= task.max_attempts:
+                # retries exhausted: escalate to humans (audit + live alert), never fail silently
+                gov.audit(db, "system", "task.escalated", f"task:{task.id}", agent=task.agent_id, attempts=task.attempts, error=(err or "")[:300])
+                gov.bus.publish({"type": "escalation", "task": task.id, "agent": task.agent_id, "error": (err or "")[:300]})
+                obs.event("escalation", "retries exhausted → operators notified", {"attempts": task.attempts, "error": (err or "")[:500]})
             db.commit()
+            obs.event("output", status, {"summary": out.summary if out else None, "result": task.result if out else None, "error": (err or "")[:500]})
+            obs.finish(run_id, status, output={"summary": out.summary if out else None, "result": task.result if out else None},
+                       error=err, tokens_in=tokens, cost_usd=cost)
+            obs.current_run.reset(token)
             gov.bus.publish({"type": "task", "id": task.id, "task_type": task.type, "agent": task.agent_id,
                              "status": status, "summary": out.summary if out else err})
             return task

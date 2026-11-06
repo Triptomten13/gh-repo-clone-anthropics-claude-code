@@ -37,14 +37,36 @@ def ai_ask(a: AskIn, db: Session = Depends(get_db), user: User = Depends(operato
     """Think before using a model: classify → cheapest reliable strategy → execute → answer with an execution trace."""
     from ..ai.router import LLMRefused, LLMUnavailable
     from ..daemon import intel
+    from ..governance import budgets
+    from ..governance import observability as obs
 
+    run_id = obs.start("ask", "", workflow="ai.ask", user_email=user.email, input={"question": a.question, "strategy": a.strategy,
+                                                                                   "sensitivity": a.sensitivity, "research_depth": a.research_depth})
+    token = obs.current_run.set(run_id)
     try:
-        return intel.answer(db, user, a.question, research_depth=a.research_depth, samples=a.samples, force_strategy=a.strategy,
-                            sensitivity=a.sensitivity)
+        out = intel.answer(db, user, a.question, research_depth=a.research_depth, samples=a.samples, force_strategy=a.strategy,
+                           sensitivity=a.sensitivity)
+        db.commit()  # release this request's write lock before the trace is written
+        obs.event("output", out.get("plan", {}).get("strategy", ""), {"answer": out.get("answer"), "status": out.get("status"),
+                                                                     "sources": len(out.get("sources") or []), "model_calls": out.get("model_calls")})
+        obs.finish(run_id, out.get("status") or "succeeded", output={"answer": out.get("answer"), "plan": out.get("plan")},
+                   cost_usd=out.get("cost_usd") or 0.0)
+        out["run_id"] = run_id
+        return out
+    except budgets.BudgetExceeded as e:
+        db.rollback()  # no write lock held while the trace is written
+        obs.finish(run_id, "blocked", error=str(e))
+        raise HTTPException(429, str(e)) from e
     except LLMRefused as e:
+        db.rollback()  # no write lock held while the trace is written
+        obs.finish(run_id, "failed", error=str(e))
         raise HTTPException(422, f"model declined: {e}") from e
     except LLMUnavailable as e:
-        raise HTTPException(503, {"error": str(e), "attempts": getattr(e, "attempts", [])}) from e
+        db.rollback()  # no write lock held while the trace is written
+        obs.finish(run_id, "failed", error=str(e))
+        raise HTTPException(503, {"error": str(e), "attempts": getattr(e, "attempts", []), "run_id": run_id}) from e
+    finally:
+        obs.current_run.reset(token)
 
 
 class PlanIn(BaseModel):

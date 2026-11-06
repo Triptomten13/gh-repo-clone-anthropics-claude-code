@@ -27,6 +27,10 @@ def prompt_hash(system: str, prompt: str) -> str:
 def complete(db: Session, *, system: str, prompt: str, tier: str = "standard", schema: dict | None = None, max_tokens: int = 2048,
              sensitivity: str = "normal", profile: str | None = None, cacheable: bool = False, agent_id: str = "", purpose: str = "api",
              workflow: str = "", project: str = "", task_id: int | None = None, run_id: int | None = None) -> dict[str, Any]:
+    from ..governance.observability import current_run
+
+    if run_id is None:
+        run_id = current_run.get()  # traced into the run this call belongs to
     st = state.load(db)
     prof = (profile or st["profile"]).upper()
     ph = prompt_hash(system, prompt)
@@ -46,6 +50,10 @@ def complete(db: Session, *, system: str, prompt: str, tier: str = "standard", s
             return {"text": row.text, "data": row.data, "provider": "cache", "model": row.model, "served_from_cache": True,
                     "input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "latency_ms": 0, "attempts": [att],
                     "saved_usd": row.original_cost_usd}
+    from ..governance import budgets
+
+    # hard budgets: refused BEFORE the call, never bypassed; settled with measured usage afterwards
+    hold = budgets.reserve(db, agent_id=agent_id or None, workflow=workflow or purpose, est_tokens=len(system + prompt) // 4 + max_tokens)
     provider = llm.get_provider()
     try:
         if isinstance(provider, LLMRouter):
@@ -54,13 +62,16 @@ def complete(db: Session, *, system: str, prompt: str, tier: str = "standard", s
         else:
             r = provider.complete(system=system, prompt=prompt, tier=tier, schema=schema, max_tokens=max_tokens)
     except LLMUnavailable as e:
+        budgets.release(db, hold)
         tracing.record(db, e.attempts, **meta)
         db.commit()
         raise
     except Exception as e:
+        budgets.release(db, hold)
         tracing.record(db, getattr(e, "attempts", []) or [], **meta)
         db.commit()
         raise
+    budgets.settle(db, hold, tokens=r.input_tokens + r.output_tokens, usd=r.cost_usd)
     attempts = getattr(r, "attempts", None) or []
     tracing.record(db, attempts, fallback_result=None if attempts else r, **meta)
     if use_cache and (r.text or r.data is not None):

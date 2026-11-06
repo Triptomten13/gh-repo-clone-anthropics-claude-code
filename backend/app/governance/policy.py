@@ -245,6 +245,10 @@ def enforce(db: Session, req: Request, *, consume: bool = True, request_approval
             obj = db.get(Approval, req.approval_id)
             if obj is not None:
                 db.refresh(obj)  # only this row: never discard the caller's other pending changes
+    from . import observability
+
+    observability.event("policy", req.action, {"allowed": d.allowed, "category": d.category_name, "rules": d.rules, "policy_version": d.policy_version,
+                                               "approval_id": d.approval_id or req.approval_id, "reasons": d.reasons[-3:]})
     actor = req.user_email or (f"agent:{req.agent_id}" if req.agent_id else "system")
     if d.category >= Category.SUPERVISED or not d.allowed:
         gov.audit(db, actor, "policy.decision", req.action, allowed=d.allowed, category=d.category_name, agent=req.agent_id,

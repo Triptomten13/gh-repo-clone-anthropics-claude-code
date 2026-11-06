@@ -46,9 +46,12 @@ async def lifespan(app: FastAPI):
         library.ensure_rows(db)
         prompts.seed(db)
         registry_seed.seed(db)
+        from .governance import egress, gates
         from .governance.tool_gateway import ensure_default_grants
 
         ensure_default_grants(db)
+        gates.ensure_defaults(db)
+        egress.install()  # outbound policy for offline / AIR_GAPPED operation (process-wide)
         db.commit()
         rec = orch.recover_interrupted(db)
         queued = db.scalar(select(func.count(Task.id)).where(Task.status == "queued"))
