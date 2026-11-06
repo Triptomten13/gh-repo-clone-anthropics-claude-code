@@ -9,5 +9,6 @@ anthropic>=0.70
 python-multipart>=0.0.9
 pypdf>=5.0
 python-docx>=1.1
+cryptography>=42  # provider credentials encrypted at rest (daemon/credentials.py, Fernet)
 psycopg[binary]>=3.2 ; extra == "postgres"
 redis>=5.0 ; extra == "redis"
