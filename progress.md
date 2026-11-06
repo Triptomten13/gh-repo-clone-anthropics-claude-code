@@ -50,8 +50,8 @@ smoke passes; Independence Tests A–G pass with real local models (2026-11-06T0
   sources and reports the failure instead of hiding it.
 * Archivum canon content — none exists in the repository; nothing is invented.
 * Control plane gaps (CONTROL_PLANE.md §5): no declarative workflow engine (workflows are code), SSO designed but not
-  built, no OpenTelemetry export, no per-run RAM/energy attribution, no PDF audit report or trusted timestamps, no
-  Content-Security-Policy on the web pages yet.
+  built, no OpenTelemetry export, no per-run RAM/energy attribution, no PDF audit report or trusted timestamps; the page
+  Content-Security-Policy still allows inline scripts (Next.js needs them without per-request nonces).
 
 ## Next sensible steps
 

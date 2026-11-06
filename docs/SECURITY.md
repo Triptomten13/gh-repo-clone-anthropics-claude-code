@@ -119,6 +119,9 @@ queries.
   `--profile https`, Caddy terminates TLS and forwards the real client IP (`FORWARDED_ALLOW_IPS` trusts only it).
 - Live events (`/api/events/stream`, and the legacy `/ws/events`) apply the same checks as every API call — signature,
   user enabled, token not revoked — and the token travels in a header, not the URL (`test_cross_platform.py`).
+- Web pages are served with a Content-Security-Policy (only this origin for scripts, connections, images, fonts and
+  workers; no frames, objects or embedding by other sites), `X-Frame-Options: DENY`, `nosniff` and a restrictive
+  `Permissions-Policy` (`frontend/next.config.ts`); proxied API responses keep the API's own stricter headers.
 - The service worker caches static assets and the offline page only; API responses are never cached on devices
   (`tests/matrix/pwa.spec.ts`). Secrets are typed into masked fields, never `prompt()`.
 
@@ -166,7 +169,7 @@ Design and status: [CONTROL_PLANE.md](CONTROL_PLANE.md). The rules that matter f
 | Privilege escalation through roles | explicit permission sets, no inheritance; only the super admin creates admins / security admins | criterion 18 | the super admin account itself — keep few, protect the host |
 | Budget exhaustion (denial of wallet) | atomic reservations before every model or tool call; daily/monthly USD limits; external spend needs an authorised provider | criteria 12, 19 | estimates are reserved and settled; a provider that bills more than reported is caught only by your invoice |
 | Denial of service | per-IP API rate limit, login lockout, task depth/attempt/time limits, kill switch, request size limits | `test_login_lockout_and_security_headers`, `test_kill_switch_cancels_and_blocks` | limits are in-process (one server); no WAF; put a reverse proxy in front for internet exposure (which is not recommended) |
-| Credential leakage | provider credentials encrypted at rest (Fernet), handed only to granted tools, redacted from tool output, traces and logs; never sent to the frontend | criterion 8 | the session token sits in browser `localStorage`, so an XSS bug would expose it; React escaping and the no-`dangerouslySetInnerHTML` rule are the defence — the web pages have **no Content-Security-Policy yet** (the API has one) |
+| Credential leakage | provider credentials encrypted at rest (Fernet), handed only to granted tools, redacted from tool output, traces and logs; never sent to the frontend | criterion 8 | the session token sits in browser `localStorage`, so an XSS bug could read it. Defences: React escaping, the no-`dangerouslySetInnerHTML` rule, and a page Content-Security-Policy that allows only this origin for scripts, connections, images, fonts and workers (no frames, objects or foreign form targets — `tests/matrix/csp.spec.ts` proves the browser refuses other origins). Inline scripts remain allowed (Next.js streams page data inline), and CSP cannot stop a script from *navigating* the page elsewhere — so it narrows, not removes, the risk |
 | Supply chain | `pip-audit` and `npm audit` in CI; npm lockfile; model files verified by SHA-256 against the catalog | CI workflow | Python requirements are version ranges, not a lockfile; no package signature verification or SBOM |
 | Self-modification by agents | agents cannot change policies, grants, budgets, gates, audit or deployments; releases pass gates; governance changes need a second person | `test_agents_can_never_perform_governance_actions`, criteria 16, 18 | humans with the right roles can still make bad changes — that is what the audit trail and four eyes are for |
 
