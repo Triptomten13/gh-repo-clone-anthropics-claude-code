@@ -399,6 +399,12 @@ def execute(db: Session, t: Any, *, user: Any | None = None, agent_id: str | Non
         judge(ok)
         best = max(ok, key=lambda x: x.score or 0)
         first_best = best.score or 0
+        if strat == "TOURNAMENT" and best.model_id != synthesizer:
+            # evidence from THIS brief outranks a benchmark score: the author of the best candidate synthesizes and revises
+            t.plan = {**t.plan, "synthesizer_planned": synthesizer, "synthesizer": best.model_id,
+                      "synthesizer_why": f"{best.model_id} wrote the best candidate in round 1 ({best.score:.2f})"}
+            synthesizer = best.model_id
+            obs.event("synthesizer", synthesizer, {"why": t.plan["synthesizer_why"]})
         if (best.score or 0) >= quality_target and not stop:
             stop = f"quality target {quality_target:.2f} reached by {best.model_id} ({best.score:.2f})"
 

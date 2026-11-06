@@ -176,7 +176,24 @@ def deterministic(text: str, brief: str, category: str) -> dict[str, Any]:
             checks["syntax"] = 0.5  # nothing we can parse deterministically here
     weights = rubric(category)
     score = sum(w * checks.get(k, 0.5) for k, w in weights.items()) / sum(weights.values())
+    # an output that mostly repeats the brief is not an answer — found in a real run, where it passed topic and
+    # structure checks because the brief's own words and section labels were in it
+    echo = echo_ratio(cleaned, brief)
+    checks["original"] = round(1.0 - echo, 3)
+    if echo >= 0.5:
+        notes.append(f"repeats the brief instead of answering it ({round(echo * 100)} % of its phrases come from the brief)")
+        score *= 0.3
     return {"checks": checks, "notes": notes, "score": round(score, 4), "cleaned": cleaned}
+
+
+def echo_ratio(text: str, brief: str) -> float:
+    """Share of the output's 4-word phrases that also occur in the brief (0 = original, 1 = a copy of the brief)."""
+    def grams(t: str) -> list[str]:
+        w = re.findall(r"[a-zåäöé0-9]+", t.lower())
+        return [" ".join(w[i:i + 4]) for i in range(max(0, len(w) - 3))]
+
+    out, src = grams(text), set(grams(brief))
+    return sum(1 for g in out if g in src) / len(out) if out and src else 0.0
 
 
 # ------------------------------------------------------------------ critics

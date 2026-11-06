@@ -73,7 +73,7 @@ class FakeProvider:
         if "Fix ONLY these problems" in prompt:  # revision: no improvement (same text) → diminishing returns
             cur = prompt.split("CURRENT VERSION:\n", 1)[1].split("\n\nFix ONLY", 1)[0]
             return Completion(cur, None, self.id, model, 300, 100, 0.0, 5)
-        text = {"poet-good": GOOD, "poet-weak": WEAK, "paster": GOOD.replace("Snö, snö", "Is, is")}.get(model, GOOD)
+        text = {"poet-good": GOOD, "poet-weak": WEAK, "paster": BETTER}.get(model, GOOD)  # the paster writes well, synthesizes badly
         if self.locality == "external":
             text = BETTER
         return Completion(text, None, self.id, model, 200, 120, 0.004 if self.locality == "external" else 0.0, 5)
@@ -227,9 +227,10 @@ def test_06_synthesis_combines_instead_of_concatenating(world, monkeypatch):
     assert synth and synth[0].status == "rejected" and "concatenation" in synth[0].error
     assert t.result_entry_id != synth[0].id
     # a real synthesizer is accepted and keeps its sources
-    from app.models import ModelProfile
+    from app.models import LocalModel, ModelProfile
 
     db.query(ModelProfile).delete()
+    db.query(LocalModel).filter(LocalModel.key == "paster").update({"status": "removed"})
     db.commit()
     _profile(db, "local:poet-good", "songwriting", 0.95, "a1" * 8)
     t2 = _run(world, strategy="TOURNAMENT", budget={"max_calls": 10, "max_models": 2, "critics": 1, "max_rounds": 0}, quality_target=0.99,
@@ -447,3 +448,23 @@ def test_gsus_delegates_a_song_brief_to_a_creative_tournament(world):
     assert step.status == "completed", step.summary
     ct = db.query(CreativeTournament).order_by(CreativeTournament.id.desc()).first()
     assert ct.agent_id == "creative_director" and ct.result_entry_id and ct.usage["calls"] <= 8
+
+
+def test_the_synthesizer_is_the_author_of_the_best_candidate_not_the_best_benchmark(world):
+    """Real run finding: a model with an inflated benchmark score was chosen to synthesize and revise, and made things
+    worse. Evidence from this brief now decides."""
+    db = world["db"]
+    _profile(db, "local:poet-weak", "songwriting", 0.99, "b1" * 8)  # benchmark says weak is best …
+    t = _run(world, strategy="TOURNAMENT", budget={"max_calls": 10, "max_models": 2, "critics": 1, "max_rounds": 0}, quality_target=0.99)
+    assert t.plan["synthesizer_planned"] == "local:poet-weak"
+    assert t.plan["synthesizer"] == "local:poet-good" and "best candidate" in t.plan["synthesizer_why"]
+    assert all(e.model_id == "local:poet-good" for e in _entries(db, t) if e.role in ("synthesis", "revision"))
+
+
+def test_an_output_that_echoes_the_brief_is_not_an_answer():
+    from app.creative import quality as Q
+
+    echo = Q.deterministic('"BRIEF (from Demonkoncernen):\n' + BRIEF + '"', BRIEF, "songwriting")
+    real = Q.deterministic(GOOD, BRIEF, "songwriting")
+    assert echo["score"] < 0.35 and any("repeats the brief" in n for n in echo["notes"])
+    assert real["checks"]["original"] > 0.8 and real["score"] > 0.8

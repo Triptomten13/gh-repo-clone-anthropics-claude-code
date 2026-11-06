@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from . import quality
 from .providers import available_models, profiles
 
-DATASET_VERSION = "creative-bench-2026-11-06"
+DATASET_VERSION = "creative-bench-2026-11-06.2"  # .2: brief-echo check added to scoring — older profiles are due
 SYSTEM = "You are a skilled writer and engineer. Follow the brief exactly. Output only the requested work, no preamble."
 
 TASKS: list[dict[str, Any]] = [
