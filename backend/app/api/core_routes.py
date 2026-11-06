@@ -701,7 +701,9 @@ def gsus_chat(body: ChatIn, db: Session = Depends(get_db), user: User = Depends(
             s2.close()
         yield "event: done\ndata: {}\n\n"
 
-    return StreamingResponse(gen(), media_type="text/event-stream")
+    from .streaming import STREAM_HEADERS
+
+    return StreamingResponse(gen(), media_type="text/event-stream", headers=STREAM_HEADERS)
 
 
 # =================================================================== Demonkoncernen HQ

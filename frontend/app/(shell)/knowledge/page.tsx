@@ -22,15 +22,15 @@ export default function ArchivePage() {
   return (
     <>
       <PageHeader kicker="G-SUS · memory" title="The Archive">
-        {s && <span className="text-[12px] text-ink-3">embeddings: <code>{s.embedding_model}</code></span>}
+        {(s || stats.loading) && <span className="text-[12px] text-ink-3">embeddings: <code>{s?.embedding_model ?? "…"}</code></span>}
       </PageHeader>
-      {s && (
+      {(s || stats.loading) && ( /* rendered at once with placeholders: the tabs below must not jump when the numbers arrive */
         <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-5">
-          <Stat label="Documents" value={s.documents} sub={Object.entries(s.by_status).map(([k, v]) => `${v} ${k}`).join(" · ")} />
-          <Stat label="Indexed passages" value={s.chunks} />
-          <Stat label="Entities" value={s.entities} />
-          <Stat label="Instruction-like content" value={s.injection_flagged} sub="documents flagged (treated as data)" />
-          <Stat label="Evidence classes" value={Object.keys(s.by_evidence_class).length} sub="in use" />
+          <Stat label="Documents" value={s?.documents ?? "…"} sub={s ? Object.entries(s.by_status).map(([k, v]) => `${v} ${k}`).join(" · ") || "\u00a0" : "\u00a0"} />
+          <Stat label="Indexed passages" value={s?.chunks ?? "…"} />
+          <Stat label="Entities" value={s?.entities ?? "…"} />
+          <Stat label="Instruction-like content" value={s?.injection_flagged ?? "…"} sub="documents flagged (treated as data)" />
+          <Stat label="Evidence classes" value={s ? Object.keys(s.by_evidence_class).length : "…"} sub="in use" />
         </div>
       )}
       <div role="tablist" className="mb-4 flex flex-wrap gap-1">

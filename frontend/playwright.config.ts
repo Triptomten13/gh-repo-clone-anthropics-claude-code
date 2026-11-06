@@ -52,5 +52,8 @@ export default defineConfig({
       device("android", devices["Pixel 7"], e),
     ]),
     { name: "matrix", testDir: "./tests/matrix", dependencies: ["setup"], use: { browserName: "chromium", storageState: "tests/.auth/admin.json" } },
+    // real local models — opt-in, against a running instance (E2E_AI=1 E2E_BASE_URL=… E2E_EMAIL=… E2E_PASSWORD=…)
+    ...(process.env.E2E_AI ? [{ name: "real-ai", testDir: "./tests/real", dependencies: ["setup"],
+                                use: { ...devices["Pixel 7"], storageState: "tests/.auth/admin.json" } }] : []),
   ],
 });

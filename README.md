@@ -45,21 +45,19 @@ division for survival, tactical, outdoor and e-mobility products. See [ROCKY_FLA
 ## Quick start (local, no Docker)
 
 ```bash
-# backend
-cd backend
-pip install -r requirements-dev.txt
-cp ../.env.example ../.env            # optional; defaults work for local use
-alembic upgrade head                   # or let the app create tables on first start
-uvicorn app.main:app --reload --port 8000
-python -m pytest -q                    # 173 tests
-
-# frontend (separate shell)
-cd frontend
-npm install
-NEXT_PUBLIC_API_URL=http://localhost:8000 npm run dev
+make install            # Python + Node dependencies (Python 3.13, Node 22)
+make dev                # API + web together, health-checked → http://localhost:3000
+make dev-lan            # …also reachable from phones/tablets on the same Wi-Fi (prints the address)
+make health             # check a running instance
+make test               # every automated test: backend pytest + frontend unit/e2e/responsive/a11y/PWA/performance
+make help               # all commands (lint, typecheck, build, test-e2e, test-responsive, test-a11y, test-perf, …)
 ```
 
-Open http://localhost:3000. The first visit asks you to create the admin account (or run
+Without `make` (e.g. Windows PowerShell): `cd backend; uvicorn app.main:app --port 8000` in one terminal and
+`cd frontend; npm run dev` in another. The browser only talks to the web server, which proxies `/api` to the backend —
+details, real-device testing and HTTPS: [docs/CROSS_PLATFORM.md](docs/CROSS_PLATFORM.md).
+
+Open http://localhost:3000 (desktop, or install it as an app: see the cross-platform guide). The first visit asks you to create the admin account (or run
 `python -m app.cli create-admin --email you@example.com` in `backend/`). Full guide incl. local models and Docker:
 [docs/INSTALL.md](docs/INSTALL.md).
 To explore before any connector is configured: **Systems & Integrations → Load demo data**
@@ -73,7 +71,8 @@ cp .env.example .env   # set SECRET_KEY, ANTHROPIC_API_KEY, connector keys
 docker compose up --build
 ```
 
-Services: `db` (PostgreSQL 16), `api` (runs migrations, then uvicorn), `web` (Next.js standalone), `backup` (daily `pg_dump`, 14-day retention).
+Services: `db` (PostgreSQL 16), `api` (runs migrations, then uvicorn), `web` (Next.js standalone), `backup` (daily `pg_dump`, 14-day retention),
+and with `--profile https` an `https` service (Caddy) for phones, tablets and other computers.
 The compose file is validated with `docker compose config`; images were not built in the development environment (no Docker daemon available).
 
 ## Enabling AI agents

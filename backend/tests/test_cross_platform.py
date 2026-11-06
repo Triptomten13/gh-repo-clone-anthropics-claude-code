@@ -83,3 +83,27 @@ def test_revoked_token_gets_no_live_events(client):
     with pytest.raises(WebSocketDisconnect) as e, other.websocket_connect(f"/ws/events?token={tok}") as ws:
         ws.receive_json()
     assert e.value.code == 4401
+
+
+def test_live_streams_forbid_proxy_transforms(client, live_server):
+    """Compression by a proxy buffers a stream until it ends (measured: a 44 s reply arrived in one piece)."""
+    import httpx
+
+    h = {"Authorization": client.headers["Authorization"]}
+    with httpx.stream("GET", f"{live_server}/api/events/stream", headers=h, timeout=10) as r:
+        assert "no-transform" in r.headers["cache-control"]
+    from app.ai import llm
+
+    class StreamingFake:
+        name = "fake"
+
+        def stream(self, *, system, prompt, tier="standard", max_tokens=16000):
+            yield from ["Ex ", "nihilo"]
+
+    llm.set_provider(StreamingFake())
+    try:
+        with httpx.stream("POST", f"{live_server}/api/gsus/chat/stream", json={"message": "hello", "use_archive": False}, headers=h, timeout=30) as r:
+            assert r.status_code == 200 and "no-transform" in r.headers["cache-control"]
+            assert "nihilo" in "".join(r.iter_text())
+    finally:
+        llm.set_provider(None)

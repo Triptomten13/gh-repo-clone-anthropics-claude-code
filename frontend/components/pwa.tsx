@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 
 type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
 let deferred: InstallEvent | null = null;
+let userAcceptedUpdate = false; // reload ONLY after "Update" — not when the first service worker takes control
 const installListeners = new Set<(v: boolean) => void>();
 
 export function PwaRegister() {
@@ -16,7 +17,7 @@ export function PwaRegister() {
     window.addEventListener("beforeinstallprompt", onPrompt);
     if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator) || !window.isSecureContext) return () => window.removeEventListener("beforeinstallprompt", onPrompt);
     let reloading = false;
-    const onController = () => { if (!reloading) { reloading = true; location.reload(); } };
+    const onController = () => { if (userAcceptedUpdate && !reloading) { reloading = true; location.reload(); } };
     navigator.serviceWorker.addEventListener("controllerchange", onController);
     navigator.serviceWorker.register("/sw.js").then((reg) => {
       if (reg.waiting && navigator.serviceWorker.controller) setWaiting(reg.waiting);
@@ -37,7 +38,7 @@ export function PwaRegister() {
     <div role="status" className="fixed inset-x-3 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 mx-auto flex max-w-md items-center gap-3 rounded-lg border border-violet-dim bg-surface-2 px-4 py-3 text-[13px] shadow-xl lg:bottom-6">
       <RefreshCw size={15} className="shrink-0 text-violet" aria-hidden />
       <span className="flex-1">A new version of Demonkoncernen is ready.</span>
-      <button onClick={() => waiting.postMessage("SKIP_WAITING")} className="min-h-9 rounded-md bg-violet px-3 font-semibold text-black">Update</button>
+      <button onClick={() => { userAcceptedUpdate = true; waiting.postMessage("SKIP_WAITING"); }} className="min-h-9 rounded-md bg-violet px-3 font-semibold text-black">Update</button>
     </div>
   );
 }

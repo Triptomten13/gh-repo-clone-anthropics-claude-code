@@ -112,6 +112,15 @@ prompt); `pip-audit -r backend/requirements.txt` and `npm audit --omit=dev`: no 
 monitor alerts are visible to every signed-in user (team-shared, like the Archive) — do not put private data in research
 queries.
 
+## Clients on other devices
+
+- Browsers reach only the web server's origin; it proxies `/api` to a backend bound to 127.0.0.1. With
+  `--profile https`, Caddy terminates TLS and forwards the real client IP (`FORWARDED_ALLOW_IPS` trusts only it).
+- Live events (`/api/events/stream`, and the legacy `/ws/events`) apply the same checks as every API call — signature,
+  user enabled, token not revoked — and the token travels in a header, not the URL (`test_cross_platform.py`).
+- The service worker caches static assets and the offline page only; API responses are never cached on devices
+  (`tests/matrix/pwa.spec.ts`). Secrets are typed into masked fields, never `prompt()`.
+
 ## Data protection (GDPR)
 
 - No personal data is scraped. Research connectors store aggregate signals (counts, views) and product listings;

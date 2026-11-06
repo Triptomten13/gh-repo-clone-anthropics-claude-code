@@ -1,0 +1,33 @@
+# HTTPS in front of Demonkoncernen AB — one origin for desktops, tablets and phones (docker compose --profile https).
+# STATUS: written from Caddy's documented behaviour; NOT executed in the development environment (Caddy could not be
+# installed there). Verify with scripts/health.sh https://<your-site> after the first start.
+#
+#   DK_SITE=localhost            → certificate from Caddy's local CA (`tls internal`; install that CA on test phones)
+#   DK_SITE=dk.example.com       → public certificate via ACME (the name must resolve to this host; ports 80/443 open)
+{
+	admin off
+}
+
+{$DK_SITE:localhost} {
+	# the API goes straight to the backend with the real client IP (X-Forwarded-For), so per-client rate limits and
+	# login lockouts work; FORWARDED_ALLOW_IPS on the api service trusts this proxy
+	@api path /api/* /health /ws/*
+	handle @api {
+		reverse_proxy {$DK_API:api:8000} {
+			flush_interval -1 # live streams (G-sus replies, events) leave as they are produced
+		}
+	}
+	handle {
+		reverse_proxy {$DK_WEB:web:3000}
+	}
+	# compress pages and assets, never live streams (compression buffers a stream until it ends)
+	@compressible not header Content-Type text/event-stream*
+	encode @compressible zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+	log
+}

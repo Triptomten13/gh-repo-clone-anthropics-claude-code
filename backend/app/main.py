@@ -20,6 +20,7 @@ from .api.daemon_routes import router as daemon_router
 from .api.hyper_routes import router as hyper_router
 from .api.flare_routes import router as flare_router
 from .api.routes import router
+from .api.streaming import STREAM_HEADERS
 from .config import get_settings
 from .db import SessionLocal, init_db
 from .governance.core import bus
@@ -168,7 +169,7 @@ async def events_stream(request: Request):
         finally:
             bus.unsubscribe(q)
 
-    return StreamingResponse(gen(), media_type="text/event-stream", headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+    return StreamingResponse(gen(), media_type="text/event-stream", headers=STREAM_HEADERS)
 
 
 @app.websocket("/ws/events")

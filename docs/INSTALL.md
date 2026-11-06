@@ -16,9 +16,13 @@ uvicorn app.main:app --port 8000             # binds 127.0.0.1 by default
 
 # frontend (second shell)
 cd frontend
-npm install
-NEXT_PUBLIC_API_URL=http://localhost:8000 npm run build && npx next start -p 3000
+npm ci
+npm run build && node .next/standalone/server.js   # or simply: scripts/dev.sh --prod  (does all of this, health-checked)
 ```
+
+The browser talks only to the web server (port 3000), which proxies `/api` and `/health` to the backend
+(`BACKEND_URL`, default `http://127.0.0.1:8000`, read at build time). Phones and tablets: see
+[CROSS_PLATFORM.md](CROSS_PLATFORM.md).
 
 ## 2. Becoming admin
 
@@ -75,8 +79,10 @@ docker compose up --build         # LOCAL_AI=0 docker compose build  → image w
 docker compose exec api python -m app.cli create-admin --email you@example.com
 ```
 
-Ports are bound to **127.0.0.1** by default. To serve a LAN, put a TLS reverse proxy (Caddy, nginx) in front and set
-`CORS_ORIGINS` and `PUBLIC_API_URL` accordingly — do not expose the API port directly. Model weights and Archive files
+Ports are bound to **127.0.0.1** by default. For phones, tablets and other computers start the TLS proxy:
+`DK_SITE=dk.example.com docker compose --profile https up -d` (`deploy/Caddyfile`; `DK_SITE=localhost` uses Caddy's
+local CA). It routes `/api` straight to the backend with the real client IP and everything else to the web app — never
+expose the API port directly. The Caddy configuration has not been executed in the development environment yet. Model weights and Archive files
 live in the `models` and `archive` volumes; the `backup` service dumps PostgreSQL and the Archive daily (14-day
 retention). See [BACKUP_RECOVERY.md](BACKUP_RECOVERY.md).
 

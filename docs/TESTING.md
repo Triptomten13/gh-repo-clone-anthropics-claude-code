@@ -13,6 +13,12 @@
 | Independence | `python scripts/independence_test.py` | Tests A–G against a live server, real local models, network namespace for offline — see [INDEPENDENCE_TESTS.md](INDEPENDENCE_TESTS.md) |
 | Backup | `scripts/backup.sh` → `scripts/restore.sh` | round-trip, `--force` guard, tamper refusal (see BACKUP_RECOVERY.md) |
 | Performance | `python scripts/perf_bench.py --label <x> [--models] [--compare <baseline>]` | endpoint p50/p95, SQL per request, RSS, model load churn on a DB copy (+ synthetic rows in the copy only) — results in `docs/perf/` |
+| Frontend unit | `make test-unit` (Playwright runner, no browser) | live-stream frame parser, API client errors/timeouts/same-origin, formatters |
+| Device workflows | `make test-e2e` | sign-in/out, navigation (tab bar, drawer, back button, sidebar, Ctrl+K, skip link), Archive upload→search→delete, emergency stop, deterministic ask, G-sus chat, download, live feed, keyboard vs tab bar — desktop, iPad, iPhone 13, Pixel 7 (Chromium emulation) |
+| Responsive | `make test-responsive` | 27 pages × 11 sizes (320–1920 px, portrait + landscape): no sideways scroll, navigation reachable, no console errors; open-document/dialog/drawer states at 320 px |
+| Accessibility | `make test-a11y` | axe-core WCAG 2.0–2.2 A/AA on 10 pages, desktop + phone: no serious/critical violations |
+| PWA / offline | `make test-pwa` | Chrome installability, nothing from the API cached, server-down / device-offline / recovery behaviour |
+| Web performance | `make test-perf` | TTFB, FCP, LCP, CLS, INP estimate, JS size, DOM size, heap — desktop and throttled phone; budgets CLS ≤ 0.1, LCP ≤ 2.5 s / 4 s |
 | Archive retrieval | `python scripts/archive_bench.py --label <x> [--compare archive-baseline]` | search p50/p95 at 2k/10k/20k synthetic chunks (temp DB, fixed seed), cold build, first search after add/delete, RSS, and whether top-k is identical to the baseline — `docs/perf/archive-*.json` |
 | System benchmark | `python scripts/system_benchmark.py` | 13 scenarios (deterministic, small model, deep reasoning, research, multi-agent, semantic retrieval, large document, concurrency, low memory, offline, provider failure, network failure, crash recovery) with accuracy, latency, RSS peak, CPU, network bytes, tokens — `docs/benchmarks/` |
 | Routing | `POST /api/ai/evals/run` (suite `intel_routing`) + held-out set `evals/datasets/intel_routing_holdout.json` | strategy choice per request category |

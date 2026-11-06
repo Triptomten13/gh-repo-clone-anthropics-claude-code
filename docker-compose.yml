@@ -21,16 +21,29 @@ services:
       DATABASE_URL: postgresql+psycopg://rocky:${POSTGRES_PASSWORD:-rocky}@db/rocky
     depends_on:
       db: { condition: service_healthy }
+      # trust X-Forwarded-For only from inside the compose network (the https proxy); the port below is loopback-only
+      FORWARDED_ALLOW_IPS: "*"
     volumes: ["models:/app/data/models", "archive:/app/data/archive"]   # weights + uploaded documents survive rebuilds
-    ports: ["127.0.0.1:8000:8000"]   # loopback only by default; put a TLS reverse proxy in front for LAN access
+    ports: ["127.0.0.1:8000:8000"]   # loopback only; phones and other computers come in through the https service
 
   web:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+        BACKEND_URL: http://api:8000   # the web server proxies /api to this; the browser only ever talks to one origin
     depends_on: [api]
     ports: ["127.0.0.1:3000:3000"]
+
+  https:
+    # TLS for phones, tablets and other computers: `DK_SITE=dk.example.com docker compose --profile https up -d`
+    # (DK_SITE=localhost → Caddy's local CA). Config: deploy/Caddyfile — not executed in the dev environment yet.
+    image: caddy:2.10.2-alpine
+    profiles: ["https"]
+    depends_on: [web, api]
+    environment:
+      DK_SITE: ${DK_SITE:-localhost}
+    ports: ["80:80", "443:443"]
+    volumes: ["./deploy/Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data", "caddy_config:/config"]
 
   backup:
     # Daily logical backup into ./backups; dumps older than 14 days are pruned.
@@ -56,6 +69,8 @@ configs:
       done
 
 volumes:
+  caddy_data:
+  caddy_config:
   pgdata:
   models:
   archive:

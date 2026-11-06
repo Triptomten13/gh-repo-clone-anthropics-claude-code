@@ -2,6 +2,13 @@
 
 Short records of decisions that shape the system. Newest first.
 
+### D-021 · 2026-11-06 · One web app for every device: same-origin API, PWA, no wrapper
+Phones could not use the app at all (no navigation; API at a build-time `localhost`). Fix in the web app itself: the
+browser talks only to its own origin and the web server proxies to the backend; live events moved from WebSocket
+(502 through the proxy) to an HTTP event stream; installable as a PWA. No Electron/Tauri (nothing needs native APIs;
+a wrapper adds an update channel and attack surface) and no separate native app (one codebase, one API contract).
+Revisit for iOS background push or OS-level integration.
+
 ### D-020 · 2026-11-05 · In-process Archive index, not a vector database (yet)
 Measured: the per-query scan cost 0.45 s at 2 000 chunks and 5.9 s at 20 000. An in-memory index (BM25 postings + a
 float32 matrix, numpy) brings that to 3.8 / 22 ms with identical rankings and no new service to run, secure or back up.
