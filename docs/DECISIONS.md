@@ -2,6 +2,14 @@
 
 Short records of decisions that shape the system. Newest first.
 
+### D-024 · 2026-11-06 · Finish before adding: approved changes are applied by repeating the original request
+Owner's principle for this round: complete and connect what exists before building new features (docs/COMPLETION_AUDIT.md).
+A governed change is applied through `POST /api/approvals/{id}/apply`, which repeats the stored request through the
+ORIGINAL endpoint, so the caller's permission, the policy decision, payload binding, four eyes, expiry, single use and
+revocation are checked again — there is no second code path that could drift from the first. Search and the attention
+list reuse each module's own permission rule instead of a new one. Each setting keeps one home; the settings map only
+reads and links.
+
 ### D-023 · 2026-11-06 · Creative Tournament Mode on the existing router, with budgets and stop conditions first
 Multi-model creative work (candidates → independent critics → synthesis → targeted revision) is built on the existing
 router and policy: one per-model policy check shared with tier routing, `complete_on` for a chosen model, the platform's
