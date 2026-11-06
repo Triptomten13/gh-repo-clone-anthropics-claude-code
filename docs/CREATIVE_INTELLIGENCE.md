@@ -130,17 +130,85 @@ providers & health, and costs.
 | 17 | repeatable cross-provider comparison | `test_17_benchmarks_compare_models_reproducibly` |
 | 18 | works when a provider is unavailable | `test_18_the_workflow_keeps_working_when_a_provider_is_unavailable` |
 
-The tests use fake models with known behaviour (deterministic). The real run on this machine's models is in §7.
+The tests use fake models with known behaviour (deterministic). Further tests cover what the real runs (§7) exposed:
+brief echo, synthesizer chosen from round-1 evidence, like-for-like comparisons, no revision without budget to judge it,
+unreliable critics skipped, AUTOMATIC skipping a synthesis that has not paid off, unchanged synthesis/revision rejected
+without critic calls, template-echo critiques discarded, plus API governance and G-sus delegation (28 tests in total).
 
-## 7. Real run on local models
+## 7. Real runs on local models (2026-11-06)
 
-See §7 results below (filled from `docs/benchmarks/creative-2026-11-06.json`).
+Evidence: `docs/benchmarks/creative-2026-11-06.json` (every entry's text, rule checks, critiques, tokens and latency).
+Hardware: 4 vCPU Xeon @ 2.1 GHz, 15 GB RAM, no GPU; llama.cpp with GGUF models. No API model was used (no key here).
+
+### Benchmark (dataset `.2`, 10 tasks per model, rule-based scoring, 434 s for 4 models)
+
+| Model | Songs | Poetry | Names | Story | Business | Summary | Code | Song latency |
+|---|---|---|---|---|---|---|---|---|
+| Qwen3 4B | **0.75** | **0.79** | **0.94** | 0.89 | 0.80 | 0.87 | 0.97 | 21.7 s |
+| Qwen2.5 1.5B | 0.66 | 0.73 | 0.90 | **0.92** | **0.83** | **0.90** | **0.98** | 10.1 s |
+| Qwen2.5 0.5B | 0.43 | 0.71 | 0.82 | **0.92** | 0.82 | 0.87 | **0.98** | 7.4 s |
+| SmolLM2 360M | 0.49 | 0.47 | 0.60 | 0.83 | 0.76 | 0.87 | 0.88 | 7.2 s |
+
+With the first scoring (dataset `.1`) SmolLM2 scored 0.78 on songs, *above* Qwen3 4B, because it answered by repeating
+the brief and the rule checks found the brief's topic words and section labels in it. The echo check fixed that.
+
+### Tournament: a Swedish song (TOURNAMENT, target 0.90, budget 9 calls · 3 contestants · 2 critics · 1 revision)
+
+Brief: *"Skriv en låt på svenska om vinterns första snö i en liten norrländsk by. Två verser och en refräng … Gärna rim,
+inga klichéer."* Critics: Qwen3 8B and Qwen2.5 0.5B. Same brief and budget each time; the code improved between runs.
+
+| Run | Round-1 candidates (score) | Synthesis | Revision | Calls | Tokens | Time | Result | Stop |
+|---|---|---|---|---|---|---|---|---|
+| 1 | Qwen3 4B 0.81 · SmolLM2 0.51 · Qwen2.5 1.5B 0.45 | SmolLM2, rejected (0.55) | SmolLM2, rejected (−0.054) | 9 | 6 479 | 319 s | Qwen3 4B draft, 0.81 | diminishing returns |
+| 2 | Qwen3 4B 0.81 · Qwen2.5 1.5B 0.55 · SmolLM2 0.20 (echo) | Qwen3 4B, its own draft unchanged, rejected (0.73) | unchanged, rejected | 9 | 5 642 | 496 s | Qwen3 4B draft, 0.81 | diminishing returns |
+| 3 | Qwen3 4B 0.83 · Qwen2.5 1.5B 0.53 · SmolLM2 0.22 (echo) | Qwen3 4B, 4 lines changed, rejected (0.77) | not attempted: no budget left to judge it | **8** | 5 458 | 371 s | Qwen3 4B draft, 0.83 | no budget to judge a revision |
+
+Creative value per resource unit: 0.116 · 0.082 · 0.107. Gain per extra call after round 1: **0.0 in all three runs**.
+Every run ended below target with "human review suggested".
+
+### What the runs exposed, and what changed
+
+1. **Brief echo** (run 1): SmolLM2 copied the brief and the rule checks gave it full marks for topic and structure →
+   echo check, scoring version `.2`.
+2. **A weak synthesizer** (run 1): the inflated benchmark score made SmolLM2 synthesizer and reviser → the author of the
+   best round-1 candidate synthesizes and revises.
+3. **An unfair comparison** (run 2): the revision had no critic scores (budget spent) and its rule score was compared
+   with the draft's critic-boosted score → like-for-like comparison.
+4. **A revision that could not be judged** (run 2) → a revision is attempted only when the budget leaves room to judge
+   it. Run 3 stopped there and used 8 calls instead of 9 for the same result.
+5. **A critic that cannot critique**: the 0.5B critic returned nothing parseable in runs 1–2, and in run 3 its one
+   "usable" answer listed the prompt's example values ("exact quote", "specific problem") as weaknesses → critic
+   reliability is recorded per tournament (`usage.critics`), critics failing in ≥ 2 tournaments are skipped, and
+   template-echo critiques are discarded.
+6. **Unchanged "new" versions** (run 2): synthesis and revision returned the draft word for word and were judged again
+   → rejected without critic calls.
+7. **Critic noise**: the same critic (Qwen3 8B) gave the *identical* Qwen2.5 1.5B text 0.11 in run 1 and 0.38 in run 2
+   (the candidates were in a different order), and the identical Qwen3 4B text 0.89 as a candidate but 0.69 when it came
+   back as a "synthesis". That is why rule checks keep ≥ 60 % of the weight and why a model's score is never the only
+   evidence.
+
+### Honest conclusion
+
+* **On this machine, the tournament did not beat the best single model.** In all three runs every synthesis and
+  revision was rejected and the result was Qwen3 4B's first draft (0.81–0.83, below the 0.90 target). The lyrics follow
+  the structure but have no rhymes, and some phrases are not idiomatic Swedish ("i skumra vänner", "källarvända").
+  Small local models do not write good Swedish lyrics, and critics of the same size cannot reliably say why.
+* What the tournament did deliver: it chose the best of three drafts, caught the brief echo, stayed inside its budget,
+  and stopped honestly instead of claiming quality it did not reach.
+* **Cost**: 5–8 minutes and 5 500–6 500 tokens per tournament, against 26–29 s for Qwen3 4B's draft alone — 12–17× the
+  time for the same text. On this hardware, a single strong model (SINGLE) or COMPARISON is better value for songs. The engine learns this:
+  after 3 rejected syntheses by the same synthesizer in a category, AUTOMATIC stops synthesizing. Qwen3 4B has 2 rejected
+  songwriting syntheses so far.
+* **Not measured**: whether tournaments pay off with stronger contestants (Qwen3 8B as a writer, or API models). No API key
+  is configured here, and an 8B contestant would take several minutes per draft on this CPU.
 
 ## 8. Implementation status
 
 | Capability | Status | Notes |
 |---|---|---|
-| Creative Tournament (candidates, critics, synthesis, revision, budgets, stop conditions) | **IMPLEMENTED AND VERIFIED** | tests 4–7, 11, 14; real local run §7 |
+| Creative Tournament (candidates, critics, synthesis, revision, budgets, stop conditions) | **IMPLEMENTED AND VERIFIED** | tests 4–7, 11, 14; three real local runs §7 |
+| Better results from tournaments than from one model | **NOT DEMONSTRATED** | on local models (≤ 8B, CPU) no synthesis or revision beat the best draft in 3 real runs (§7); stronger models not measured |
+| Learning from earlier tournaments (critic reliability, synthesis track record) | **IMPLEMENTED AND VERIFIED** (tests); real effect not yet observed | needs more runs per category |
 | Provider selection with 10 routing modes + explanations | **IMPLEMENTED AND VERIFIED** | tests 1–3, 9, 18 |
 | Free-first with verified free tiers | **PARTIALLY IMPLEMENTED** | the logic is there; **no free tier is verified** in the registry, so "free" means local today |
 | External providers | **CONFIGURATION REQUIRED** | only the Anthropic adapter exists; never called live here (no key); others are discovered candidates without adapters |

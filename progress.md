@@ -14,13 +14,13 @@
 | **Cross-platform** (desktop, tablet, phone, installable PWA): same-origin API through the web server, live events over HTTP, mobile tab bar + page drawer, accessible dialogs, touch/keyboard/safe-area fixes, offline honesty, run scripts (`make dev`, `make dev-lan`, `scripts/health.sh`) | Playwright: unit, device workflows (desktop/iPad/iPhone/Android emulation), 27 pages × 11 sizes, axe, PWA, performance (docs/CROSS_PLATFORM.md); no physical device yet |
 | **Governed AI control plane** (docs/CONTROL_PLANE.md): policy decision/enforcement point with 5 approval categories and mandatory floors; approvals bound to arguments, expiring, single use, four eyes, revocable, delegable; governed governance changes; deny-by-default Tool Gateway (per agent/workflow/role/operation, user-bounded agents, scoped credentials, redaction, atomic budgets); Knowledge Vault classification + inherited collection access + verified deletion; classification-aware routing; runs + replay; release gates on prompt/model activation; model/tool budgets; AIR_GAPPED egress guard; 10 roles with separation of duties; hash-chained audit with triggers, verification, signed export, governed retention; runs/replay for tasks, Ask and G-sus runs; Governance & Audit page | `test_control_plane.py` (all 20 acceptance criteria), PostgreSQL smoke + concurrency checks, migrations 0006–0010 up/down/up on SQLite and PostgreSQL, Playwright (governance page on 4 devices, responsive + axe matrices) |
 | **Public launch** (docs/PUBLIC_LAUNCH.md): separate public demo (DEMO_MODE: temporary visitor sessions, sample data + sample vault, catalog-only workflows, action budgets, forced offline, setup disabled, scheduled reset), landing page, public status page, Demo Center with source labels, `/ready` `/api/version` `/api/status`, all-in-one image + start script, compose demo profile, Render Blueprint, manual deploy workflow, page CSP | demo suite 10/10 (local stack, image layout here, built container in CI), 15 backend tests, CI run 29 green incl. `demo-image`; **not deployed** (no hosting account here) |
+| **Creative Intelligence** (docs/CREATIVE_INTELLIGENCE.md): Creative Tournament Mode (candidates from several models, independent critics, synthesis, targeted revision, hard budgets, stop conditions), provider selection with 10 routing modes on the existing router, rule-based quality checks (≥ 60 % weight) + critics, versioned benchmark profiles with staleness, Creative Director agent, G-sus delegation, Creative Intelligence Center (`/creative`), migration 0011 | `test_creative.py` (18 acceptance criteria + 10 more), PostgreSQL smoke, Playwright (CI run 34), three real local-model runs: mechanics verified, but **no quality gain over the best single model** on this hardware (§7) |
 | DAEMON COST INTELLIGENCE: registry, credentials, routing, quota backoff, spend limits, caches, benchmarks, dashboard, proposals | `test_daemon.py`, real benchmark runs on two local models |
 | Backup / restore | round-trip + tamper refusal tested (docs/BACKUP_RECOVERY.md) |
 | Docs restructure | docs/ holds architecture, AI system, knowledge, agents, security, design system, decisions, testing, roadmap, DAEMON, cost, install, backup |
 
-Totals: 239 backend tests pass (also in a clean virtualenv); ruff clean; Playwright 77 passed, 4 skipped (Chromium) and
-62 passed, 4 skipped (WebKit + Firefox, CI); public demo suite 10/10; migrations 0001–0010 verified on SQLite and
-PostgreSQL; PostgreSQL smoke passes; Independence Tests A–G pass with real local models (2026-11-06T05:10Z).
+Totals: 267 backend tests pass; ruff clean; Playwright 81 passed, 4 skipped (Chromium, CI run 34) and WebKit + Firefox
+green (CI); public demo suite 10/10; migrations 0001–0011 verified on SQLite and PostgreSQL; PostgreSQL smoke passes; Independence Tests A–G pass with real local models (2026-11-06T05:10Z).
 CI was red from the cost-intelligence phase until 2026-11-06 (`cryptography` undeclared) — fixed; CI run 29 green.
 
 ## Measured facts worth remembering
@@ -32,6 +32,10 @@ CI was red from the cost-intelligence phase until 2026-11-06 (`cryptography` und
   fresh process); self-consistency (3 samples) outvoted it 2/3. Use `samples` + human review for consequential answers.
 * The 1.5B model once invented a fact about the company when asked offline; the identity prompt now limits what G-SUS
   may claim about itself.
+
+* Creative tournaments on local models (Swedish song, 3 runs): every synthesis and revision was rejected and the result
+  was always Qwen3 4B's draft (0.81–0.83) — 12–17× the time of the single draft for the same text. The same 8B critic
+  scored identical text 0.11 and 0.38 in two runs: model critics are noisy, rule checks carry ≥ 60 % of the score.
 
 * Archive search (retrieval only): 454 ms → 3.8 ms at 2 000 chunks, 5.9 s → 22 ms at 20 000, identical rankings
   (in-memory index, docs/perf/archive-*.json).
@@ -52,6 +56,9 @@ CI was red from the cost-intelligence phase until 2026-11-06 (`cryptography` und
   (one process; background work runs in threads).
 * Wikipedia rate-limits this host's shared egress IP intermittently (429/403 measured); research falls back to other
   sources and reports the failure instead of hiding it.
+* Creative Intelligence gaps (CREATIVE_INTELLIGENCE.md §8): no verified free tier, no external creative provider
+  exercised live, no image/audio/video generation, research-assisted creation not wired in, no human rating UI, quality
+  gain from tournaments not demonstrated on local models.
 * Archivum canon content — none exists in the repository; nothing is invented.
 * Control plane gaps (CONTROL_PLANE.md §5): no declarative workflow engine (workflows are code), SSO designed but not
   built, no OpenTelemetry export, no per-run RAM/energy attribution, no PDF audit report or trusted timestamps; the page

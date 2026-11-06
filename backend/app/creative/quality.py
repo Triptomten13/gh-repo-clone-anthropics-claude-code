@@ -209,8 +209,13 @@ def critic_prompt(brief: str, category: str, labelled: list[tuple[str, str]]) ->
     return system, prompt
 
 
+TEMPLATE_PLACEHOLDERS = {"exact quote", "specific problem"}  # the example values in critic_prompt's JSON shape
+
+
 def parse_critique(raw: str, labels: list[str], texts: dict[str, str], category: str) -> dict[str, dict[str, Any]]:
-    """Robust parse of a critic's JSON; scores clamped to 1..10 and normalised to 0..1; invented quotes dropped."""
+    """Robust parse of a critic's JSON; scores clamped to 1..10 and normalised to 0..1; invented quotes dropped.
+    A critique that only copies the prompt's example values ("exact quote", "specific problem") is discarded: the critic
+    filled in the template instead of reading the candidate (real run 3, a 0.5B critic), so its scores are not evidence."""
     dims = CRITIC_DIMENSIONS.get(category) or CRITIC_DIMENSIONS["general"]
     m = re.search(r"\{.*\}", raw or "", re.S)
     data: dict[str, Any] = {}
@@ -233,8 +238,11 @@ def parse_critique(raw: str, labels: list[str], texts: dict[str, str], category:
                 continue
         if not vals:
             continue
+        given = [str(x).strip().lower() for x in [*(d.get("best_lines") or []), *(d.get("weaknesses") or [])] if str(x).strip()]
         quotes = [q for q in (d.get("best_lines") or []) if isinstance(q, str) and q.strip() and q.strip().lower() in texts[lab].lower()][:3]
-        weak = [w for w in (d.get("weaknesses") or []) if isinstance(w, str) and w.strip()][:3]
+        weak = [w for w in (d.get("weaknesses") or []) if isinstance(w, str) and w.strip() and w.strip().lower() not in TEMPLATE_PLACEHOLDERS][:3]
+        if any(g in TEMPLATE_PLACEHOLDERS for g in given) and not quotes and not weak:
+            continue
         out[lab] = {"scores": vals, "score": round((sum(vals.values()) / len(vals) - 1) / 9, 4), "best_lines": quotes, "weaknesses": weak}
     return out
 

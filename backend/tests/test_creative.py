@@ -555,3 +555,17 @@ def test_an_unchanged_synthesis_or_revision_is_rejected_without_critic_calls(wor
     assert "unchanged" in t.stop_reason and t.result_entry_id not in (synth.id, rev.id)
     critiques = [c for c in local.calls if "=== CANDIDATE" in c["prompt"]]
     assert len(critiques) == 1  # only the round-1 candidates were judged
+
+
+def test_a_critique_that_only_fills_in_the_template_is_not_evidence():
+    """Real run 3: the 0.5B critic answered with the prompt's example values as its 'weaknesses'."""
+    from app.creative import quality as Q
+
+    texts = {"A": "Vers 1\nsnön faller tyst\nRefräng\nlyktan lyser"}
+    echo = json.dumps({"A": {"scores": {"originality": 7, "imagery": 8, "structure": 8, "language": 7, "adherence": 9},
+                             "best_lines": ["exact quote"], "weaknesses": ["exact quote", "specific problem"]}})
+    assert Q.parse_critique(echo, ["A"], texts, "songwriting") == {}
+    real = json.dumps({"A": {"scores": {"originality": 6, "imagery": 6, "structure": 7, "language": 6, "adherence": 8},
+                             "best_lines": ["lyktan lyser"], "weaknesses": ["specific problem", "refrängen är för kort"]}})
+    got = Q.parse_critique(real, ["A"], texts, "songwriting")["A"]
+    assert got["best_lines"] == ["lyktan lyser"] and got["weaknesses"] == ["refrängen är för kort"]
