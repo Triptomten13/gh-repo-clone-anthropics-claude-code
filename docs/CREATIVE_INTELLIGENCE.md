@@ -21,11 +21,17 @@ That is what `app/creative/tournament.py` does:
 3. **Critics** — up to 3 other models score every candidate in one call each, quote the best lines (quotes that do not
    occur in the text are dropped) and name weaknesses. **A critic never grades its own output.** Rule-based checks
    (structure, rhyme, language, topic, repetition, clichés, AI boilerplate, completeness, code syntax) count for 60 %.
-4. **Synthesis** — the strongest model writes ONE new version from the top candidates and the critics' notes. It is
-   **rejected** if it is a paste-up of candidates or scores below the best candidate — the result is never worse than
-   something already in hand.
-5. **Targeted revision** — only the named weaknesses are fixed; everything else is kept.
-6. **Stop** — quality target reached · call / token / USD budget would be exceeded · time limit · diminishing returns
+4. **Synthesis** — the author of the best round-1 candidate (evidence from this brief outranks a benchmark score) writes
+   ONE new version from the top candidates and the critics' notes. It is **rejected** if it is a candidate returned
+   unchanged or a paste-up of candidates (both without spending critic calls), or if it scores below the best candidate
+   — the result is never worse than something already in hand.
+5. **Targeted revision** — only the named weaknesses are fixed; everything else is kept. A revision is attempted only
+   when the budget leaves room to judge it; a revision that returns the text unchanged ends refinement without being
+   judged again. Scores are compared like for like: when one side has no critic scores, rule score vs rule score.
+6. **Learning from earlier tournaments** — a critic whose answers could not be parsed in ≥ 2 earlier tournaments of
+   the category is not chosen again (`plan.critics_excluded` says why), and in AUTOMATIC mode a synthesizer whose last
+   ≥ 3 syntheses for the category were all rejected is skipped: the tournament becomes a comparison.
+7. **Stop** — quality target reached · call / token / USD budget would be exceeded · time limit · diminishing returns
    (a round gains < `min_gain`, default 0.02) · rounds exhausted · no permitted model. The reason is stored and shown.
 
 **Hard caps** whatever is requested: 6 contestants, 3 critics, 4 revision rounds, 40 calls, 3 600 s, 200 000 tokens.
@@ -65,7 +71,10 @@ its cost and the budget allows it (tested both ways).
 
 * `app/creative/quality.py` — rubrics per category (songwriting, poetry, storytelling, brainstorming, business,
   programming, general). Deterministic share ≥ 0.5 (currently 0.6) so model opinions are never the only evidence.
-* `app/creative/perf.py` — a versioned dataset (`creative-bench-2026-11-06`) of Demonkoncernen tasks: Swedish and
+* Every output is also checked for **echoing the brief**: if ≥ 50 % of its 4-word phrases come from the brief, the
+  score is capped (×0.3) with the note "repeats the brief instead of answering it" (found in the first real run, §7).
+* `app/creative/perf.py` — a versioned dataset (`creative-bench-2026-11-06.2`; `.2` = scoring with the echo check, so
+  profiles measured with the old scoring are listed as due) of Demonkoncernen tasks: Swedish and
   English lyrics, poems, product names (pannier, hand-crank radio), a short story, business ideas (e-scooter
   batteries), a product summary, a Python function. Profiles are stored per model **version** and category with their
   conditions. A changed model file or API model id makes the profile **stale**: the selector discounts it (×0.85, marked)

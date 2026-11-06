@@ -245,6 +245,12 @@ def combine(det_score: float, critic_scores: list[float]) -> float:
     return round(DETERMINISTIC_WEIGHT * det_score + (1 - DETERMINISTIC_WEIGHT) * (sum(critic_scores) / len(critic_scores)), 4)
 
 
+def same_text(a: str, b: str) -> bool:
+    """True when two outputs differ only in whitespace, blank lines or letter case — a 'new' version that changed nothing."""
+    norm = lambda t: [" ".join(ln.lower().split()) for ln in _lines(t)]  # noqa: E731
+    return bool(norm(a)) and norm(a) == norm(b)
+
+
 def is_concatenation(synth: str, candidates: list[str]) -> bool:
     """A 'synthesis' that is two or more candidates pasted together is rejected."""
     s_lines = {ln.lower() for ln in _lines(synth)}

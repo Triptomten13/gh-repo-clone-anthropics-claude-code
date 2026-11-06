@@ -489,13 +489,18 @@ def execute(db: Session, t: Any, *, user: Any | None = None, agent_id: str | Non
             if isinstance(s, str):
                 stop = f"no synthesis: {s} would be exceeded"
             elif s.status == "ok":
-                judge([s])
-                if Q.is_concatenation(s.text, [x.text for x in top]):
-                    s.status, s.error = "rejected", "concatenation of candidates, not a synthesis"
-                elif _worse(s, best):  # the result is never worse than something already in hand
-                    s.status, s.error = "rejected", f"scored below the best candidate ({_cmp_note(s, best)})"
+                # rejected without spending critic calls when it is plainly not a new version
+                dup = next((x for x in top if Q.same_text(s.text, x.text)), None)
+                if dup is not None:
+                    s.status, s.error = "rejected", f"returned candidate #{dup.id} unchanged — not a new version (not sent to critics)"
+                elif Q.is_concatenation(s.text, [x.text for x in top]):
+                    s.status, s.error = "rejected", "concatenation of candidates, not a synthesis (not sent to critics)"
                 else:
-                    best = s
+                    judge([s])
+                    if _worse(s, best):  # the result is never worse than something already in hand
+                        s.status, s.error = "rejected", f"scored below the best candidate ({_cmp_note(s, best)})"
+                    else:
+                        best = s
                 obs.event("synthesis_decision", s.status, {"entry": s.id, "score": s.score, "best": best.id, "reason": s.error})
                 db.commit()
             if not stop and (best.score or 0) >= quality_target:
@@ -521,6 +526,12 @@ def execute(db: Session, t: Any, *, user: Any | None = None, agent_id: str | Non
                 break
             if r2.status != "ok":
                 stop = f"revision failed ({r2.error[:80]})"
+                break
+            if Q.same_text(r2.text, best.text):  # nothing changed: no critic calls for a text already judged
+                r2.status, r2.error = "rejected", "returned the text unchanged (not sent to critics)"
+                obs.event("refinement", "unchanged", {"entry": r2.id})
+                db.commit()
+                stop = "diminishing returns: the revision returned the text unchanged"
                 break
             judge([r2])
             gain = _gain(r2, best)

@@ -525,3 +525,33 @@ def test_a_revision_is_not_attempted_without_budget_to_judge_it(world):
     t = _run(world, strategy="ITERATIVE", budget={"max_calls": 3, "max_models": 1, "critics": 1, "max_rounds": 2}, quality_target=0.99)
     assert "judge a revision fairly" in t.stop_reason
     assert not [e for e in _entries(world["db"], t) if e.role == "revision"]
+
+
+def test_an_unchanged_synthesis_or_revision_is_rejected_without_critic_calls(world, monkeypatch):
+    """Real run 2: the synthesizer returned its own candidate word for word, and the same critic scored the identical text
+    0.89 and then 0.69. A text that is already judged is not judged again — that only buys noise."""
+    from app.creative import quality as Q
+
+    assert Q.same_text("Vers 1\nSnön  faller\n\n", "vers 1\nsnön faller") and not Q.same_text("a\nb", "a\nc") and not Q.same_text("", "")
+    local = world["local"]
+    real = local.complete
+
+    def lazy(*, model, system, prompt, schema, effort, max_tokens):  # the synthesizer hands back the top version unchanged
+        if "Several writers answered" in prompt:
+            from app.ai.providers import Completion
+
+            top = prompt.split("=== VERSION A (score", 1)[1].split(") ===\n", 1)[1].split("\nStrongest:", 1)[0]
+            local.calls.append({"model": model, "system": system, "prompt": prompt})
+            return Completion(top, None, local.id, model, 400, 120, 0.0, 5)
+        return real(model=model, system=system, prompt=prompt, schema=schema, effort=effort, max_tokens=max_tokens)
+
+    monkeypatch.setattr(local, "complete", lazy)
+    t = _run(world, strategy="TOURNAMENT", budget={"max_calls": 12, "max_models": 2, "critics": 1, "max_rounds": 2}, quality_target=0.99)
+    es = _entries(world["db"], t)
+    synth = next(e for e in es if e.role == "synthesis")
+    assert synth.status == "rejected" and "unchanged" in synth.error and not synth.critiques
+    rev = next(e for e in es if e.role == "revision")  # the fake reviser also returns the text unchanged
+    assert rev.status == "rejected" and "unchanged" in rev.error and not rev.critiques
+    assert "unchanged" in t.stop_reason and t.result_entry_id not in (synth.id, rev.id)
+    critiques = [c for c in local.calls if "=== CANDIDATE" in c["prompt"]]
+    assert len(critiques) == 1  # only the round-1 candidates were judged
