@@ -82,7 +82,12 @@ with TestClient(app) as c:
                                ("post", "/api/ai/ask", {"question": "25% of 480"}), ("post", "/api/ai/ask", {"question": "What does our archive say about Jerusalem?"}),
                                ("post", "/api/ai/plan", {"question": "Latest research on quantization"}),
                                ("post", "/api/monitors", {"name": "smoke monitor", "purpose": "smoke", "query": "llama", "sources": ["hn"]}),
-                               ("post", "/api/control/retention", None)]:
+                               ("post", "/api/control/retention", None),
+                               ("post", "/api/creative/select", {"brief": "Skriv en låt om snö med refräng", "mode": "FREE_FIRST"}),
+                               ("post", "/api/creative/tournaments", {"brief": "Write a haiku about rain", "wait": True}),
+                               ("get", "/api/creative/tournaments", None), ("get", "/api/creative/models", None),
+                               ("get", "/api/creative/providers", None), ("get", "/api/creative/costs", None),
+                               ("get", "/api/creative/discovery", None), ("get", "/api/creative/overview", None)]:
         r = getattr(c, method)(path, json=body) if body is not None else getattr(c, method)(path)
         print(f"{r.status_code} {method.upper()} {path}")
         if r.status_code != 200:

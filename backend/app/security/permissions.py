@@ -51,6 +51,11 @@ ACTION_LEVELS: dict[str, Level] = {
     "product.launch": Level.EXTERNAL_PUBLISH,
     "brand.launch": Level.EXTERNAL_PUBLISH,
     "asset.publish": Level.EXTERNAL_PUBLISH,
+    # creative intelligence (DAEMON CREATIVE INTELLIGENCE)
+    "creative.tournament": Level.DRAFTING,       # local / verified-free models, within budget: autonomous, recorded
+    "creative.benchmark": Level.ANALYSIS,
+    "providers.discover": Level.RESEARCH,        # list candidates; never makes them routable
+    "creative.tournament.paid": Level.EXTERNAL_PUBLISH,  # paid model spend above CREATIVE_AUTONOMOUS_USD: a human approves
     # financial (approval required)
     "ads.launch_campaign": Level.FINANCIAL,
     "ads.budget_change": Level.FINANCIAL,

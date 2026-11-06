@@ -48,7 +48,7 @@ APPROVAL_TTL_H = float(os.getenv("APPROVAL_TTL_HOURS", "72"))
 
 # governance actions an AGENT may never perform, whatever any rule says (spec §13)
 AGENT_PROHIBITED = ["policy.*", "tools.grant", "tools.revoke", "budget.*", "approval.*", "audit.*", "permissions.*", "users.*",
-                    "security.*", "deploy.*", "gates.*", "credentials.*"]
+                    "security.*", "deploy.*", "gates.*", "credentials.*", "providers.approve"]
 # never through the platform, for anyone
 PROHIBITED = ["audit.modify", "audit.delete", "permissions.self_grant", "budget.self_increase", "deploy.unreviewed",
               "policy.disable_mandatory"]
@@ -57,7 +57,8 @@ FLOORS = {"tool:*.DELETE": Category.APPROVAL_REQUIRED, "tool:*.EXECUTE.external"
           "tool:*.ADMINISTER": Category.RESTRICTED, "policy.*": Category.RESTRICTED, "tools.grant": Category.RESTRICTED,
           "tools.revoke": Category.SUPERVISED, "budget.*": Category.RESTRICTED, "gates.*": Category.RESTRICTED,
           "knowledge.reclassify": Category.SUPERVISED, "knowledge.declassify": Category.RESTRICTED,
-          "knowledge.delete": Category.APPROVAL_REQUIRED, "audit.prune": Category.RESTRICTED}
+          "knowledge.delete": Category.APPROVAL_REQUIRED, "audit.prune": Category.RESTRICTED,
+          "providers.approve": Category.RESTRICTED}  # making a provider routable is a governance change
 
 
 class PolicyDenied(Exception):

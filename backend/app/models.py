@@ -774,7 +774,7 @@ class LLMCall(Base):
 # THE ARCHIVE — knowledge, provenance, memory
 # =====================================================================================
 EVIDENCE_CLASSES = ("historical_fact", "primary_source", "religious_interpretation", "philosophical_theory", "scholarly_hypothesis",
-                    "speculative", "fiction_canon", "unclassified")
+                    "speculative", "fiction_canon", "model_generated", "unclassified")
 
 
 class Document(Base):
@@ -1280,6 +1280,81 @@ class SemanticCacheEntry(Base):
     hits: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+
+# =====================================================================================
+# DAEMON CREATIVE INTELLIGENCE — tournaments, their entries, model performance profiles
+# =====================================================================================
+class CreativeTournament(Base):
+    """One creative/intellectual task served by one or more models under a hard budget and explicit stop conditions."""
+    __tablename__ = "creative_tournaments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by: Mapped[str] = mapped_column(String(255), default="", index=True)  # user email, or agent:<id>
+    agent_id: Mapped[str] = mapped_column(String(64), default="")
+    workflow: Mapped[str] = mapped_column(String(96), default="")
+    brief: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(String(32), default="general", index=True)
+    language: Mapped[str] = mapped_column(String(8), default="en")
+    routing_mode: Mapped[str] = mapped_column(String(24), default="FREE_FIRST")
+    strategy: Mapped[str] = mapped_column(String(24), default="AUTOMATIC")
+    status: Mapped[str] = mapped_column(String(24), default="running", index=True)  # running|completed|stopped|failed|pending_approval
+    quality_target: Mapped[float] = mapped_column(Float, default=0.7)
+    budget: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    usage: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    plan: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # contestants, critics, synthesizer + why
+    stop_reason: Mapped[str] = mapped_column(Text, default="")
+    result_entry_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    final_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    alternatives: Mapped[list[Any]] = mapped_column(JSON, default=list)
+    classification: Mapped[str] = mapped_column(String(24), default="INTERNAL")
+    cache_key: Mapped[str] = mapped_column(String(64), default="", index=True)
+    trace_run_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    approval_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    saved_document_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class CreativeEntry(Base):
+    """One model output inside a tournament (candidate, synthesis or revision), with full provenance and its evaluation."""
+    __tablename__ = "creative_entries"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tournament_id: Mapped[int] = mapped_column(Integer, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    round: Mapped[int] = mapped_column(Integer, default=1)
+    role: Mapped[str] = mapped_column(String(16), default="candidate")  # candidate | synthesis | revision
+    model_id: Mapped[str] = mapped_column(String(160), default="")
+    provider: Mapped[str] = mapped_column(String(48), default="")
+    model_version: Mapped[str] = mapped_column(String(80), default="")
+    status: Mapped[str] = mapped_column(String(16), default="ok")  # ok | failed | rejected
+    error: Mapped[str] = mapped_column(Text, default="")
+    text: Mapped[str] = mapped_column(Text, default="")
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    deterministic: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # rule-based checks, never a model's opinion
+    critiques: Mapped[list[Any]] = mapped_column(JSON, default=list)  # [{critic_model, independent, scores, strengths, weaknesses}]
+    score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sources: Mapped[list[Any]] = mapped_column(JSON, default=list)  # entry ids a synthesis/revision was built from
+    prompt_hash: Mapped[str] = mapped_column(String(64), default="")
+    accepted: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class ModelProfile(Base):
+    """Task-specific performance of one model VERSION on one category — measured, with its conditions. Never marketing."""
+    __tablename__ = "model_profiles"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    model_id: Mapped[str] = mapped_column(String(160), index=True)  # provider:model
+    model_version: Mapped[str] = mapped_column(String(80), default="")
+    category: Mapped[str] = mapped_column(String(32), index=True)
+    score: Mapped[float] = mapped_column(Float, default=0.0)  # 0..1 on the category's reproducible tasks
+    metrics: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # per-dimension averages, latency, cost, reliability
+    tasks: Mapped[int] = mapped_column(Integer, default=0)
+    conditions: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # dataset version, max_tokens, hardware
+    source: Mapped[str] = mapped_column(String(24), default="benchmark")  # benchmark | tournament
+    measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
 # Archive index change tracking: every process that writes document_chunks must record change tokens (see knowledge/index.py)

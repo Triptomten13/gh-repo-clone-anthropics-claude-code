@@ -37,6 +37,7 @@ PERMISSIONS = {
     "models.manage": "model registry, routing, credentials",
     "system.configure": "offline / air-gap mode, deployment profile, budgets",
     "users.manage": "users and roles",
+    "creative.run": "run creative tournaments and benchmarks (within policy and budget)",
 }
 
 ROLES: dict[str, set[str]] = {
@@ -45,13 +46,13 @@ ROLES: dict[str, set[str]] = {
     "security_admin": {"audit.read", "audit.export", "audit.verify", "audit.retention", "policy.read", "policy.write", "approval.read",
                        "tools.read", "tools.grant", "runs.read", "knowledge.admin", "knowledge.read"},
     "system_admin": {"audit.read", "policy.read", "tools.read", "runs.read", "models.manage", "system.configure", "knowledge.read"},
-    "workflow_designer": {"policy.read", "workflow.design", "runs.read", "eval.run", "tools.read", "knowledge.read"},
-    "agent_developer": {"policy.read", "agent.develop", "runs.read", "eval.run", "tools.read", "knowledge.read"},
+    "workflow_designer": {"policy.read", "workflow.design", "runs.read", "eval.run", "tools.read", "knowledge.read", "creative.run"},
+    "agent_developer": {"policy.read", "agent.develop", "runs.read", "eval.run", "tools.read", "knowledge.read", "creative.run"},
     "operator": {"audit.read", "policy.read", "approval.read", "tools.read", "tools.invoke", "runs.read", "work.run",
-                 "eval.run", "knowledge.read", "knowledge.write"},
+                 "eval.run", "knowledge.read", "knowledge.write", "creative.run"},
     "approver": {"approval.read", "approval.decide", "policy.read", "runs.read", "knowledge.read"},
     "auditor": {"audit.read", "audit.export", "audit.verify", "policy.read", "approval.read", "tools.read", "runs.read"},
-    "user": {"work.run", "tools.invoke", "knowledge.read", "knowledge.write"},
+    "user": {"work.run", "tools.invoke", "knowledge.read", "knowledge.write", "creative.run"},
     "viewer": {"audit.read", "policy.read", "approval.read", "tools.read", "runs.read", "knowledge.read"},
     # public demo visitor (DEMO_MODE servers only, created by POST /api/demo/session — never assignable): read sample
     # data and run the approved sample workflows; no tools, approvals, uploads, settings or administration

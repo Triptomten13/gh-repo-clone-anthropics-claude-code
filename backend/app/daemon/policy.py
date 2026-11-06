@@ -92,33 +92,42 @@ def plan(tier: str, providers: dict[str, Any], *, sensitivity: str = "normal", p
         if (pid, model) in seen:
             continue
         seen.add((pid, model))
-        prov = providers.get(pid)
-        loc = provider_locality(pid, prov)
-        spec = registry.find(pid, model)
-        paid = bool(spec and (spec.input_usd_per_mtok or spec.output_usd_per_mtok))
-        rec = {"provider": pid, "model": model, "tier": tier, "locality": loc}
-        if loc == "external":
-            if offline:
-                excluded.append({**rec, "status": "excluded_offline"})
-                continue
-            if sensitivity in PRIVATE:
-                excluded.append({**rec, "status": "excluded_privacy"})
-                continue
-            if not st["external_allowed"]:
-                excluded.append({**rec, "status": "excluded_external_disabled"})
-                continue
-        elif loc == "lan" and sensitivity == "sensitive":
-            excluded.append({**rec, "status": "excluded_privacy"})
-            continue
-        if loc != "local" and sensitivity in LOCAL_ONLY:  # after the external/LAN rules, for every remaining non-local candidate
-            excluded.append({**rec, "status": "excluded_classification"})
-            continue
-        reason = quota.blocked_reason(pid)
-        if reason:
-            excluded.append({**rec, "status": "paused", "error": reason})
-            continue
-        out.append(Candidate(pid, model, loc, paid))
+        cand, why = check_candidate(pid, model, providers, sensitivity=sensitivity, tier=tier, offline=offline, st=st)
+        if why:
+            excluded.append(why)
+        else:
+            out.append(cand)
     return out, excluded
+
+
+def check_candidate(pid: str, model: str, providers: dict[str, Any], *, sensitivity: str = "normal", tier: str = "standard",
+                    offline: bool | None = None, st: dict[str, Any] | None = None) -> tuple[Candidate | None, dict | None]:
+    """The policy for ONE (provider, model): offline mode, privacy/classification, the external master switch and quota.
+    Used by tier routing (plan) and by agents that choose a specific model (DAEMON PROVIDER INTELLIGENCE) — the same
+    rules whichever way a model is chosen. Returns (candidate, None) or (None, exclusion record)."""
+    st = st or state.load()
+    if offline is None:
+        offline = bool(st["offline_mode"]) or (st.get("profile") or "").upper() == "OFFLINE"
+    prov = providers.get(pid)
+    loc = provider_locality(pid, prov)
+    spec = registry.find(pid, model)
+    paid = bool(spec and (spec.input_usd_per_mtok or spec.output_usd_per_mtok))
+    rec = {"provider": pid, "model": model, "tier": tier, "locality": loc}
+    if loc == "external":
+        if offline:
+            return None, {**rec, "status": "excluded_offline"}
+        if sensitivity in PRIVATE:
+            return None, {**rec, "status": "excluded_privacy"}
+        if not st["external_allowed"]:
+            return None, {**rec, "status": "excluded_external_disabled"}
+    elif loc == "lan" and sensitivity == "sensitive":
+        return None, {**rec, "status": "excluded_privacy"}
+    if loc != "local" and sensitivity in LOCAL_ONLY:  # after the external/LAN rules, for every remaining non-local candidate
+        return None, {**rec, "status": "excluded_classification"}
+    reason = quota.blocked_reason(pid)
+    if reason:
+        return None, {**rec, "status": "paused", "error": reason}
+    return Candidate(pid, model, loc, paid), None
 
 
 def max_tokens_cap(profile: str | None = None) -> int | None:

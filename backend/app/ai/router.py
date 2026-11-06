@@ -96,7 +96,7 @@ class LLMRouter:
 
     def complete(self, *, system: str, prompt: str, tier: str = "standard", schema: dict | None = None, max_tokens: int = 16000,
                  sensitivity: str = "normal", profile: str | None = None) -> RouterResult:
-        from ..daemon import policy, quota
+        from ..daemon import policy
 
         providers = self._all_providers()
         cands, excluded = policy.plan(tier, providers, sensitivity=sensitivity, profile=profile)
@@ -105,47 +105,76 @@ class LLMRouter:
             max_tokens = min(max_tokens, cap)
         attempts: list[dict] = list(excluded)
         for c_ in cands:
-            prov_id, model = c_.provider, c_.model
-            p = providers.get(prov_id)
-            rec = {"provider": prov_id, "model": model, "tier": tier, "locality": c_.locality}
-            if p is None or not p.configured():
-                attempts.append({**rec, "status": "not_configured"})
-                continue
-            br = self.breakers.setdefault(prov_id, Breaker())
-            if br.is_open():
-                attempts.append({**rec, "status": "circuit_open"})
-                continue
-            if c_.paid:
-                blocked = quota.spend_check(prov_id, policy.estimate_cost(prov_id, model, system, prompt, max_tokens))
-                if blocked:
-                    attempts.append({**rec, "status": "spend_blocked", "error": blocked})
-                    continue
-            t0 = time.monotonic()
-            try:
-                c = p.complete(model=model, system=system, prompt=prompt, schema=schema, effort=EFFORT_BY_TIER.get(tier, "medium"), max_tokens=max_tokens)
-            except LLMRefused as e:
-                br.ok()
-                attempts.append({**rec, "status": "refused", "error": str(e)[:300], "latency_ms": int((time.monotonic() - t0) * 1000)})
-                e.attempts = attempts  # type: ignore[attr-defined]
-                raise
-            except (ProviderUnavailable, RuntimeError) as e:
-                if quota.is_rate_limit(str(e)):
-                    wait = quota.note_rate_limited(prov_id)
-                    attempts.append({**rec, "status": "rate_limited", "error": f"{str(e)[:200]} — backing off {int(wait)}s",
-                                     "latency_ms": int((time.monotonic() - t0) * 1000)})
-                    continue
-                br.fail(str(e))
-                attempts.append({**rec, "status": "unavailable" if isinstance(e, ProviderUnavailable) else "error", "error": str(e)[:300],
-                                 "latency_ms": int((time.monotonic() - t0) * 1000)})
-                continue
-            br.ok(c.latency_ms)
-            quota.note_success(prov_id, c.input_tokens + c.output_tokens)
-            attempts.append({**rec, "status": "ok", "model": c.model, "input_tokens": c.input_tokens, "output_tokens": c.output_tokens,
-                             "cost_usd": c.cost_usd, "latency_ms": c.latency_ms})
-            return RouterResult(c.text, c.data, c.model, c.input_tokens, c.output_tokens, c.cost_usd, c.provider, c.latency_ms, attempts,
-                                getattr(c, "reasoning", ""), getattr(c, "reasoning_truncated", False))
+            r = self._attempt(c_, providers, attempts, system=system, prompt=prompt, tier=tier, schema=schema, max_tokens=max_tokens)
+            if r is not None:
+                return r
         raise LLMUnavailable(f"no provider could serve tier '{tier}' "
                              f"({'; '.join(a['provider'] + ':' + a['status'] for a in attempts) or 'none configured'})", attempts)
+
+    def complete_on(self, provider: str, model: str, *, system: str, prompt: str, schema: dict | None = None, max_tokens: int = 2048,
+                    sensitivity: str = "normal", tier: str = "standard") -> RouterResult:
+        """Run ONE chosen (provider, model) — an agent's own model choice (DAEMON PROVIDER INTELLIGENCE). The same policy
+        (offline, privacy/classification, external switch, quota), breaker, rate-limit and spend checks as tier routing;
+        no silent fallback: the caller decides what to try next."""
+        from ..daemon import policy
+
+        providers = self._all_providers()
+        cand, why = policy.check_candidate(provider, model, providers, sensitivity=sensitivity, tier=tier)
+        if why:
+            raise LLMUnavailable(f"{provider}:{model} not permitted ({why['status']})", [why])
+        cap = policy.max_tokens_cap()
+        if cap:
+            max_tokens = min(max_tokens, cap)
+        attempts: list[dict] = []
+        r = self._attempt(cand, providers, attempts, system=system, prompt=prompt, tier=tier, schema=schema, max_tokens=max_tokens)
+        if r is None:
+            raise LLMUnavailable(f"{provider}:{model} could not serve ({attempts[-1]['status'] if attempts else 'unknown'})", attempts)
+        return r
+
+    def _attempt(self, c_: Any, providers: dict[str, Provider], attempts: list[dict], *, system: str, prompt: str, tier: str,
+                 schema: dict | None, max_tokens: int) -> RouterResult | None:
+        """One candidate: returns the result, or records why it could not serve and returns None. Refusals raise."""
+        from ..daemon import policy, quota
+
+        prov_id, model = c_.provider, c_.model
+        p = providers.get(prov_id)
+        rec = {"provider": prov_id, "model": model, "tier": tier, "locality": c_.locality}
+        if p is None or not p.configured():
+            attempts.append({**rec, "status": "not_configured"})
+            return None
+        br = self.breakers.setdefault(prov_id, Breaker())
+        if br.is_open():
+            attempts.append({**rec, "status": "circuit_open"})
+            return None
+        if c_.paid:
+            blocked = quota.spend_check(prov_id, policy.estimate_cost(prov_id, model, system, prompt, max_tokens))
+            if blocked:
+                attempts.append({**rec, "status": "spend_blocked", "error": blocked})
+                return None
+        t0 = time.monotonic()
+        try:
+            c = p.complete(model=model, system=system, prompt=prompt, schema=schema, effort=EFFORT_BY_TIER.get(tier, "medium"), max_tokens=max_tokens)
+        except LLMRefused as e:
+            br.ok()
+            attempts.append({**rec, "status": "refused", "error": str(e)[:300], "latency_ms": int((time.monotonic() - t0) * 1000)})
+            e.attempts = attempts  # type: ignore[attr-defined]
+            raise
+        except (ProviderUnavailable, RuntimeError) as e:
+            if quota.is_rate_limit(str(e)):
+                wait = quota.note_rate_limited(prov_id)
+                attempts.append({**rec, "status": "rate_limited", "error": f"{str(e)[:200]} — backing off {int(wait)}s",
+                                 "latency_ms": int((time.monotonic() - t0) * 1000)})
+                return None
+            br.fail(str(e))
+            attempts.append({**rec, "status": "unavailable" if isinstance(e, ProviderUnavailable) else "error", "error": str(e)[:300],
+                             "latency_ms": int((time.monotonic() - t0) * 1000)})
+            return None
+        br.ok(c.latency_ms)
+        quota.note_success(prov_id, c.input_tokens + c.output_tokens)
+        attempts.append({**rec, "status": "ok", "model": c.model, "input_tokens": c.input_tokens, "output_tokens": c.output_tokens,
+                         "cost_usd": c.cost_usd, "latency_ms": c.latency_ms})
+        return RouterResult(c.text, c.data, c.model, c.input_tokens, c.output_tokens, c.cost_usd, c.provider, c.latency_ms, attempts,
+                            getattr(c, "reasoning", ""), getattr(c, "reasoning_truncated", False))
 
     def stream(self, *, system: str, prompt: str, tier: str = "standard", max_tokens: int = 16000, sensitivity: str = "normal",
                profile: str | None = None) -> Iterator[str]:
