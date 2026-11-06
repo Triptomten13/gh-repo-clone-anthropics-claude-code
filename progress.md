@@ -1,4 +1,4 @@
-# Progress — current state (2026-11-05)
+# Progress — current state (2026-11-06)
 
 ## Done and verified
 
@@ -12,13 +12,14 @@
 | **Local deep reasoning** (owner decision: deep reasoning required, Swedish not): Qwen3 4B in a `deep` slot, two-phase thinking with a budget, incomplete reasoning flagged, working notes kept apart, self-consistency voting, Chamber → Deep reasoning | benchmark 17/17 (deep reasoning 7/7 vs 1–2/7 for the small models); Independence Tests A (self-consistency) and B (offline) solve multi-step problems |
 | **DAEMON HYPERINTELLIGENCE**: audit + baseline, telemetry, memory-aware residency + resource modes, rules-first orchestrator (`/api/ai/ask`), deterministic solvers, L1/L2/L3/L4 caches, internet research (10 official sources, QUICK/STANDARD/DEEP, citations, contradictions), monitors, retention, Performance Engineering Agent, delegation report, Control Center + Research pages | `test_hyper.py`, measured before/after (docs/HYPERINTELLIGENCE.md §3), routing eval 30/30 + held-out 12/12, 13-scenario system benchmark |
 | **Cross-platform** (desktop, tablet, phone, installable PWA): same-origin API through the web server, live events over HTTP, mobile tab bar + page drawer, accessible dialogs, touch/keyboard/safe-area fixes, offline honesty, run scripts (`make dev`, `make dev-lan`, `scripts/health.sh`) | Playwright: unit, device workflows (desktop/iPad/iPhone/Android emulation), 27 pages × 11 sizes, axe, PWA, performance (docs/CROSS_PLATFORM.md); no physical device yet |
+| **Governed AI control plane** (docs/CONTROL_PLANE.md): policy decision/enforcement point with 5 approval categories and mandatory floors; approvals bound to arguments, expiring, single use, four eyes, revocable, delegable; governed governance changes; deny-by-default Tool Gateway (per agent/workflow/role/operation, user-bounded agents, scoped credentials, redaction, atomic budgets); Knowledge Vault classification + inherited collection access + verified deletion; classification-aware routing; runs + replay; release gates on prompt/model activation; model/tool budgets; AIR_GAPPED egress guard; 10 roles with separation of duties; hash-chained audit with triggers, verification, signed export, governed retention; Governance & Audit page | `test_control_plane.py` (all 20 acceptance criteria), PostgreSQL smoke + concurrency checks, migrations 0006–0009 up/down/up on SQLite and PostgreSQL, Playwright (governance page on 4 devices, responsive + axe matrices) |
 | DAEMON COST INTELLIGENCE: registry, credentials, routing, quota backoff, spend limits, caches, benchmarks, dashboard, proposals | `test_daemon.py`, real benchmark runs on two local models |
 | Backup / restore | round-trip + tamper refusal tested (docs/BACKUP_RECOVERY.md) |
 | Docs restructure | docs/ holds architecture, AI system, knowledge, agents, security, design system, decisions, testing, roadmap, DAEMON, cost, install, backup |
 
-Totals: 173 backend tests pass; ruff clean; frontend type-checks and builds (30 routes); migrations 0001–0005 verified
-upgrade/downgrade/upgrade on SQLite and PostgreSQL; PostgreSQL smoke passes; Independence Tests A–G pass
-(2026-11-05T20:27Z, after the HYPERINTELLIGENCE changes).
+Totals: 221 backend tests pass; ruff clean; frontend type-checks and builds; Playwright 72 passed, 4 skipped
+(device-conditional); migrations 0001–0009 verified upgrade/downgrade/upgrade on SQLite and PostgreSQL; PostgreSQL
+smoke passes; Independence Tests A–G pass with real local models (2026-11-06T05:10Z, after the control-plane changes).
 
 ## Measured facts worth remembering
 
@@ -48,6 +49,9 @@ upgrade/downgrade/upgrade on SQLite and PostgreSQL; PostgreSQL smoke passes; Ind
 * Wikipedia rate-limits this host's shared egress IP intermittently (429/403 measured); research falls back to other
   sources and reports the failure instead of hiding it.
 * Archivum canon content — none exists in the repository; nothing is invented.
+* Control plane gaps (CONTROL_PLANE.md §5): no declarative workflow engine (workflows are code), SSO designed but not
+  built, G-sus runs not yet unified into the run/trace model, no OpenTelemetry export, no per-run RAM/energy
+  attribution, no PDF audit report or trusted timestamps, no Content-Security-Policy on the web pages yet.
 
 ## Next sensible steps
 

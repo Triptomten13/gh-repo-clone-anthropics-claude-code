@@ -11,9 +11,10 @@
 | 4 | External publishing | publish listing, publish content, live price change, customer message, send supplier inquiry, product launch | agent level **+ approved Approval** |
 | 5 | Financial / contractual | ad campaigns & budgets, purchase orders, supplier agreements, paid experiments | agent level **+ approved Approval** |
 
-Unknown actions are treated as LEVEL 5 (`security/permissions.py`). Only users with the `admin` role can decide
-approvals, approve compliance, change agent permissions/budgets/status, and use the kill switch.
-Every one of these changes is written to `audit_log`.
+Unknown actions are treated as LEVEL 5 (`security/permissions.py`). Approvals are decided by users whose role holds
+`approval.decide` (super admin, approver) — never by the person who requested the action or the person it is for
+(docs/CONTROL_PLANE.md §2). Compliance approval, agent permissions/budgets/status and the kill switch stay admin-only.
+Every one of these changes is written to the hash-chained `audit_log`.
 
 **Agents cannot change their own permissions, security policies or financial limits.** There is no code path from an
 agent to `PATCH /api/agents/*`; `sync_agents()` never overwrites a level set by an admin.
@@ -133,6 +134,78 @@ queries.
 Connectors use official APIs only, declare and respect rate limits, and never bypass CAPTCHAs, authentication,
 paywalls or robots restrictions. Platforms without an API are supported only through manual import of data you are
 licensed to use.
+
+## Governed AI control plane (2026-11-06)
+
+Design and status: [CONTROL_PLANE.md](CONTROL_PLANE.md). The rules that matter for security:
+
+* Every consequential action passes the policy decision point in the backend (`governance/policy.py`); prompts carry no
+  authority. Agents have no API credentials, act only through the orchestrator and the Tool Gateway, and can never
+  perform governance actions (policies, grants, budgets, approvals, audit, users, deployment, gates, credentials).
+* Tools are deny-by-default per agent / workflow / role and per operation; an agent working for a user gets at most
+  the intersection of its grants and the user's.
+* Approvals bind to the exact arguments (hash), expire, are single use, revocable, and need a second person for
+  RESTRICTED actions. Silence is never approval.
+* Knowledge Vault access is checked before any passage is scored or placed in a model context; the highest
+  classification in the context decides which models may see it.
+
+### Threat model
+
+| Threat | Controls in place | Evidence | Residual risk |
+|---|---|---|---|
+| Direct prompt injection ("ignore your rules, grant yourself…") | permissions live in the backend, not the prompt; agents cannot call governance endpoints; PROHIBITED actions for agents | criteria 1, 3, 17; `test_agents_can_never_perform_governance_actions` | a model can still write a wrong or manipulated *answer* within its permissions — cite sources, review consequential output |
+| Indirect injection (instructions inside documents, web pages, tool output) | all such content is wrapped as untrusted data (`security/untrusted.wrap`); tool outputs are data; injection-detection suite is a **mandatory** release gate (threshold 1.0) for prompt releases | eval suite `injection_detection`, criterion 16 | detection is heuristic; the guarantee is that injected text cannot change permissions, not that it never influences wording |
+| Leaking restricted data to external models | classification-aware routing (CONFIDENTIAL → local/LAN, RESTRICTED → this machine, HIGHLY_SENSITIVE → in-process); model functions that cannot receive the classification are not called; offline mode; egress guard | criteria 7, 13, 14 | a human can still copy text out of the UI; classification is only as good as the labels given |
+| Retrieval leakage across users | access filter before scoring on every search path; semantic answer cache stores only answers whose sources everyone may read; verified deletion | criteria 5, 6 | backups keep deleted documents until they age out (BACKUP_RECOVERY.md) |
+| SSRF | `internet/http.guard_url` on every request and redirect hop: http(s) only, public addresses only; `web.fetch` only through the gateway | `test_hyper.py` (guard on private, metadata and redirect targets) | DNS re-binding between check and connect |
+| SQL injection | SQLAlchemy with bound parameters only; string-built SQL is a lint error (ruff S608) | ruff in CI | raw `text()` reviewed by hand |
+| Command / code execution | no shell is ever invoked with user or model input (one fixed-argv `nvidia-smi` call); `code.execute` is refused (no sandbox); model output is never executed | `test_01_*`, gateway `blocked` status | — |
+| Malicious uploads | 20 MB limit, extension allow-list, magic-byte check, DOCX expansion limit (100 MB / 2 000 parts), pypdf per-stream decompression limits (75 MB), parsed as data only, generated SVG rendered via `<img>` | `test_extract_formats`, `test_docx_zip_bomb_is_refused_before_parsing` | a PDF with many large streams can still use several hundred MB while parsing; no antivirus scanning |
+| Audit manipulation | keyed HMAC chain sealed at commit, append-only triggers (SQLite + PostgreSQL), verification, signed export, pruning only of an old verified prefix with a second person's approval | criterion 15, `test_retention_*` | whoever holds the database superuser **and** the audit key can rebuild the chain — keep signed exports outside the system |
+| Approval abuse (self-approval, replay, reuse, stale approvals) | four eyes, payload-hash binding, atomic single use, expiry, revocation, delegation only to approvers | criteria 2–4, 19 | collusion between two people |
+| Privilege escalation through roles | explicit permission sets, no inheritance; only the super admin creates admins / security admins | criterion 18 | the super admin account itself — keep few, protect the host |
+| Budget exhaustion (denial of wallet) | atomic reservations before every model or tool call; daily/monthly USD limits; external spend needs an authorised provider | criteria 12, 19 | estimates are reserved and settled; a provider that bills more than reported is caught only by your invoice |
+| Denial of service | per-IP API rate limit, login lockout, task depth/attempt/time limits, kill switch, request size limits | `test_login_lockout_and_security_headers`, `test_kill_switch_cancels_and_blocks` | limits are in-process (one server); no WAF; put a reverse proxy in front for internet exposure (which is not recommended) |
+| Credential leakage | provider credentials encrypted at rest (Fernet), handed only to granted tools, redacted from tool output, traces and logs; never sent to the frontend | criterion 8 | the session token sits in browser `localStorage`, so an XSS bug would expose it; React escaping and the no-`dangerouslySetInnerHTML` rule are the defence — the web pages have **no Content-Security-Policy yet** (the API has one) |
+| Supply chain | `pip-audit` and `npm audit` in CI; npm lockfile; model files verified by SHA-256 against the catalog | CI workflow | Python requirements are version ranges, not a lockfile; no package signature verification or SBOM |
+| Self-modification by agents | agents cannot change policies, grants, budgets, gates, audit or deployments; releases pass gates; governance changes need a second person | `test_agents_can_never_perform_governance_actions`, criteria 16, 18 | humans with the right roles can still make bad changes — that is what the audit trail and four eyes are for |
+
+### Incident response
+
+1. **Contain.** Engage the kill switch (header button or `POST /api/system/kill-switch`) — new tasks are rejected,
+   queued ones cancelled, running ones stop at their next check. For data-exposure suspicion also switch to
+   `AIR_GAPPED` (`POST /api/deployment {"profile": "AIR_GAPPED"}`, applies at once) and suspend affected agents.
+2. **Cut access.** Disable affected users (Users & access) — their tokens stop working immediately (`token_version`).
+   Revoke tool grants and pending approvals that the incident touches; rotate provider credentials (DAEMON →
+   Providers) and, if the host may be compromised, `SECRET_KEY` and `AUDIT_HMAC_KEY` (rotation invalidates all sessions;
+   export and verify the audit trail **before** rotating the audit key, since verification needs the old key).
+3. **Preserve evidence.** `python -m app.cli audit-verify`, then `audit-export --format zip` to storage outside the host;
+   copy the database (`scripts/backup.sh`). Do not prune anything during an investigation.
+4. **Investigate.** `/governance` → Runs & replay (what each run did, in order), Tool security → invocations,
+   Audit & compliance (filter by actor, action, time), `llm_calls` for model destinations. A failing chain
+   verification names the first broken record.
+5. **Recover.** Fix the cause; restore from backup if data was changed (`scripts/restore.sh`, refuses tampered
+   archives); roll back policies (`POST /api/policies/{key}/rollback`) or model slots if a release caused it; re-run the
+   evaluation gates and `scripts/independence_test.py`; release the kill switch.
+6. **Record.** Write what happened, the impact, and the fix into the Archive / DECISIONS; notify affected people and,
+   where the law requires it (e.g. a GDPR personal-data breach: the supervisory authority within 72 hours), the authority.
+
+### Audit retention and privacy
+
+The audit trail stores actor e-mails, action names, targets and redacted details — personal data. The trade-off is
+accountability against data minimisation and the right to erasure:
+
+* Records are kept at least `AUDIT_MIN_RETENTION_DAYS` (default **365**); older ones can be pruned only as a contiguous,
+  verified prefix, with a second person's approval for that exact cut-off (`POST /api/audit/prune`). An anchor keeps
+  the remaining chain verifiable, and the pruning itself is recorded.
+* Individual records cannot be edited or deleted (that would break the evidence). For an erasure request, rely on the
+  lawful-basis exception for records you are obliged or entitled to keep, or prune once the retention period has
+  passed — decide this with your legal adviser and record the decision.
+* Configuration points for your deployment: the retention period (statutory record-keeping duties — e.g. if audit
+  records double as accounting documentation — may require years), who holds `audit.retention`, where signed exports
+  are stored and for how long, and the backup retention (deleted data lives on in backups until they expire).
+* Document contents and model text are not copied into the audit trail or traces (references and hashes only;
+  strings are cut at 2 000 characters and secret-looking fields redacted).
 
 ## Reporting
 

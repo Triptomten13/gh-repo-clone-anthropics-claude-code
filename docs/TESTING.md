@@ -4,6 +4,7 @@
 |---|---|---|
 | Lint | `cd backend && ruff check .` | style, bugs, security rules (bandit subset) |
 | Backend unit + API | `cd backend && python -m pytest -q` | engines, orchestrator governance, AI router/fallback/refusal, Archive, memory screening, canon, G-sus, security primitives, admin access, DAEMON policy/offline/privacy/spend/quota, cache, credentials, model library, prompts, tools, internal AI API, benchmarks, optimiser, crash recovery — with stub providers, no model files needed |
+| Control plane | `cd backend && python -m pytest tests/test_control_plane.py` | the 20 acceptance criteria (grants, approvals, self-approval, expiry, Vault access, deletion, classification routing, credentials, audit of tool calls, traces, retry/escalation, budgets under concurrency, fallback, air-gap egress, tamper detection, release gates, user-bounded agents, role permissions, concurrent approval use, rollback) — mapping in CONTROL_PLANE.md §5 |
 | PostgreSQL | `DATABASE_URL=postgresql+psycopg://… python scripts/pg_smoke.py` (empty DB) | migrations to head + main and DAEMON endpoints + evals on PostgreSQL (JSON/SQL portability) |
 | Migrations | `alembic upgrade head && alembic downgrade 0003 && alembic upgrade head` | reversible migration 0004 (run on SQLite and PostgreSQL) |
 | Frontend | `cd frontend && npx tsc --noEmit && npx next build` | types, build of every route |

@@ -57,7 +57,7 @@ FLOORS = {"tool:*.DELETE": Category.APPROVAL_REQUIRED, "tool:*.EXECUTE.external"
           "tool:*.ADMINISTER": Category.RESTRICTED, "policy.*": Category.RESTRICTED, "tools.grant": Category.RESTRICTED,
           "tools.revoke": Category.SUPERVISED, "budget.*": Category.RESTRICTED, "gates.*": Category.RESTRICTED,
           "knowledge.reclassify": Category.SUPERVISED, "knowledge.declassify": Category.RESTRICTED,
-          "knowledge.delete": Category.APPROVAL_REQUIRED}
+          "knowledge.delete": Category.APPROVAL_REQUIRED, "audit.prune": Category.RESTRICTED}
 
 
 class PolicyDenied(Exception):

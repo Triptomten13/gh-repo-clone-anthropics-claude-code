@@ -8,6 +8,10 @@ import re
 from dataclasses import dataclass, field
 
 MAX_BYTES = 20 * 1024 * 1024
+# DOCX is a ZIP container: bound what it may expand to before python-docx reads it (zip bombs). Python's zipfile
+# stops each member at its declared size, so checking the declared sizes bounds memory.
+DOCX_MAX_UNCOMPRESSED = 100 * 1024 * 1024
+DOCX_MAX_MEMBERS = 2000
 TYPES = {  # extension -> (doc_type, mime)
     ".txt": ("txt", "text/plain"), ".md": ("markdown", "text/markdown"), ".markdown": ("markdown", "text/markdown"),
     ".csv": ("csv", "text/csv"), ".json": ("json", "application/json"), ".pdf": ("pdf", "application/pdf"),
@@ -100,8 +104,16 @@ def extract(filename: str, data: bytes) -> Extracted:
         notes = [] if text.strip() else ["no extractable text (scanned PDF?) — OCR is not available"]
         return Extracted(doc_type, mime, text, pages, notes)
     if doc_type == "docx":
+        import zipfile
+
         import docx
 
+        try:
+            members = zipfile.ZipFile(io.BytesIO(data)).infolist()
+        except zipfile.BadZipFile as e:
+            raise ExtractionError("unreadable DOCX: not a valid ZIP container") from e
+        if len(members) > DOCX_MAX_MEMBERS or sum(m.file_size for m in members) > DOCX_MAX_UNCOMPRESSED:
+            raise ExtractionError(f"DOCX expands beyond the allowed {DOCX_MAX_UNCOMPRESSED // 2**20} MB / {DOCX_MAX_MEMBERS} parts — refused")
         try:
             d = docx.Document(io.BytesIO(data))
         except Exception as e:  # noqa: BLE001

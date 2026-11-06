@@ -56,12 +56,24 @@ def audit_export(fmt: Literal["json", "csv", "zip"] = "zip", since: datetime | N
 
 class PruneIn(BaseModel):
     before: datetime
+    approval_id: int | None = None
 
 
 @router.post("/audit/prune")
 def audit_prune(p: PruneIn, db: Session = Depends(get_db), user: User = Depends(require_permission("audit.retention"))):
+    """Destroying evidence is RESTRICTED: a second person approves this exact cut-off, and the minimum retention age
+    always applies."""
+    before = p.before if p.before.tzinfo else p.before.replace(tzinfo=UTC)
     try:
-        out = audit_chain.prune(db, p.before, user.email)
+        audit_chain.check_retention(before)
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    blocked = _governed(db, user, "audit.prune", {"before": before.isoformat()}, p.approval_id,
+                        f"Prune audit records created before {before.isoformat()}")
+    if blocked:
+        return blocked
+    try:
+        out = audit_chain.prune(db, before, user.email)
     except ValueError as e:
         raise HTTPException(409, str(e)) from e
     db.commit()

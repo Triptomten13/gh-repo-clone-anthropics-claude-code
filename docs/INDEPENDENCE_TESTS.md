@@ -1,6 +1,6 @@
 # Independence Tests A–G — actual results
 
-Run: `python scripts/independence_test.py`. Latest run: 2026-11-05 21:23 UTC (after the Archive index and the research SSRF guard) — **all 7 tests passed**.
+Run: `python scripts/independence_test.py`. Latest run: 2026-11-06 05:10 UTC (after the governed control plane: policy engine, Tool Gateway, Vault access, classification routing, egress guard, roles) — **all 7 tests passed**.
 Raw output with every check's evidence: [independence_results.json](independence_results.json); every run, including
 failed ones, is kept in [independence_runs/](independence_runs/).
 
@@ -31,6 +31,7 @@ the loopback interface exists. The test first proved that `huggingface.co` and `
 | 16:59 | A failed, 6/7 | First run with deep-reasoning checks. A's single-sample answer to the margin problem was wrong; the evidence then kept only the first 160 characters. `…T1659-deep-run1-A-failed.json` |
 | 17:10 | A failed, 6/7 | Same failure, now with the full answer captured: the model counted the marketplace's 40 SEK cut as *income* and answered **−40**. Identical output to 16:59 — a fresh process starts from the same sampling seed. In a separate process the same prompt was answered correctly (80) twice. `…T1710-deep-run2-A-failed-answer-minus40.json` |
 | 17:26 | **7/7 passed** | Test A's deep check switched to **self-consistency** (`samples: 3`), the mode now recommended for answers that matter (decision D-015). The check still requires the exact answer 80. The first sample was again −40; the next two were 80 → majority 80. Test B's deep check stayed single-sample and passed. |
+| 11-06 05:10 | **7/7 passed** | After the governed control plane (classification routing, egress guard in offline mode, Tool Gateway, RBAC). Test A 373 s, B 81 s (network namespace). `…2026-11-06T0510-after-control-plane.json` |
 
 ## What these results do and do not mean
 

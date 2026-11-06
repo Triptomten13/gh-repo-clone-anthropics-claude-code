@@ -41,6 +41,7 @@ division for survival, tactical, outdoor and e-mobility products. See [ROCKY_FLA
 | Admin access: first-run setup, `python -m app.cli`, Users & access UI | ✅ tested |
 | DAEMON HYPERINTELLIGENCE: rules-first orchestrator, deterministic solvers, multi-layer caches, internet research over official APIs with citations, monitors, telemetry, memory-aware model residency, Control Center | ✅ tested; measured before/after in docs/HYPERINTELLIGENCE.md |
 | Local deep reasoning: Qwen3 4B reasoning model (deep tier), thinking budget, self-consistency, Chamber → Deep reasoning | ✅ benchmark 17/17 (deep reasoning 7/7); Independence Tests A & B |
+| Governed AI control plane: policy engine with 5 approval categories, four-eyes approvals, deny-by-default Tool Gateway, permission-aware Knowledge Vault, classification-aware routing, runs + replay, release gates, budgets, air-gap egress guard, roles, hash-chained exportable audit trail, Governance & Audit page | ✅ 20 acceptance criteria tested; partial items listed in docs/CONTROL_PLANE.md |
 
 ## Quick start (local, no Docker)
 
@@ -88,7 +89,8 @@ Deterministic agents (scoring, economics, compliance, trends, business models, e
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) — system design, data model, request/agent flow
 - [AGENTS.md](docs/AGENTS.md) — every agent, its task types, permission level and outputs
-- [SECURITY.md](docs/SECURITY.md) — permission levels, approvals, kill switch, secrets, data protection
+- [SECURITY.md](docs/SECURITY.md) — permission levels, approvals, kill switch, secrets, data protection, threat model, incident response
+- [CONTROL_PLANE.md](docs/CONTROL_PLANE.md) — governed control plane: architecture, policies, roles, routing, air-gap, implementation matrix
 - [INTEGRATIONS.md](docs/INTEGRATIONS.md) — every connector, its state and the credentials it needs
 - [ROCKY_FLARE.md](docs/ROCKY_FLARE.md) — creative intelligence layer & Field Operations: modules, workflows, acceptance map
 - [ROADMAP.md](docs/ROADMAP.md) — completed / partial / blocked / planned

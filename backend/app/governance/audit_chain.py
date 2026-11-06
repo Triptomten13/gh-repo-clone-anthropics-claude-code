@@ -35,6 +35,9 @@ HEAD = "audit_head"      # system_state key: {"seq": n, "hash": h}
 ANCHOR = "audit_anchor"  # where verification starts after retention pruning: {"seq": n, "hash": h, "pruned_at": …}
 PRUNING = "audit_prune_in_progress"
 GENESIS = "0" * 64
+# Retention can never remove recent history: records younger than this many days are kept whatever cut-off is asked
+# for. Set it to what your legal obligations require (docs/SECURITY.md → "Audit retention and privacy").
+MIN_RETENTION_DAYS = int(os.getenv("AUDIT_MIN_RETENTION_DAYS", "365"))
 
 
 def _key(purpose: str) -> bytes:
@@ -172,12 +175,24 @@ def _bad(checked: int, seq: int, reason: str) -> dict[str, Any]:
 
 
 # ------------------------------------------------------------------ retention
+def check_retention(before: datetime, min_days: int | None = None) -> None:
+    from datetime import timedelta
+
+    days = MIN_RETENTION_DAYS if min_days is None else min_days
+    b = before if before.tzinfo else before.replace(tzinfo=UTC)
+    if b > datetime.now(UTC) - timedelta(days=days):
+        raise ValueError(f"retention keeps at least {days} days of audit history (AUDIT_MIN_RETENTION_DAYS); "
+                         f"cut-off {b:%Y-%m-%d} is too recent")
+
+
 def prune(db: Session, before: datetime, actor: str) -> dict[str, Any]:
     """Retention: remove the OLDEST records (created before `before`) only after verifying them, and keep an anchor
-    (last removed seq + hash) so the remaining chain still verifies. Writes its own audit record."""
+    (last removed seq + hash) so the remaining chain still verifies. Writes its own audit record. Never touches records
+    younger than MIN_RETENTION_DAYS. The HTTP route additionally requires a second person's approval."""
     from ..models import AuditLog, SystemState
     from . import core as gov
 
+    check_retention(before)
     v = verify(db)
     if not v["ok"]:
         raise ValueError(f"refusing to prune an audit trail that does not verify: {v['reason']}")

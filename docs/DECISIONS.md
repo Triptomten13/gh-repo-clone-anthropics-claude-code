@@ -2,6 +2,17 @@
 
 Short records of decisions that shape the system. Newest first.
 
+### D-022 · 2026-11-06 · The control plane lives inside the application, enforced in code paths, not prompts
+Governance (policy decisions, approvals, tool grants, Vault access, routing by classification, budgets, gates, egress,
+audit chain) is a set of backend modules every consequential path calls — not a separate gateway service and not
+instructions in prompts. Reasons: one process to secure and back up, and a check that sits in the code path cannot be
+talked out of by a model. Governance changes are themselves RESTRICTED (a second person approves the exact change);
+tightening applies at once. The audit trail is a keyed hash chain on the existing table with append-only triggers,
+because a plain table is not immutable — tamper-*evidence* plus signed exports kept off-host, not a claim of
+immutability. Kept: the existing auth (no new identity service; SSO designed, not built), the orchestrator, the
+router. Revisit: an external policy engine (OPA) or workflow engine if non-developers must author policies or
+workflows; WORM storage or trusted timestamps if evidence must survive a compromised host.
+
 ### D-021 · 2026-11-06 · One web app for every device: same-origin API, PWA, no wrapper
 Phones could not use the app at all (no navigation; API at a build-time `localhost`). Fix in the web app itself: the
 browser talks only to its own origin and the web server proxies to the backend; live events moved from WebSocket

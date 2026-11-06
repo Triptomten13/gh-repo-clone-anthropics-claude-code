@@ -168,11 +168,25 @@ def test_signed_export_verifies_and_detects_tampering(client, fresh_db):
     assert auditor.get("/api/audit/export?fmt=csv").text.startswith("seq,id,created_at")
 
 
-def test_retention_prunes_only_a_verified_prefix_and_keeps_the_chain_verifiable(client, fresh_db):
+def test_retention_prunes_only_a_verified_prefix_and_keeps_the_chain_verifiable(client, fresh_db, approver, monkeypatch):
     _make_events(client, 4)
     sec = _login_as(client, "security_admin")
-    r = sec.post("/api/audit/prune", json={"before": (datetime.now(UTC) + timedelta(seconds=1)).isoformat()})
+    soon = datetime.now(UTC).isoformat()  # everything recorded so far
+    # the minimum retention age protects recent history whatever cut-off is asked for
+    r = sec.post("/api/audit/prune", json={"before": soon})
+    assert r.status_code == 422 and "AUDIT_MIN_RETENTION_DAYS" in r.text
+    monkeypatch.setattr(audit_chain, "MIN_RETENTION_DAYS", 0)
+    # destroying evidence needs a second person, for exactly this cut-off
+    r = sec.post("/api/audit/prune", json={"before": soon})
+    assert r.status_code == 202 and r.json()["category"] == "RESTRICTED", r.text
+    aid = r.json()["approval_id"]
+    assert sec.post(f"/api/approvals/{aid}/decide", json={"approve": True}).status_code == 403
+    assert approver.post(f"/api/approvals/{aid}/decide", json={"approve": True}).status_code == 200
+    other = (datetime.fromisoformat(soon) - timedelta(seconds=1)).isoformat()
+    assert sec.post("/api/audit/prune", json={"before": other, "approval_id": aid}).status_code == 202  # other cut-off
+    r = sec.post("/api/audit/prune", json={"before": soon, "approval_id": aid})
     assert r.status_code == 200 and r.json()["pruned"] >= 4
+    assert sec.post("/api/audit/prune", json={"before": soon, "approval_id": aid}).status_code == 202  # single use
     v = client.get("/api/audit/verify").json()
     assert v["ok"] and v["anchored"]
     assert any(x["action"] == "audit.pruned" for x in client.get("/api/audit/records").json())

@@ -46,7 +46,7 @@ Alembic, SQLite or PostgreSQL), with one administrative page (`/governance`) bes
 
 | Component | Module | Tables (migration) | API |
 |---|---|---|---|
-| Audit & provenance | `governance/audit_chain.py` | `audit_log` + `seq`, `prev_hash`, `hash`; triggers (0006) | `GET /api/audit/records`, `/audit/verify`, `/audit/export?fmt=json\|csv\|zip`, `POST /audit/prune`; CLI `audit-verify`, `audit-export`, `audit-verify-export` |
+| Audit & provenance | `governance/audit_chain.py` | `audit_log` + `seq`, `prev_hash`, `hash`; triggers (0006) | `GET /api/audit/records`, `/audit/verify`, `/audit/export?fmt=json\|csv\|zip`, `POST /audit/prune` (governed, four eyes); CLI `audit-verify`, `audit-export`, `audit-verify-export` |
 | Identity & access | `security/rbac.py` | `users.role` | `GET /api/rbac/roles`, `/auth/me` (permissions), user management (super admin) |
 | Policy (PDP/PEP) | `governance/policy.py` | `policy_rules` (0007) | `GET /api/policies`, `/policies/history`, `POST /policies`, `/policies/{key}/rollback`, `/policies/{key}/disable` |
 | Approvals | `governance/core.py` | `approvals` + category, on_behalf_of, payload_hash, expires/revoked/consumed, delegated_to (0007) | `GET /api/approvals`, `POST /approvals/{id}/decide`, `/revoke`, `/delegate` |
@@ -75,7 +75,7 @@ Error format: `403 {"detail": "requires permission: …"}` · governed change `2
 * **Approvals** are bound to the action and to a hash of the exact arguments, expire (`APPROVAL_TTL_HOURS`, 72 h), are
   single use (atomic), revocable and delegable to another approver. Pending never turns into approved by waiting.
 * **Changing governance is itself governed:** policy rules, tool grants, budgets, release gates, widening document
-  access and loosening deployment egress are RESTRICTED — the first request files an approval; the change applies
+  access, loosening deployment egress and pruning audit records are RESTRICTED — the first request files an approval; the change applies
   when the same request is repeated with an approval decided by someone else. Tightening (revoking a grant,
   narrowing access, entering AIR_GAPPED) applies at once.
 * **Roles** (`/api/rbac/roles`): admin (super admin), security_admin, system_admin, workflow_designer,
@@ -128,7 +128,7 @@ in a network namespace with loopback only — OS-level proof). What keeps workin
 | 7 | Identity, RBAC, SSO (DAEMON IDENTITY & ACCESS) | own auth, 3 roles, token revocation, lockout | 10 roles with explicit permissions, separation of duties, permission-checked endpoints, agents bounded by their user | yes | 17, 18 | **PARTIALLY IMPLEMENTED** — SSO (OIDC/SAML): **DESIGNED BUT NOT IMPLEMENTED** (no identity provider in this environment); agents have identities and grants but no per-agent owner field or delegated tokens |
 | 8 | Deployment flexibility & air-gap (DAEMON DEPLOYMENT MANAGER) | offline mode, profiles for compute, Docker Compose, HTTPS profile | 6 deployment profiles, process-wide egress guard, AIR_GAPPED mode, egress self-test, governed loosening | yes (this process) | 14 | **IMPLEMENTED AND VERIFIED** in-process · other processes need OS/network isolation; container images were never built here (**BLOCKED BY INFRASTRUCTURE**: no Docker daemon); profiles other than AIR_GAPPED share one mechanism |
 | 9 | Cost, token, RAM, energy governance (DAEMON RESOURCE & COST INTELLIGENCE) | cost dashboard, USD limits, agent token budgets, telemetry, energy estimates | atomic budgets for tool calls, model calls, tokens and USD per user/agent/workflow/global, per day/month; IES with components | yes | 12, 19 | **PARTIALLY IMPLEMENTED** — RAM/VRAM/CPU/energy measured system-wide, not attributed per run; no per-run step or concurrency budget beyond the orchestrator's depth/attempt limits |
-| 10 | Exportable audit trail (DAEMON AUDIT & PROVENANCE) | mutable `audit_log` table | keyed hash chain sealed at commit, append-only triggers (SQLite + PostgreSQL), verification, signed ZIP / JSON / CSV export with filters, retention with anchors | yes | 15 | **IMPLEMENTED AND VERIFIED** · no PDF report and no trusted (RFC 3161) timestamps; whoever holds both the database and the audit key can rewrite history — keep exported signed manifests outside the system |
+| 10 | Exportable audit trail (DAEMON AUDIT & PROVENANCE) | mutable `audit_log` table | keyed hash chain sealed at commit, append-only triggers (SQLite + PostgreSQL), verification, signed ZIP / JSON / CSV export with filters, retention with anchors (minimum age `AUDIT_MIN_RETENTION_DAYS`, default 365, and a second person's approval per cut-off) | yes | 15 | **IMPLEMENTED AND VERIFIED** · no PDF report and no trusted (RFC 3161) timestamps; whoever holds both the database and the audit key can rewrite history — keep exported signed manifests outside the system |
 | — | Unified interface | Control Center, Approvals, Archive, DAEMON | `/governance`: policies, tool security, runs & replay, gates, audit & compliance, deployment & egress, budgets, roles | n/a | e2e on desktop, iPad, iPhone, Android | **IMPLEMENTED AND VERIFIED** (Chromium emulation) |
 
 ### Acceptance criteria → tests (`backend/tests/test_control_plane.py`)

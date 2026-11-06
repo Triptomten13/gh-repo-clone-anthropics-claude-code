@@ -148,3 +148,26 @@ def test_extract_formats():
         extract("a.docx", b"not a zip")
     with pytest.raises(ExtractionError):
         extract("big.txt", b"x" * (21 * 1024 * 1024))
+
+
+def test_docx_zip_bomb_is_refused_before_parsing():
+    """A DOCX is a ZIP: a few hundred KB can declare gigabytes. The declared expansion is checked first."""
+    import io as _io
+    import zipfile
+
+    from app.knowledge import extract as ex
+
+    buf = _io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("[Content_Types].xml", "<Types/>")
+        z.writestr("word/document.xml", b"\0" * (ex.DOCX_MAX_UNCOMPRESSED + 1))  # compresses to ~100 KB
+    data = buf.getvalue()
+    assert len(data) < ex.MAX_BYTES  # passes the upload size check — only the expansion check stops it
+    with pytest.raises(ExtractionError, match="expands beyond"):
+        extract("bomb.docx", data)
+    many = _io.BytesIO()
+    with zipfile.ZipFile(many, "w") as z:
+        for i in range(ex.DOCX_MAX_MEMBERS + 1):
+            z.writestr(f"p{i}.xml", "")
+    with pytest.raises(ExtractionError, match="expands beyond"):
+        extract("many.docx", many.getvalue())
