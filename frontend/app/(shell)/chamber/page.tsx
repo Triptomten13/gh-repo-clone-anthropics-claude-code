@@ -49,7 +49,7 @@ export default function Chamber() {
           {llm ? `models: ${meta.data.llm}` : "no AI provider — research & orchestration still work; creative text is not faked"}</span>
       </PageHeader>
       <ErrorBanner error={err || meta.error} />
-      <div className="grid gap-4 xl:grid-cols-[1fr_340px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="space-y-4">
           <Card>
             <label className="sr-only" htmlFor="objective">Objective</label>

@@ -16,6 +16,10 @@ const nextConfig: NextConfig = {
   // proxied requests otherwise time out after 30 s — deep reasoning and STANDARD/DEEP research take longer (measured
   // 42–91 s and ~32 s), and the live event socket must stay open
   experimental: { proxyTimeout: 10 * 60 * 1000 },
+  async headers() {
+    // the service worker must be re-checked on every visit, or updates are never noticed
+    return [{ source: "/sw.js", headers: [{ key: "Cache-Control", value: "no-cache, no-store, must-revalidate" }, { key: "Content-Type", value: "application/javascript; charset=utf-8" }] }];
+  },
   async rewrites() {
     return [
       { source: "/api/:path*", destination: `${BACKEND}/api/:path*` },

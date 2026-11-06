@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { DialogProvider, useDialog } from "@/components/dialog";
+import { InstallButton } from "@/components/pwa";
 import { api, getToken, setToken } from "@/lib/api";
 import { useApi, useLiveEvents, type LiveStatus } from "@/lib/hooks";
 import { useIdentity } from "@/lib/identity";
@@ -164,6 +165,7 @@ function ShellFrame({ children }: { children: ReactNode }) {
           </div>
           <div className={`mt-2 flex items-center gap-3 ${collapsed ? "flex-col" : ""}`}>
             <button className="text-ink-3 underline-offset-2 hover:text-ink-2 hover:underline" onClick={signOut}>Sign out</button>
+            {!collapsed && <InstallButton className="text-ink-3 hover:text-ink-2" />}
             <span className="flex-1" />
             <button onClick={toggleCollapsed} aria-pressed={collapsed} aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} title={collapsed ? "Expand navigation" : "Collapse navigation"}
               className="rounded p-1 text-ink-3 hover:bg-surface hover:text-ink-2">
@@ -305,6 +307,7 @@ function NavDrawer({ path, pending, live, onClose, onSignOut, company }: { path:
         <div className="flex items-center gap-3 border-t border-line px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] text-[12px] text-ink-3">
           <Activity size={13} className={live === "live" ? "text-good" : "text-ink-3"} aria-hidden />
           <span className="flex-1">{LIVE_LABEL[live]}</span>
+          <InstallButton className="min-h-11 rounded-md px-2 text-ink-2 hover:bg-surface-2" />
           <button onClick={onSignOut} className="min-h-11 rounded-md px-3 text-ink-2 hover:bg-surface-2">Sign out</button>
         </div>
       </div>

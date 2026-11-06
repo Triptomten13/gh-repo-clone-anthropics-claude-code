@@ -111,7 +111,7 @@ function DocumentsTab({ docId, setDocId, onChange }: { docId: number | null; set
   const docs = useApi<any[]>(`/api/archive/documents${ev ? `?evidence_class=${ev}` : ""}`, [ev]);
   const [err, setErr] = useState<string | null>(null);
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="space-y-4">
         <AddDocument onDone={(id) => { docs.reload(); onChange(); setDocId(id); }} onError={setErr} />
         <ErrorBanner error={err} />
@@ -189,7 +189,7 @@ function DocumentDetail({ id, onChange, onClose }: { id: number; onChange: () =>
         <select value={x.evidence_class} onChange={(e) => patch({ evidence_class: e.target.value })} aria-label="change evidence class">{EVIDENCE_CLASSES.map((c) => <option key={c} value={c}>{c.replaceAll("_", " ")}</option>)}</select>
         <span className="text-ink-3">{x.doc_type} · {x.char_count.toLocaleString()} chars · {x.chunks} passages</span>
       </div>
-      <dl className="mt-2 grid grid-cols-[100px_1fr] gap-y-0.5 text-[12px]">
+      <dl className="mt-2 grid grid-cols-[100px_minmax(0,1fr)] gap-y-0.5 text-[12px]">
         {[["Source", x.source], ["Author", x.author], ["Dated", x.created_date], ["Imported", new Date(x.imported_at).toLocaleString()], ["Tags", (x.tags ?? []).join(", ")]].map(([k, v]) => <Fragment key={k}><dt className="text-ink-3">{k}</dt><dd className="text-ink-2">{v || "—"}</dd></Fragment>)}
       </dl>
       {x.error && <div className="mt-2 text-[12px] text-warning">{x.error}</div>}
@@ -217,7 +217,7 @@ function EntitiesTab() {
   const ents = useApi<any[]>("/api/archive/entities");
   const g = useApi<any>("/api/archive/graph");
   return (
-    <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
+    <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
       <Card title="Entities" pad={false}>
         {ents.data?.length ? <Table head={["Name", "Kind", "Docs"]}>{ents.data.map((e) => <tr key={e.id}><td className="font-serif">{e.name}</td><td className="text-ink-3">{e.kind}</td><td className="num">{e.documents}</td></tr>)}</Table>
           : <div className="p-4"><Empty title="No entities yet">Entities are linked from a curated gazetteer when documents are ingested.</Empty></div>}
@@ -251,7 +251,7 @@ function MemoryTab() {
     const a = document.createElement("a"); a.href = url; a.download = "gsus-memory-export.json"; a.click(); URL.revokeObjectURL(url);
   };
   return (
-    <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
+    <div className="grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
       <Card title="Remember something">
         <p className="mb-2 text-[12px] text-ink-3">Your memory is private to you. It never stores passwords, keys, personal identity or card numbers; you can edit, export and delete everything.</p>
         <div className="space-y-2">

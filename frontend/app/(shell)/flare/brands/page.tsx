@@ -48,7 +48,7 @@ export default function BrandLab() {
         </Card>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_520px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_520px]">
         <Card title={`${concepts.data?.length ?? 0} concepts (latest versions)`}>
           {concepts.data?.length ? (
             <div className="grid gap-2 md:grid-cols-2">
@@ -77,7 +77,7 @@ function ConceptDetail({ id, onChange, run, busy, onError }: { id: number; onCha
     <Card title={`${d.name} · v${d.version}`} action={<span className="text-[12px] text-ink-3">{d.status}</span>}>
       <p className="text-[13px] italic text-ink-2">{d.tagline}</p>
       <p className="mt-2 text-[12.5px] text-ink-2">{d.story}</p>
-      <dl className="mt-3 grid grid-cols-[110px_1fr] gap-y-1 text-[12px]">
+      <dl className="mt-3 grid grid-cols-[110px_minmax(0,1fr)] gap-y-1 text-[12px]">
         <dt className="text-ink-3">Audience</dt><dd>{d.audience}</dd><dt className="text-ink-3">USP</dt><dd>{d.usp}</dd>
         <dt className="text-ink-3">Genres</dt><dd>{label(d.primary_genre)} × {label(d.secondary_genre)}</dd>
         <dt className="text-ink-3">Typography</dt><dd>{d.direction?.typography?.display} / {d.direction?.typography?.text}</dd>

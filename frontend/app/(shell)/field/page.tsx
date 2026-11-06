@@ -62,7 +62,7 @@ function ProductBoard({ sub }: { sub: string }) {
   const segs = useApi<any[]>("/api/field/segments");
   const mine = (segs.data ?? []).filter((s) => SEGMENT_FOR[sub]?.includes(s.id));
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
       <Card title="Product board" pad={false}>
         {prods.data?.length ? (
           <Table head={["Product", "Pillars", "Score · coverage", "Net margin", "Compliance", "Mobility class", "Verified fits"]}>
@@ -142,7 +142,7 @@ function Fusion() {
       </Card>
       <Card title="Generated genre">
         {h ? (
-          <dl className="grid grid-cols-[130px_1fr] gap-y-1.5 text-[12.5px]">
+          <dl className="grid grid-cols-[130px_minmax(0,1fr)] gap-y-1.5 text-[12.5px]">
             <dt className="text-ink-3">Name</dt><dd className="text-[15px] font-semibold text-parchment">{h.name} {h.novel && <span className="text-[11px] text-gold">· new hybrid</span>}</dd>
             <dt className="text-ink-3">Concept</dt><dd>{h.concept}</dd><dt className="text-ink-3">Philosophy</dt><dd>{h.philosophy}</dd>
             <dt className="text-ink-3">Audience</dt><dd>{h.target_audience}</dd><dt className="text-ink-3">Palette</dt><dd><Swatches colors={h.palette} /></dd>

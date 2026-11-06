@@ -41,7 +41,7 @@ export default function ThinkSideways() {
       {!res ? <Card><Empty title="Ask a question or pick a challenge">Results are hypotheses with a named bridge — validate demand before investing.</Empty></Card> : (
         <>
           {res.domains && (
-            <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <Card title={`Cross-industry graph · mode: ${res.mode}`}>{graph?.nodes?.length ? <GraphView nodes={graph.nodes} edges={graph.edges} height={460} /> : <Empty title="No graph" />}</Card>
               <Card title="Highest-potential combinations">
                 {res.high_potential.map((c: any, i: number) => (

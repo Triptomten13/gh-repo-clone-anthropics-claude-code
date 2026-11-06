@@ -35,7 +35,7 @@ export default function PersonasPage() {
       </PageHeader>
       <ErrorBanner error={err} />
       <p className="mb-4 max-w-3xl text-[13px] text-ink-3">Personalities shape judgement — evaluation lens, genre affinities, novelty and risk appetite change scores and concepts measurably. They never carry permissions or budgets; those stay in the Agent Control Room. Every edit is versioned and audited.</p>
-      <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
+      <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <Card title={`${list.data?.length ?? "…"} personalities`} pad={false}>
           <ul className="max-h-[760px] divide-y divide-line/60 overflow-auto">
             {(list.data ?? []).map((p) => (
