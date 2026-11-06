@@ -36,7 +36,7 @@ export default function HQ() {
     <>
       <PageHeader kicker={`${identity.company_name} · infrastructure`} title="Demonkoncernen HQ" />
       <ErrorBanner error={depts.error} />
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
         {(depts.data ?? []).map((x) => (
           <button key={x.id} onClick={() => setSel(x.id)} aria-pressed={sel === x.id}
             className={`rounded-lg border p-4 text-left transition ${sel === x.id ? "border-cyan bg-cyan/5" : "border-line bg-surface hover:border-line-strong"}`}>
@@ -48,7 +48,7 @@ export default function HQ() {
         ))}
       </div>
       {d ? (
-        <div className="mt-4 grid gap-4 xl:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
           <Card title={`${d.title} · agents`} pad={false}>
             {d.agents.length ? <Table head={["Agent", "Status", "Lvl", "OK/blk/fail", "$"]}>{d.agents.map((a: any) => <tr key={a.id}><td className="text-[12.5px]">{a.name}</td><td><StatusBadge status={a.status} /></td><td className="num">{a.level}</td><td className="num">{a.ok}/{a.blocked}/{a.failed}</td><td className="num">{a.cost_usd}</td></tr>)}</Table>
               : <div className="p-4 text-[12.5px] text-ink-3">This department has no runtime agents; its work is shown in the metrics.</div>}

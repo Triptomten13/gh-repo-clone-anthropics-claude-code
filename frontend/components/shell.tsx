@@ -195,8 +195,8 @@ function ShellFrame({ children }: { children: ReactNode }) {
               <span className="sr-only">{LIVE_LABEL[live]}</span>
             </span>
             <button onClick={() => setDrawer(true)} className="hidden items-center gap-2 rounded-md border border-line px-2.5 py-1 text-ink-3 hover:border-line-strong hover:text-ink-2 lg:inline-flex"
-              aria-label="Find a page (Ctrl+K)">
-              <Search size={13} aria-hidden /> Find a page <kbd className="rounded border border-line px-1 font-mono text-[10px]">Ctrl K</kbd>
+              aria-keyshortcuts="Control+K Meta+K">
+              <Search size={13} aria-hidden /> Find a page <kbd className="rounded border border-line px-1 font-mono text-[10px]" aria-hidden>Ctrl K</kbd>
             </button>
             <KillSwitch engaged={engaged} onChange={status.reload} />
           </div>

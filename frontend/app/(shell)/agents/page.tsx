@@ -55,7 +55,7 @@ export default function AgentsPage() {
         </Table>
       </Card>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card title="Task queue" className="xl:col-span-2" pad={false}>
           {tasks.data?.length ? (
             <Table head={["#", "Type", "Agent", "Status", "Depth", "Prio", "Tries", "Tokens", "Created", ""]}>
@@ -115,7 +115,7 @@ function TaskDetail({ id }: { id: number }) {
   const t = useApi<any>(`/api/tasks/${id}`, [id]);
   if (!t.data) return null;
   return (
-    <div className="grid gap-3 py-2 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-3 py-2 md:grid-cols-2">
       <div><div className="mb-1 text-[11px] text-ink-3">payload</div><Json value={t.data.payload} /></div>
       <div><div className="mb-1 text-[11px] text-ink-3">{t.data.error ? "error" : "result"}{t.data.children.length ? ` · spawned ${t.data.children.join(", ")}` : ""}</div>
         {t.data.error ? <pre className="whitespace-pre-wrap rounded-md bg-bg p-3 font-mono text-[11.5px] text-[#f3a5a5]">{t.data.error}</pre> : <Json value={t.data.result} />}</div>

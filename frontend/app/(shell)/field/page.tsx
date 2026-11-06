@@ -62,7 +62,7 @@ function ProductBoard({ sub }: { sub: string }) {
   const segs = useApi<any[]>("/api/field/segments");
   const mine = (segs.data ?? []).filter((s) => SEGMENT_FOR[sub]?.includes(s.id));
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
       <Card title="Product board" pad={false}>
         {prods.data?.length ? (
           <Table head={["Product", "Pillars", "Score · coverage", "Net margin", "Compliance", "Mobility class", "Verified fits"]}>
@@ -95,8 +95,8 @@ function Archive() {
   if (!a.data) return null;
   return (
     <>
-      <Card title="Rules for pillar D" className="mb-4"><ul className="grid gap-1 text-[12.5px] text-parchment md:grid-cols-2">{a.data.rules.map((r: string) => <li key={r}>✦ {r}</li>)}</ul></Card>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <Card title="Rules for pillar D" className="mb-4"><ul className="grid grid-cols-1 gap-1 text-[12.5px] text-parchment md:grid-cols-2">{a.data.rules.map((r: string) => <li key={r}>✦ {r}</li>)}</ul></Card>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {a.data.genres.map((g: any) => (
           <div key={g.id} className="rounded-lg border border-bronze/40 bg-char/80 p-3">
             <div className="flex items-center justify-between"><span className="text-[14px] font-medium text-parchment">{g.name}</span><Swatches colors={g.palette} size={12} /></div>
@@ -131,7 +131,7 @@ function Fusion() {
   const pillarD = (g.data?.genres ?? []).filter((x: any) => x.pillar === "D");
   const field = (g.data?.genres ?? []).filter((x: any) => order.includes(x.id));
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <Card title="Combine the four pillars">
         <ErrorBanner error={err} />
         <div className="mb-2 font-mono text-[10.5px] uppercase text-gold">Function & mobility</div>
@@ -161,10 +161,10 @@ function Fusion() {
 function Modular() {
   const e = useApi<any>("/api/field/ecosystems");
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       {(e.data?.ecosystems ?? []).map((x: any) => (
         <Card key={x.template} title={`${x.label} · ${Math.round(x.coverage * 100)}% covered`}>
-          <div className="grid gap-2 md:grid-cols-2">{x.modules.map((m: any) => (
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">{x.modules.map((m: any) => (
             <div key={m.id} className={`rounded-md border p-2.5 ${m.products.length ? "border-olive bg-olive/10" : "border-dashed border-line-strong"}`}>
               <div className="text-[13px] text-parchment">{m.label}</div>
               <div className="text-[11.5px] text-ink-3">{m.products.length ? m.products.map((p: any) => p.name).join(", ") : m.status}</div>
@@ -212,7 +212,7 @@ function BrandFactory() {
         <p className="mt-2 text-[12px] text-ink-3">Competitors: {FIELD_COMPETITORS.map(label).join(", ")}. Names are checked against known marks; an official EUIPO/PRV search is always required.</p>
       </Card>
       {s.data && (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
           {s.data.concepts.map((c: any) => {
             const r = s.data.decision?.ranking?.find((x: any) => x.concept_id === c.id);
             return (
@@ -239,7 +239,7 @@ function Innovation() {
   const [err, setErr] = useState<string | null>(null);
   const add = async () => { try { await api("/api/field/compatibility", { method: "POST", json: { ...f, product_id: pid } }); compat.reload(); setErr(null); } catch (e) { setErr((e as Error).message); } };
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <Card title="Survival product innovation lab" action={<ProductPicker value={pid} onChange={setPid} />} pad={false}>
         {inn.data ? (
           <Table head={["Question", "Proposed design", "Functional", "Risk", "Verify first"]}>
@@ -282,11 +282,11 @@ function Council() {
       <Card title="Creative council — 8 independent seats, no forced consensus" className="mb-4">
         <div className="flex flex-wrap items-center gap-2"><ProductPicker value={pid} onChange={setPid} />
           <Button variant="primary" disabled={!pid} busy={busy === "flare.council"} onClick={async () => { const t = await run("flare.council", { product_id: pid }); if (t?.result) { setSid(t.result.session_id); sessions.reload(); } }}>Convene council</Button>
-          <select value={sid ?? ""} onChange={(e) => setSid(Number(e.target.value))}><option value="">previous councils…</option>{(sessions.data ?? []).map((x) => <option key={x.id} value={x.id}>#{x.id} {x.topic}</option>)}</select></div>
+          <select value={sid ?? ""} onChange={(e) => setSid(Number(e.target.value))} aria-label="Previous councils"><option value="">previous councils…</option>{(sessions.data ?? []).map((x) => <option key={x.id} value={x.id}>#{x.id} {x.topic}</option>)}</select></div>
         <p className="mt-2 text-[12px] text-ink-3">Seats: Rocky Flare Creative Director · Tactical Product Designer · Survival Specialist · E-Mobility Engineer · Ancient Symbolism Art Director · Commercial Strategist · CFO · Devil's Advocate</p>
       </Card>
       {c && (
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
           <Card title="Best functional design">{c.best_functional_design ? <><div className="text-parchment">{c.best_functional_design.question}</div><div className="text-[12px] text-ink-2">{c.best_functional_design.proposal}</div><div className="text-[11.5px] text-ink-3">verify: {c.best_functional_design.verification}</div></> : "—"}</Card>
           <Card title="Best creative direction">{c.best_creative_direction ? <><div className="text-parchment">{c.best_creative_direction.name}</div><div className="num text-[12px] text-ink-3">mean {c.best_creative_direction.mean} ±{c.best_creative_direction.stdev} · {c.best_creative_direction.consensus}</div></> : "—"}</Card>
           <Card title="Best brand opportunity">{c.best_brand_opportunity ? <><div className="text-parchment">{c.best_brand_opportunity.name}</div><div className="num text-[12px] text-ink-3">mean {c.best_brand_opportunity.mean}</div></> : "No concept passed the originality gate"}</Card>

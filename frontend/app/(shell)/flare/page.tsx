@@ -39,7 +39,7 @@ export default function CreativeIntelligence() {
         <Stat label="Style DNA" value={<span className="text-lg">{dna.data?.status ?? "…"}</span>} sub={`${Object.keys(dna.data?.evidence ?? {}).length} learned features`} accent />
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card title="Hybrid fusion lab" className="xl:col-span-1">
           <p className="mb-2 text-[12.5px] text-ink-3">Pick 2–4 genres. Order matters: the first carries structure, the second the story.</p>
           <div className="mb-2 flex flex-wrap gap-1.5">{picked.map((g) => <button key={g} onClick={() => setPicked(picked.filter((x) => x !== g))} className="rounded border border-violet-dim px-2 py-0.5 text-[12px] text-violet">{label(g)} ×</button>)}</div>
@@ -60,7 +60,7 @@ export default function CreativeIntelligence() {
         </Card>
         <Card title="Genre taxonomy" className="xl:col-span-2" action={
           <select value={family} onChange={(e) => setFamily(e.target.value)}><option value="">all families</option>{["structural", "cultural", "nature", "narrative"].map((f) => <option key={f}>{f}</option>)}</select>}>
-          <div className="grid max-h-[460px] gap-2 overflow-auto pr-1 md:grid-cols-2">
+          <div className="grid grid-cols-1 max-h-[460px] gap-2 overflow-auto pr-1 md:grid-cols-2">
             {list.map((g: any) => (
               <button key={g.id} onClick={() => setPicked((p) => p.includes(g.id) || p.length >= 4 ? p : [...p, g.id])}
                 className="rounded-md border border-line bg-bg/50 p-2.5 text-left hover:border-violet-dim">
@@ -73,7 +73,7 @@ export default function CreativeIntelligence() {
         </Card>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card title="Originality scores · recent concepts" action={<Link href="/flare/brands" className="text-[12px] text-violet hover:underline">Brand Laboratory →</Link>} pad={false}>
           {recent.length ? (
             <Table head={["Concept", "Genres", "Originality", "Status", "Author"]}>

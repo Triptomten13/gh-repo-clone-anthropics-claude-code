@@ -34,7 +34,7 @@ export default function Archivum() {
         <Stat label="Canon version" value={versions.data?.[0]?.version ?? "—"} sub={versions.data?.[0]?.note} />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card title="Books & chapters">
           {w?.works?.length ? (
             <ul className="divide-y divide-line/60">{w.works.map((b: any) => (
@@ -56,7 +56,7 @@ export default function Archivum() {
         </Card>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card title="Assertions (subject — predicate — object)" pad={false}>
           <AddAssertion onDone={reload} onError={setErr} />
           {assertions.data?.length ? <Table head={["Subject", "Predicate", "Object", "Evidence", "Status"]}>{assertions.data.map((a) => <tr key={a.id}><td>{a.subject}</td><td className="text-ink-3">{a.predicate}</td><td className="font-serif">{a.object}</td><td><EvidenceBadge kind={a.evidence_class} /></td><td className="text-ink-3">{a.status}</td></tr>)}</Table> : null}

@@ -35,7 +35,7 @@ export default function PersonasPage() {
       </PageHeader>
       <ErrorBanner error={err} />
       <p className="mb-4 max-w-3xl text-[13px] text-ink-3">Personalities shape judgement — evaluation lens, genre affinities, novelty and risk appetite change scores and concepts measurably. They never carry permissions or budgets; those stay in the Agent Control Room. Every edit is versioned and audited.</p>
-      <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <Card title={`${list.data?.length ?? "…"} personalities`} pad={false}>
           <ul className="max-h-[760px] divide-y divide-line/60 overflow-auto">
             {(list.data ?? []).map((p) => (
@@ -51,7 +51,7 @@ export default function PersonasPage() {
         {draft && (
           <div className="space-y-4">
             <Card title={`${draft.name} — ${draft.role}`} action={<span className="flex items-center gap-2 text-[12px] text-ink-3">agent <code>{draft.agent_id}</code> · level {draft.metrics.permission_level} · <StatusBadge status={draft.metrics.agent_status ?? "active"} /></span>}>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <Field label="Personality"><textarea rows={3} value={draft.personality} onChange={(e) => setDraft({ ...draft, personality: e.target.value })} /></Field>
                 <Field label="Decision philosophy"><textarea rows={3} value={draft.decision_philosophy} onChange={(e) => setDraft({ ...draft, decision_philosophy: e.target.value })} /></Field>
                 <Field label="Communication style"><select value={draft.communication_style} onChange={(e) => setDraft({ ...draft, communication_style: e.target.value })}>{STYLES.map((s) => <option key={s}>{s}</option>)}</select></Field>
@@ -61,7 +61,7 @@ export default function PersonasPage() {
                 <Field label="Known biases (comma separated)"><input value={draft.known_biases.join(", ")} onChange={(e) => setDraft({ ...draft, known_biases: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })} /></Field>
                 <Field label="Expertise (comma separated)"><input value={draft.expertise.join(", ")} onChange={(e) => setDraft({ ...draft, expertise: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) })} /></Field>
               </div>
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
                   <div className="mb-1.5 font-mono text-[10.5px] uppercase tracking-[0.14em] text-ink-3">Evaluation lens (weights)</div>
                   {detail.data.criteria.map((c: string) => (
@@ -90,7 +90,7 @@ export default function PersonasPage() {
                 {saved && <span className="text-[12px] text-good">{saved}</span>}
               </div>
             </Card>
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <Card title="Performance metrics">
                 <dl className="grid grid-cols-2 gap-y-1 text-[13px]">
                   <dt className="text-ink-3">Tasks</dt><dd className="num">{draft.metrics.tasks}</dd>

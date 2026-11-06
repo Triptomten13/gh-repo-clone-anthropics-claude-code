@@ -19,7 +19,7 @@ export default function SettingsPage() {
       <PageHeader kicker="Systems & integrations" title="Configuration status" />
       <ErrorBanner error={err} />
       {msg && <div className="mb-4 rounded-md border border-line bg-surface px-3 py-2 font-mono text-[12px] text-ink-2">{msg}</div>}
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card title="Runtime">
           {status.data && (
             <dl className="grid grid-cols-2 gap-y-1.5 text-[13px]">
@@ -41,7 +41,7 @@ export default function SettingsPage() {
           <div className="flex gap-2"><Button onClick={() => call("/api/demo", "POST", "Demo loaded")}>Load demo data</Button><Button variant="danger" onClick={() => call("/api/demo", "DELETE", "Demo removed")}>Remove demo data</Button></div>
         </Card>
       </div>
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <div className="xl:col-span-2"><UsersCard /></div>
         <PasswordCard />
       </div>

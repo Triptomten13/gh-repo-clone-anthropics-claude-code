@@ -27,7 +27,7 @@ export default function FinancePage() {
   return (
     <>
       <PageHeader kicker="Financial command center" title="Profitability, forecasts & capital">
-        <select value={days} onChange={(e) => setDays(Number(e.target.value))}>{[7, 30, 90, 365].map((d) => <option key={d} value={d}>last {d} days</option>)}</select>
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Period (days)">{[7, 30, 90, 365].map((d) => <option key={d} value={d}>last {d} days</option>)}</select>
       </PageHeader>
       <ErrorBanner error={err || sum.error} />
       {s && (
@@ -43,7 +43,7 @@ export default function FinancePage() {
             <Stat label="Chargebacks" value={sek(s.chargebacks)} />
             <Stat label="Tax recorded" value={sek(s.tax)} />
           </div>
-          <div className="mt-4 grid gap-4 xl:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
             <Card title="Daily revenue & profit" className="xl:col-span-2">
               {s.daily.length ? <RevenueProfitChart data={s.daily} /> : <Empty title="No ledger entries in range" />}
             </Card>
@@ -58,7 +58,7 @@ export default function FinancePage() {
               ) : <Empty title="Forecast unavailable">{fc.data?.reason}</Empty>}
             </Card>
           </div>
-          <div className="mt-4 grid gap-4 xl:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
             <Card title="Profit by product">
               <Table head={["Product", "Profit"]}>{Object.entries(s.profit_by_product).map(([k, v]: any) => <tr key={k}><td>{names.get(k) ?? `#${k}`}</td><td className="num">{sek(v)}</td></tr>)}</Table>
             </Card>
@@ -104,7 +104,7 @@ function UnitEconomicsCalculator() {
       </div>
       <div className="mt-3"><Button variant="primary" onClick={run}>Calculate</Button></div>
       {e && (
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
             <Stat label="Net revenue" value={sek(e.net_revenue, 2)} sub={`VAT ${sek(e.vat, 2)}`} />
             <Stat label="Landed cost" value={sek(e.landed_cost, 2)} />

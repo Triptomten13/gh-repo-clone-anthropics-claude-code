@@ -18,7 +18,7 @@ export default function PortfolioPage() {
     <>
       <PageHeader kicker="Business portfolio" title="Opportunities, models & businesses" />
       <ErrorBanner error={opps.error} />
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card title="Live businesses">
           {prods.data?.length ? prods.data.map((p) => <div key={p.id} className="py-1 text-[13px]">{p.name}</div>) :
             <Empty title="No live businesses yet">A product becomes live only after a human approves its compliance review and launch request.</Empty>}

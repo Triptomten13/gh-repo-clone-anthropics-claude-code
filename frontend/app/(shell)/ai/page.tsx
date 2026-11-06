@@ -25,7 +25,7 @@ export default function AICore() {
         <Stat label="Calls (30 d)" value={u?.calls ?? "…"} sub={u ? `$${u.cost_usd.toFixed(4)} at list prices` : ""} />
         <Stat label="Embeddings" value={<span className="text-[13px]">{prov.data?.embeddings.active ?? "…"}</span>} sub={prov.data?.embeddings.note} />
       </div>
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card title="Provider health" pad={false}>
           <Table head={["Provider", "Configured", "Circuit", "Last OK", "Last error"]}>
             {(prov.data?.llm ?? []).map((p: any) => <tr key={p.provider}><td className="font-medium">{p.provider}</td>
@@ -52,7 +52,7 @@ export default function AICore() {
             <td><StatusBadge status={m.available ? "configured" : "missing_credentials"} /></td></tr>)}
         </Table>
       </Card>
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card title="Usage by model (30 days)" pad={false}>
           {u && Object.keys(u.by_model).length ? <Table head={["Model", "Calls", "OK", "Tokens in/out", "Cost", "Avg latency"]}>{Object.entries(u.by_model).map(([k, v]: any) => <tr key={k}><td className="font-mono text-[12px]">{k}</td><td className="num">{v.calls}</td><td className="num">{v.status_ok ?? 0}</td><td className="num">{v.input_tokens}/{v.output_tokens}</td><td className="num">${v.cost_usd}</td><td className="num">{v.avg_latency_ms ?? "—"} ms</td></tr>)}</Table>
             : <div className="p-4"><Empty title="No model calls recorded">Calls appear here (with failed and fallback attempts) as soon as a provider is configured and used.</Empty></div>}

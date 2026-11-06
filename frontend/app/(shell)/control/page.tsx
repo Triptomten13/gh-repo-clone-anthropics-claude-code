@@ -71,7 +71,7 @@ export default function ControlCenter() {
           <Stat label="External cost today" value={usd(d.economics.today.external_cost_usd)} sub={`local share ${pct(d.economics.today.local_share)}`} />
           <Stat label="API latency p50" value={d.efficiency.api_latency.p50_ms === null ? "—" : `${d.efficiency.api_latency.p50_ms} ms`} sub="since process start" />
         </div>
-        <div className="grid gap-4 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
           <Card title={<span className="inline-flex items-center gap-1.5"><Cpu size={13} />Intelligence</span>} pad={false}>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1 p-4 text-[12.5px]">
               {Object.entries(d.intelligence.active_models).map(([slot, key]: any) => <div key={slot} className="contents"><span className="text-ink-3">{slot}</span><span className="truncate font-mono text-[11.5px]" title={key ?? ""}>{key ?? "none"}</span></div>)}

@@ -25,7 +25,7 @@ export default function MutationLab() {
       <div className="mb-4 flex flex-wrap gap-4 text-[12px]">{Object.entries(STATUS_STYLE).map(([k, v]) => <span key={k} className={v}>● {label(k)}</span>)}<span className="text-ink-3">— conceptual modifications are never presented as manufactured products</span></div>
       {!pid ? <Card><Empty title="Pick a product" /></Card> : (
         <>
-          <div className="grid gap-4 xl:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <Card title="Mutation graph">
               {g.data?.nodes?.length ? <GraphView nodes={g.data.nodes} edges={g.data.edges} /> : <Empty title="No saved graph yet">Run the mutation engine to persist the graph.</Empty>}
             </Card>
@@ -43,7 +43,7 @@ export default function MutationLab() {
               </Table>
             </Card>
           </div>
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
             <Card title="Survival & outdoor innovation lab" pad={false}>
               <Table head={["Question", "Proposal", "Status", "Verification before any claim"]}>
                 {(inn.data?.innovation ?? []).map((i: any) => (

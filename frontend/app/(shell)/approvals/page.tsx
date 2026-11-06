@@ -18,7 +18,7 @@ export default function ApprovalsPage() {
   return (
     <>
       <PageHeader kicker="Approval center" title="Human control over consequential actions">
-        <select value={filter} onChange={(e) => setFilter(e.target.value)}><option value="pending">pending</option><option value="approved">approved</option><option value="rejected">rejected</option><option value="">all</option></select>
+        <select value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Show approvals"><option value="pending">pending</option><option value="approved">approved</option><option value="rejected">rejected</option><option value="">all</option></select>
       </PageHeader>
       <ErrorBanner error={err || ap.error} />
       <p className="mb-4 max-w-3xl text-[13px] text-ink-3">

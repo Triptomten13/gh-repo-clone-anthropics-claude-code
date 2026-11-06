@@ -36,7 +36,7 @@ export default function RadarPage() {
       <ErrorBanner error={err || trends.error} />
       {notice && <div className="mb-4 rounded-md border border-line bg-surface px-3 py-2 text-[12.5px] text-ink-2">{notice}</div>}
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card title="Watchlist" className="xl:col-span-1">
           <form className="mb-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (kw.trim()) { saveWatch([...(watch.data?.keywords ?? []), kw]); setKw(""); } }}>
             <input className="flex-1" placeholder="add keyword, e.g. sourdough" value={kw} onChange={(e) => setKw(e.target.value)} />

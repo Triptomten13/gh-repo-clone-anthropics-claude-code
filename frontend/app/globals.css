@@ -78,6 +78,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--color-viole
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 /* a <select> is as wide as its longest option — never wider than its container (grid/flex children shrink too) */
 select { max-width: 100%; text-overflow: ellipsis; }
+input, select, textarea { min-width: 0; } /* shrink in tight rows instead of pushing the page sideways */
+input[type="file"] { max-width: 100%; }
 body { overscroll-behavior-y: none; }
 @media (pointer: coarse) {
   /* iOS Safari zooms the page when a focused field's text is under 16 px */

@@ -48,10 +48,10 @@ export default function BrandLab() {
         </Card>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_520px]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_520px]">
         <Card title={`${concepts.data?.length ?? 0} concepts (latest versions)`}>
           {concepts.data?.length ? (
-            <div className="grid gap-2 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {concepts.data.map((c) => <ConceptCard key={c.id} c={c} selected={cmp.includes(c.id)} onOpen={() => setOpen(c.id)}
                 onSelect={() => setCmp((x) => x.includes(c.id) ? x.filter((i) => i !== c.id) : [...x, c.id].slice(-4))} />)}
             </div>

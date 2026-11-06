@@ -55,7 +55,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         <Stat label="Compliance" value={<StatusBadge status={d.compliance_status} />} sub={d.status} />
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card title="Score composition">
           {d.score_breakdown?.components ? (
             <>
@@ -69,7 +69,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
         <ComplianceCard d={d} rep={rep} onDone={p.reload} onError={setErr} />
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card title="Unit economics (per order, SEK)">
           {econ ? (
             <Table head={["Line", "Value"]}>
@@ -94,7 +94,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
       </div>
 
       {opp && (
-        <div className="mt-4 grid gap-4 xl:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
           <Card title="Recommended business models">
             <ol className="space-y-3">
               {opp.business_models.map((m: any, i: number) => (
@@ -106,7 +106,7 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
             </ol>
           </Card>
           <Card title={`Transformation lab · ${opp.transformations.length} concepts`} className="xl:col-span-2">
-            <div className="grid gap-2 md:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
               {opp.transformations.map((t: any, i: number) => (
                 <div key={i} className="rounded-md border border-line bg-bg/60 p-3">
                   <div className="flex items-center justify-between gap-2">

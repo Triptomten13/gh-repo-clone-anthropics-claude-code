@@ -56,7 +56,7 @@ function SearchTab() {
   return (
     <Card>
       <form className="flex flex-wrap gap-2" onSubmit={(e) => { e.preventDefault(); if (q) go(); }}>
-        <input className="min-w-80 flex-1" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search passages (full-text + vectors)…" aria-label="search query" />
+        <input className="w-full flex-1 sm:w-auto sm:min-w-80" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search passages (full-text + vectors)…" aria-label="search query" />
         <select value={mode} onChange={(e) => setMode(e.target.value)} aria-label="mode"><option value="hybrid">hybrid</option><option value="keyword">keyword (BM25)</option><option value="semantic">vector</option></select>
         <select value={ev} onChange={(e) => setEv(e.target.value)} aria-label="evidence filter"><option value="">any evidence class</option>{EVIDENCE_CLASSES.map((c) => <option key={c} value={c}>{c.replaceAll("_", " ")}</option>)}</select>
         <Button variant="primary" type="submit" disabled={!q}>Search</Button>
@@ -88,7 +88,7 @@ function AskTab() {
   return (
     <Card title="The Archivist answers only from the Archive">
       <div className="flex flex-wrap gap-2">
-        <input className="min-w-80 flex-1" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask a question…" aria-label="question" />
+        <input className="w-full flex-1 sm:w-auto sm:min-w-80" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask a question…" aria-label="question" />
         <label className="flex items-center gap-1.5 text-[12px] text-ink-3"><input type="checkbox" checked={useLlm} onChange={(e) => setUseLlm(e.target.checked)} /> phrase with AI (citations verified)</label>
         <Button variant="primary" busy={busy} disabled={!q} onClick={ask}>Ask</Button>
       </div>
@@ -111,7 +111,7 @@ function DocumentsTab({ docId, setDocId, onChange }: { docId: number | null; set
   const docs = useApi<any[]>(`/api/archive/documents${ev ? `?evidence_class=${ev}` : ""}`, [ev]);
   const [err, setErr] = useState<string | null>(null);
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="space-y-4">
         <AddDocument onDone={(id) => { docs.reload(); onChange(); setDocId(id); }} onError={setErr} />
         <ErrorBanner error={err} />
@@ -157,7 +157,7 @@ function AddDocument({ onDone, onError }: { onDone: (id: number) => void; onErro
   };
   return (
     <Card title="Add to the Archive (provenance required)">
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <Field label="File (pdf, docx, txt, md, csv, json, vtt, srt, images)"><input type="file" accept=".pdf,.docx,.txt,.md,.csv,.json,.vtt,.srt,.png,.jpg,.jpeg,.webp" onChange={(e) => setFile(e.target.files?.[0] ?? null)} /></Field>
         <Field label="Evidentiary status">
           <select value={m.evidence_class} onChange={(e) => setM({ ...m, evidence_class: e.target.value })}>{EVIDENCE_CLASSES.map((c) => <option key={c} value={c}>{c.replaceAll("_", " ")}</option>)}</select>
@@ -203,9 +203,9 @@ function DocumentDetail({ id, onChange, onClose }: { id: number; onChange: () =>
       <div className="mt-4 font-mono text-[10.5px] uppercase tracking-[0.14em] text-violet">Interpretations & notes (kept apart from the source)</div>
       <ul className="mt-1 space-y-1.5">{x.annotations.map((a: any) => <li key={a.id} className="text-[12.5px]"><EvidenceBadge kind={a.evidence_class} /> <span className="text-ink-3">{a.kind} · {a.author}</span><div className="text-ink-2">{a.text}</div></li>)}</ul>
       <div className="mt-2 flex flex-wrap gap-2">
-        <input className="min-w-60 flex-1" value={note.text} onChange={(e) => setNote({ ...note, text: e.target.value })} placeholder="Add an interpretation or note…" aria-label="annotation" />
-        <select value={note.kind} onChange={(e) => setNote({ ...note, kind: e.target.value })}><option>interpretation</option><option>note</option><option>source_comparison</option><option>correction</option></select>
-        <select value={note.evidence_class} onChange={(e) => setNote({ ...note, evidence_class: e.target.value })}>{EVIDENCE_CLASSES.map((c) => <option key={c} value={c}>{c.replaceAll("_", " ")}</option>)}</select>
+        <input className="w-full flex-1 sm:w-auto sm:min-w-60" value={note.text} onChange={(e) => setNote({ ...note, text: e.target.value })} placeholder="Add an interpretation or note…" aria-label="annotation" />
+        <select value={note.kind} onChange={(e) => setNote({ ...note, kind: e.target.value })} aria-label="Annotation kind"><option>interpretation</option><option>note</option><option>source_comparison</option><option>correction</option></select>
+        <select value={note.evidence_class} onChange={(e) => setNote({ ...note, evidence_class: e.target.value })} aria-label="Annotation evidence class">{EVIDENCE_CLASSES.map((c) => <option key={c} value={c}>{c.replaceAll("_", " ")}</option>)}</select>
         <Button disabled={!note.text} onClick={annotate}>Add</Button>
       </div>
       <div className="mt-4 border-t border-line pt-3"><Button variant="danger" onClick={del}>Delete document (admin)</Button></div>
@@ -217,7 +217,7 @@ function EntitiesTab() {
   const ents = useApi<any[]>("/api/archive/entities");
   const g = useApi<any>("/api/archive/graph");
   return (
-    <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
       <Card title="Entities" pad={false}>
         {ents.data?.length ? <Table head={["Name", "Kind", "Docs"]}>{ents.data.map((e) => <tr key={e.id}><td className="font-serif">{e.name}</td><td className="text-ink-3">{e.kind}</td><td className="num">{e.documents}</td></tr>)}</Table>
           : <div className="p-4"><Empty title="No entities yet">Entities are linked from a curated gazetteer when documents are ingested.</Empty></div>}
@@ -251,7 +251,7 @@ function MemoryTab() {
     const a = document.createElement("a"); a.href = url; a.download = "gsus-memory-export.json"; a.click(); URL.revokeObjectURL(url);
   };
   return (
-    <div className="grid gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[380px_minmax(0,1fr)]">
       <Card title="Remember something">
         <p className="mb-2 text-[12px] text-ink-3">Your memory is private to you. It never stores passwords, keys, personal identity or card numbers; you can edit, export and delete everything.</p>
         <div className="space-y-2">

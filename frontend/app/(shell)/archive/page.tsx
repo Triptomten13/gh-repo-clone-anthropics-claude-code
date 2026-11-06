@@ -16,7 +16,7 @@ export default function ArchivePage() {
         <input placeholder="search everything…" value={q} onChange={(e) => setQ(e.target.value)} className="w-72" />
       </PageHeader>
       <ErrorBanner error={audit.error} />
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card title="Lessons learned">
           {lessons.data?.filter(match).length ? <ul className="space-y-2 text-[13px]">{lessons.data.filter(match).map((l) => <li key={l.id}><span className="text-ink-3">{l.source} · {ago(l.created_at)}</span><div className="text-ink-2">{l.text}</div></li>)}</ul>
             : <Empty title="No lessons yet">Completed and abandoned experiments write their lessons here.</Empty>}

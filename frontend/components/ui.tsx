@@ -1,6 +1,6 @@
 "use client";
 import { AlertTriangle, CheckCircle2, CircleDashed, Loader2, OctagonX, ShieldAlert, ShieldCheck, ShieldQuestion } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 export function PageHeader({ title, kicker, children }: { title: string; kicker?: string; children?: ReactNode }) {
   return (
@@ -18,8 +18,8 @@ export function Card({ title, action, children, className = "", pad = true }: { 
   return (
     <section className={`min-w-0 rounded-lg border border-line bg-surface ${className}`}>
       {title && (
-        <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-2.5">
-          <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-2">{title}</h2>
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-2.5">
+          <h2 className="min-w-0 font-mono text-[11px] uppercase tracking-[0.16em] text-ink-2 [overflow-wrap:anywhere]">{title}</h2>
           {action}
         </header>
       )}
@@ -144,9 +144,21 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
   );
 }
 
-export function Table({ head, children }: { head: ReactNode[]; children: ReactNode }) {
+export function Table({ head, children, label = "Table" }: { head: ReactNode[]; children: ReactNode; label?: string }) {
+  // when the table is wider than the screen (phones), its scroll area must be reachable by keyboard and named
+  const ref = useRef<HTMLDivElement>(null);
+  const [scrolls, setScrolls] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setScrolls(el.scrollWidth > el.clientWidth + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
-    <div className="overflow-x-auto">
+    <div ref={ref} className="overflow-x-auto" {...(scrolls ? { tabIndex: 0, role: "region", "aria-label": `${label} (scrolls sideways)` } : {})}>
       <table className="w-full border-collapse text-[13px]">
         <thead>
           <tr className="border-b border-line text-left font-mono text-[10.5px] uppercase tracking-[0.12em] text-ink-3">
@@ -165,7 +177,7 @@ export function Json({ value }: { value: unknown }) {
 
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1 text-[12px] text-ink-3">
+    <label className="flex min-w-0 flex-col gap-1 text-[12px] text-ink-3">
       <span>{label}</span>
       {children}
     </label>

@@ -74,7 +74,7 @@ function StatusTab({ s, act }: { s: any; act: Act }) {
         <Stat label="Embeddings" value={<span className="text-[14px]">{s.active_models.embedding ?? "lexical hash (fallback)"}</span>} sub="Archive search" />
         <Stat label="Hardware" value={<span className="text-[14px]">{s.hardware.cores} cores · {s.hardware.ram_total_gb} GB</span>} sub={`${s.hardware.accelerator.toUpperCase()} · llama.cpp ${s.hardware.runtime.llama_cpp ? s.hardware.runtime.llama_cpp_version : "not installed"}`} />
       </div>
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card title="Operating mode">
           {settings.data && <div className="space-y-4">
             <label className="flex items-center justify-between gap-3">
@@ -194,7 +194,7 @@ function CostsTab({ act }: { act: Act }) {
         <Stat label="Savings" value={usd(c.data.savings.actual_usd)} sub={`actual · est. ${usd(c.data.savings.estimated_usd)}`} />
         <Stat label="Month forecast" value={usd(c.data.forecast.projected_month_usd, 2)} sub={`MTD ${usd(c.data.forecast.month_to_date_usd, 2)}`} />
       </div>
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card title="Where work ran" className="xl:col-span-2">{daysData.length ? <LocalExternalBars data={daysData} /> : <Empty title="No AI calls yet" />}</Card>
         <Card title="Spending limits">
           <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); act(() => api("/api/daemon/settings", { method: "PATCH", json: { limits: { daily_usd: lim.daily === "" ? null : Number(lim.daily), monthly_usd: lim.monthly === "" ? null : Number(lim.monthly) } } }), settings.reload); }}>
@@ -205,7 +205,7 @@ function CostsTab({ act }: { act: Act }) {
           <p className="mt-3 text-[11.5px] text-ink-3">Paid calls that would exceed a cap are not made — the task is blocked and shown here. Failed requests: {t.failed ?? 0}; excluded by policy: {t.excluded_by_policy ?? 0}.</p>
         </Card>
       </div>
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         {dim("Cost per agent", c.data.by_agent)}
         {dim("Cost per workflow", c.data.by_workflow)}
         {dim("Cost per model", c.data.by_model)}
@@ -312,7 +312,7 @@ function PromptsTab({ act }: { act: Act }) {
   const tools = useApi<any[]>("/api/daemon/tools");
   const names = Array.from(new Set((pr.data ?? []).map((x) => x.name)));
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <Card title="Versioned prompts" pad={false}>
         {names.map((n) => {
           const versions = (pr.data ?? []).filter((x) => x.name === n);
@@ -340,7 +340,7 @@ function WorkersTab({ act }: { act: Act }) {
   const hw = useApi<any>("/api/daemon/hardware");
   const [f, setF] = useState({ name: "", base_url: "http://192.168.1.20:8080", models: "" });
   return (
-    <div className="grid gap-4 xl:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
       <Card title="Inference workers (OpenAI-compatible)" pad={false}>
         {w.data?.length ? <Table head={["Name", "URL", "Locality", "Status", ""]}>{w.data.map((x) => <tr key={x.id}><td className="font-medium">{x.name}</td><td className="font-mono text-[11.5px]">{x.base_url}</td>
           <td className={x.locality === "external" ? "text-warning" : "text-ink-2"}>{x.locality}</td><td><StatusBadge status={x.status} /></td>

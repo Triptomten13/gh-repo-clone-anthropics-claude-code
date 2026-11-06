@@ -34,7 +34,7 @@ export default function CampaignStudio() {
       </PageHeader>
       <ErrorBanner error={error || camps.error} />
       {an.data?.insight && <div className="mb-4 rounded-md border border-violet-dim bg-violet/5 px-3 py-2 text-[13px] text-ink-2">{an.data.insight}</div>}
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card title="Contribution after ads vs engagement (per campaign)">
           {chart.length ? (
             <div className="grid grid-cols-2 gap-2">

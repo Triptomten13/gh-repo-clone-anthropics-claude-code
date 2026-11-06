@@ -19,7 +19,7 @@ export default function CollabPage() {
         <select value={kind} onChange={(e) => setKind(e.target.value)}><option value="">all kinds</option>{["discussion", "panel", "council", "competition"].map((k) => <option key={k}>{k}</option>)}</select>
       </PageHeader>
       <ErrorBanner error={sessions.error} />
-      <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[340px_minmax(0,1fr)]">
         <Card title="Sessions" pad={false}>
           {sessions.data?.length ? (
             <ul className="max-h-[760px] divide-y divide-line/60 overflow-auto">

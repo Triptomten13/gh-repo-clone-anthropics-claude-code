@@ -39,7 +39,7 @@ export default function OverviewPage() {
             <Stat label="Pending approvals" value={<Link href="/approvals" className="hover:underline">{d.counts.pending_approvals}</Link>} sub={`${d.counts.queued_tasks} tasks in queue`} />
           </div>
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-3">
+          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
             <Card title="Revenue & profit · last 60 days" className="xl:col-span-2">
               {fin.data?.daily?.length ? <RevenueProfitChart data={fin.data.daily} /> :
                 <Empty title="No ledger data yet">Connect a payment provider or import ledger entries. Figures are only ever computed from recorded transactions.</Empty>}
@@ -58,7 +58,7 @@ export default function OverviewPage() {
             </Card>
           </div>
 
-          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
             <Card title="Best opportunities" action={<Link className="text-[12px] text-violet hover:underline" href="/lab">Laboratory →</Link>}>
               {d.top_products.length ? (
                 <ul className="divide-y divide-line/60">

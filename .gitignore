@@ -16,3 +16,6 @@ backend/data/
 *.gguf
 *.gguf.part
 .dev-logs/
+frontend/tests/.auth/
+frontend/test-results/
+frontend/playwright-report/
