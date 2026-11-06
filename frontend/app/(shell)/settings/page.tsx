@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button, Card, ErrorBanner, PageHeader, StatusBadge, Table } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useApi } from "@/lib/hooks";
+import { SettingsMap } from "@/components/settings-map";
 import { PasswordCard, UsersCard } from "@/components/users";
 
 export default function SettingsPage() {
@@ -17,6 +18,7 @@ export default function SettingsPage() {
   return (
     <>
       <PageHeader kicker="Systems & integrations" title="Configuration status" />
+      <SettingsMap />
       <ErrorBanner error={err} />
       {msg && <div className="mb-4 rounded-md border border-line bg-surface px-3 py-2 font-mono text-[12px] text-ink-2">{msg}</div>}
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">

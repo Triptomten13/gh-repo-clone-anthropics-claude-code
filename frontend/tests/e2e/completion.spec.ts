@@ -112,3 +112,13 @@ test("the command center lists what needs attention and leads to it", async ({ p
   await page.getByRole("link", { name: /of your requests wait for someone else/ }).click();
   await expect(page).toHaveURL(/\/approvals$/);
 });
+
+test("settings: one map shows every setting's current value and leads to its single home", async ({ page }) => {
+  await openShell(page, "/settings");
+  const map = page.getByRole("table", { name: "Settings and where they are changed" });
+  await expect(map.getByRole("cell", { name: "Deployment profile and egress" })).toBeVisible();
+  await expect(map.getByRole("row", { name: /Offline mode/ })).toContainText(/online|offline/);
+  await map.getByRole("link", { name: "DAEMON CORE → Models" }).click();
+  await expect(page).toHaveURL(/\/daemon#models$/);
+  await expect(page.getByRole("button", { name: "Models" })).toHaveAttribute("aria-current", "page");
+});

@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { Button, Card, Empty, ErrorBanner, PageHeader, Stat, StatusBadge, Table } from "@/components/ui";
 import { ago, api } from "@/lib/api";
@@ -58,7 +59,7 @@ export default function AICore() {
             : <div className="p-4"><Empty title="No model calls recorded">Calls appear here (with failed and fallback attempts) as soon as a provider is configured and used.</Empty></div>}
         </Card>
         <Card title="Recent calls (trace)" pad={false}>
-          {calls.data?.length ? <Table head={["When", "Agent", "Purpose", "Provider:model", "Status", "$"]}>{calls.data.map((c) => <tr key={c.id}><td className="text-ink-3">{ago(c.created_at)}</td><td>{c.agent_id}</td><td className="text-[12px] text-ink-3">{c.purpose}</td><td className="font-mono text-[11.5px]">{c.provider}:{c.model}</td><td><StatusBadge status={c.status === "ok" ? "succeeded" : c.status === "refused" ? "blocked" : "failed"} /></td><td className="num">{c.cost_usd}</td></tr>)}</Table>
+          {calls.data?.length ? <Table head={["When", "Agent", "Purpose", "Provider:model", "Status", "$"]}>{calls.data.map((c) => <tr key={c.id}><td className="text-ink-3">{ago(c.created_at)}</td><td>{c.agent_id}</td><td className="text-[12px] text-ink-3">{c.purpose}</td><td className="font-mono text-[11.5px]">{c.provider}:{c.model}</td><td><StatusBadge status={c.status === "ok" ? "succeeded" : c.status === "refused" ? "blocked" : "failed"} /></td><td className="num">{c.cost_usd}{c.run_id ? <> · <Link className="text-violet underline underline-offset-2" href={`/governance#runs/${c.run_id}`}>run #{c.run_id}</Link></> : null}</td></tr>)}</Table>
             : <div className="p-4 text-[12.5px] text-ink-3">No traces yet.</div>}
         </Card>
       </div>

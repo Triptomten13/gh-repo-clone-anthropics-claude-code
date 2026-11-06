@@ -15,6 +15,11 @@ const usd = (v: number | null | undefined, d = 4) => (v === null || v === undefi
 
 export default function DaemonCore() {
   const [tab, setTab] = useState<Tab>("Status");
+  useEffect(() => {  // deep links: /daemon#models, #providers, #costs … (from search, settings and alerts)
+    const h = decodeURIComponent(window.location.hash.slice(1)).toLowerCase();
+    const t = TABS.find((x) => x.toLowerCase() === h || x.toLowerCase().split(" ")[0] === h);
+    if (t) setTab(t);
+  }, []);
   const [err, setErr] = useState<string | null>(null);
   const status = useApi<any>("/api/ai/status");
   const act = async (fn: () => Promise<unknown>, after?: () => void) => {
@@ -30,7 +35,7 @@ export default function DaemonCore() {
       <ErrorBanner error={err ?? status.error} />
       <nav className="mb-5 flex flex-wrap gap-1 border-b border-line" aria-label="DAEMON sections">
         {TABS.map((t) => (
-          <button key={t} onClick={() => setTab(t)} aria-current={tab === t ? "page" : undefined}
+          <button key={t} onClick={() => { setTab(t); history.replaceState(null, "", `#${t.toLowerCase().split(" ")[0]}`); }} aria-current={tab === t ? "page" : undefined}
             className={`-mb-px border-b-2 px-3 py-2 text-[13px] transition ${tab === t ? "border-violet text-ink" : "border-transparent text-ink-3 hover:text-ink-2"}`}>{t}</button>
         ))}
       </nav>

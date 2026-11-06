@@ -153,7 +153,8 @@ function Runs({ initial }: { initial: number | null }) {
       </Card>
       <div ref={replayRef} className={`min-w-0 scroll-mt-20 ${sel ? "order-first xl:order-none" : ""}`}><Card title={sel ? `Replay · run #${sel}` : "Replay"}>
         {!sel ? <Empty title="Select a run" /> : rep.data ? (<>
-          <p className="mb-3 text-[12px] text-ink-3">{rep.data.replay_kind}. Policy version {rep.data.run.policy_version || "—"}.</p>
+          <p className="mb-2 text-[12px] text-ink-3">{rep.data.replay_kind}. Policy version {rep.data.run.policy_version || "—"}.</p>
+          <RunLinks run={rep.data.run} />
           <ol className="space-y-2">{rep.data.events.map((e: any) => (
             <li key={e.seq} className="rounded-md border border-line bg-bg/50 p-2 text-[12.5px]">
               <div className="flex flex-wrap items-center gap-2"><span className="num text-ink-3">{e.seq}</span><span className="font-mono text-cyan">{e.type}</span><span>{e.name}</span>
@@ -167,6 +168,23 @@ function Runs({ initial }: { initial: number | null }) {
           {rep.data.model_calls.length > 0 && <p className="mt-3 text-[12px] text-ink-3">{rep.data.model_calls.length} model attempt(s) · {rep.data.tool_invocations.length} tool call(s) · {rep.data.approvals.length} approval(s) linked.</p>}
         </>) : <ErrorBanner error={rep.error} />}
       </Card></div>
+    </div>
+  );
+}
+
+/** Where a run came from: its agent, the task it executed, the tournament or G-sus run it belongs to, the person. */
+function RunLinks({ run }: { run: any }) {
+  const ref: string = run.ref ?? "";
+  const links: [string, string][] = [];
+  if (run.agent_id) links.push([`/agents?agent=${run.agent_id}`, `agent ${run.agent_id}`]);
+  const m = /^task:(\d+)$/.exec(ref); if (m) links.push([`/agents?task=${m[1]}`, `task #${m[1]}`]);
+  const t = /^creative:(\d+)$/.exec(ref) ?? /^tournament:(\d+)$/.exec(ref); if (t) links.push([`/creative#t-${t[1]}`, `tournament #${t[1]}`]);
+  if (ref.startsWith("gsus:")) links.push(["/chamber", "G-sus Chamber"]);
+  if (!links.length && !run.user_email) return null;
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
+      {links.map(([href, label]) => <Link key={href} className="text-violet underline underline-offset-2" href={href}>{label}</Link>)}
+      {run.user_email && <span className="text-ink-3">started by {run.user_email}</span>}
     </div>
   );
 }
