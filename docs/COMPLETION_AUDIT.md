@@ -30,11 +30,17 @@ three overview pages that do not answer "what needs my attention?".
 | Delete a budget rule | `DELETE /api/budgets/{id}` | Budgets can be created, never removed |
 | Knowledge Vault collections and per-document access | `GET/POST /api/vault/collections`, `PATCH /api/vault/documents/{id}/access` | Classification-aware access (CP4) cannot be managed in the Archive |
 | Audit retention (governed, four eyes) | `POST /api/audit/prune` | Retention can only be requested through the API |
-| Ledger entry and ledger import | `POST /api/finance/ledger`, `POST /api/import/ledger` | Finance and the Operating picture show "No ledger data" and nothing in the interface can add real data |
+| Ledger entry | `POST /api/finance/ledger` | Finance and the Operating picture show "No ledger data"; a single entry could not be recorded anywhere, and the CSV/JSON ledger import (`/api/import/ledger`, reachable but hidden in Opportunity database → Import) was not mentioned on the Finance page — the static map missed it because the URL is built at runtime |
 | Telemetry retention, cache purge, model unload | `POST /api/control/retention`, `/api/daemon/cache/purge`, `/api/control/unload/{key}` | Operator maintenance only through the API |
 
 Intentionally API-only (no UI needed): `/api/ai/*` (internal AI API for programs), `/health`, `/ready`, `/api/version`,
 `/api/events/stream` (used by the live feed), streaming variants.
+
+### 2.1b BROKEN — a workflow that could not be completed
+
+* **Governed changes could never be applied from the interface.** Proposing a policy rule, a budget, a grant, an egress
+  change, a release gate or wider document access files an approval and says "repeat the change with that approval" —
+  but no form can send an approval id, so once someone approved it, nothing in the interface could apply it.
 
 ### 2.2 MISSING — needed for the application to work as one system
 

@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { RevenueProfitChart } from "@/components/charts";
 import { Button, Card, Empty, ErrorBanner, Field, Json, PageHeader, Stat, Table } from "@/components/ui";
@@ -30,6 +31,7 @@ export default function FinancePage() {
         <select value={days} onChange={(e) => setDays(Number(e.target.value))} aria-label="Period (days)">{[7, 30, 90, 365].map((d) => <option key={d} value={d}>last {d} days</option>)}</select>
       </PageHeader>
       <ErrorBanner error={err || sum.error} />
+      <LedgerEntryForm onSaved={() => { sum.reload(); fc.reload(); }} />
       {s && (
         <>
           {s.contains_demo_data && <div className="mb-4 rounded-md border border-violet-dim bg-violet/5 px-3 py-2 text-[12.5px] text-ink-2">Includes <b className="text-violet">synthetic demo</b> ledger entries.</div>}
@@ -123,5 +125,49 @@ function UnitEconomicsCalculator() {
         </div>
       )}
     </Card>
+  );
+}
+
+const KINDS = ["revenue", "cogs", "shipping", "fees", "ad_spend", "refund", "chargeback", "opex", "tax"];
+
+/** Real numbers in: one entry at a time here, or many at once as CSV/JSON (Opportunity database → Import). Amounts are
+ *  positive; the kind decides the sign. Every entry is audited. */
+function LedgerEntryForm({ onSaved }: { onSaved: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ kind: "revenue", amount: "", occurred_at: new Date().toISOString().slice(0, 10), channel: "direct", reference: "", product_id: "" });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const amount = Number(f.amount);
+  const save = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await api<any>("/api/finance/ledger", { method: "POST", json: { kind: f.kind, amount, occurred_at: new Date(f.occurred_at).toISOString(),
+        channel: f.channel || "direct", reference: f.reference, product_id: f.product_id ? Number(f.product_id) : null } });
+      setMsg({ ok: true, text: `Recorded ${f.kind} ${sek(amount)} as entry #${r.id}.` }); setF({ ...f, amount: "", reference: "" }); onSaved();
+    } catch (e) { setMsg({ ok: false, text: (e as Error).message }); } finally { setBusy(false); }
+  };
+  return (
+    <div className="mb-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button onClick={() => setOpen((o) => !o)}>{open ? "Close" : "Record an entry"}</Button>
+        <Link className="text-[12.5px] text-violet hover:underline" href="/lab?import=ledger">Import many (CSV / JSON) →</Link>
+      </div>
+      {open && (
+        <Card title="Record a ledger entry" className="mt-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
+            <Field label="Kind"><select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}>{KINDS.map((k) => <option key={k}>{k}</option>)}</select></Field>
+            <Field label="Amount (SEK, positive)"><input inputMode="decimal" value={f.amount} onChange={(e) => setF({ ...f, amount: e.target.value })} /></Field>
+            <Field label="Date"><input type="date" value={f.occurred_at} onChange={(e) => setF({ ...f, occurred_at: e.target.value })} /></Field>
+            <Field label="Channel"><input value={f.channel} onChange={(e) => setF({ ...f, channel: e.target.value })} /></Field>
+            <Field label="Product id (optional)"><input inputMode="numeric" value={f.product_id} onChange={(e) => setF({ ...f, product_id: e.target.value.replace(/\D/g, "") })} /></Field>
+            <Field label="Reference"><input value={f.reference} onChange={(e) => setF({ ...f, reference: e.target.value })} placeholder="order / invoice no." /></Field>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button variant="primary" busy={busy} disabled={!(amount >= 0) || f.amount === "" || !f.occurred_at} onClick={save}>Save entry</Button>
+            {msg && <span role="status" className={`text-[12.5px] ${msg.ok ? "text-good" : "text-[#f08a8a]"}`}>{msg.text}</span>}
+          </div>
+        </Card>
+      )}
+    </div>
   );
 }

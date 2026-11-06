@@ -17,6 +17,7 @@ from ..governance import audit_chain
 from ..governance import core as gov
 from ..models import Approval, PolicyRule, ToolGrant, ToolInvocation, User
 from ..security.rbac import PERMISSIONS, ROLES, require_permission
+from ..security.auth import current_user
 
 
 def _cols(o: Any) -> dict[str, Any]:
@@ -196,6 +197,15 @@ def policy_disable(key: str, approval_id: int | None = None, db: Session = Depen
 # ------------------------------------------------------------------ approvals (lifecycle)
 class DelegateIn(BaseModel):
     to: str = Field(min_length=3, max_length=255)
+
+
+@router.get("/approvals/approvers")
+def approval_approvers(db: Session = Depends(get_db), user: User = Depends(require_permission("approval.decide"))):
+    """People a pending approval can be delegated to: active users who may decide approvals (never the caller)."""
+    from ..security.rbac import has
+
+    return [{"email": u.email, "role": u.role} for u in db.scalars(select(User).order_by(User.email))
+            if u.email != user.email and not u.disabled and has(u, "approval.decide")]
 
 
 @router.post("/approvals/{aid}/revoke")
@@ -627,3 +637,46 @@ def gates_check(c: GateCheckIn, db: Session = Depends(get_db), user: User = Depe
         return {"passed": False, "gate_run": _cols(e.run)}
     db.commit()
     return {"passed": True, "gate_run": _cols(run)}
+
+
+# ------------------------------------------------------------------ apply an approved governance change
+# A governed change is filed as an approval the first time it is requested; it is applied by calling the same endpoint
+# again with that approval. The interface had no way to do the second step, so approved changes could never be applied.
+# This endpoint repeats the stored request through the ORIGINAL route, so every check runs again: the caller's own
+# permission, the policy decision, approval bound to the exact payload, decided by someone else, not expired, revoked or used.
+_APPLY: dict[str, str] = {"policy.write": "policy.write", "audit.prune": "audit.retention", "tools.grant": "tools.grant",
+                          "knowledge.declassify": "knowledge.admin", "budget.change": "system.configure",
+                          "deploy.loosen_egress": "system.configure", "gates.change": "gates.write"}
+
+
+@router.post("/approvals/{aid}/apply")
+def approval_apply(aid: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    from ..security.rbac import has
+
+    a = db.get(Approval, aid)
+    if a is None:
+        raise HTTPException(404)
+    perm = _APPLY.get(a.action)
+    if perm is None:
+        raise HTTPException(422, f"{a.action} is applied by the agent or tool call that requested it, not from here")
+    if not has(user, perm):
+        raise HTTPException(403, f"applying {a.action} needs the {perm} permission")
+    if a.status != "approved":
+        raise HTTPException(409, f"approval #{aid} is {a.status}, not approved")
+    p = dict(a.payload or {})
+    if a.action == "policy.write":
+        return policy_disable(p["disable"], aid, db, user) if "disable" in p else policy_upsert(RuleIn(**p, approval_id=aid), db, user)
+    if a.action == "audit.prune":
+        return audit_prune(PruneIn(before=p["before"], approval_id=aid), db, user)
+    if a.action == "tools.grant":
+        return tools_grant(GrantIn(**p, approval_id=aid), db, user)
+    if a.action == "knowledge.declassify":
+        if "document" in p:
+            return vault_document_access(p["document"], AccessIn(classification=p.get("classification"), collection=p.get("collection"),
+                                                                 access=p.get("access"), approval_id=aid), db, user)
+        return vault_collection_upsert(CollectionIn(**p, approval_id=aid), db, user)
+    if a.action == "budget.change":
+        return budgets_disable(p["disable"], aid, db, user) if "disable" in p else budgets_create(BudgetIn(**p, approval_id=aid), db, user)
+    if a.action == "deploy.loosen_egress":
+        return deployment_set(DeploymentIn(**p, approval_id=aid), db, user)
+    return gates_upsert(GateIn(**p, approval_id=aid), db, user)

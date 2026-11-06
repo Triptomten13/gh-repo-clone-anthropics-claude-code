@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, Card, DemoBadge, Empty, ErrorBanner, Field, PageHeader, ScoreBar, StatusBadge, Table } from "@/components/ui";
 import { api, pct, sek } from "@/lib/api";
 import { useApi, useRefreshOn } from "@/lib/hooks";
@@ -27,6 +27,8 @@ export default function LabPage() {
   const [err, setErr] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [importKind, setImportKind] = useState("products");
+  useEffect(() => { const k = new URLSearchParams(window.location.search).get("import"); if (k) { setImportKind(k); setShowImport(true); } }, []);
   const [compare, setCompare] = useState<number[]>([]);
 
   const evaluateAll = async () => {
@@ -45,7 +47,7 @@ export default function LabPage() {
       </PageHeader>
       <ErrorBanner error={err || prods.error} />
       {showAdd && <AddProduct onDone={() => { setShowAdd(false); prods.reload(); }} onError={setErr} />}
-      {showImport && <ImportBox onDone={() => { setShowImport(false); prods.reload(); }} onError={setErr} />}
+      {showImport && <ImportBox initialKind={importKind} onDone={() => { setShowImport(false); prods.reload(); }} onError={setErr} />}
 
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <Field label="Search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="name or description" /></Field>
@@ -124,8 +126,8 @@ function AddProduct({ onDone, onError }: { onDone: () => void; onError: (e: stri
   );
 }
 
-function ImportBox({ onDone, onError }: { onDone: () => void; onError: (e: string) => void }) {
-  const [kind, setKind] = useState("products");
+function ImportBox({ initialKind = "products", onDone, onError }: { initialKind?: string; onDone: () => void; onError: (e: string) => void }) {
+  const [kind, setKind] = useState(initialKind);
   const [format, setFormat] = useState("csv");
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);

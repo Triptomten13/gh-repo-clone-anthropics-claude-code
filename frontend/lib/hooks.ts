@@ -21,6 +21,24 @@ export function useApi<T>(path: string | null, deps: unknown[] = []) {
   return { data, error, loading, reload, setData };
 }
 
+export type Me = { email: string; role: string; permissions: string[] };
+let meCache: { token: string | null; p: Promise<Me | null> } | null = null;
+
+/** The signed-in user with their permissions — one request per sign-in, shared by every component that asks.
+ *  Used to show only the actions a person may take; the server enforces the same permissions on every call. */
+export function useMe(): Me | null {
+  const [me, setMe] = useState<Me | null>(null);
+  useEffect(() => {
+    let token: string | null = null;
+    try { token = localStorage.getItem("rocky.token"); } catch { /* storage unavailable */ }
+    if (!meCache || meCache.token !== token) meCache = { token, p: api<Me>("/api/auth/me").catch(() => null) };
+    let live = true;
+    meCache.p.then((m) => { if (live) setMe(m); });
+    return () => { live = false; };
+  }, []);
+  return me;
+}
+
 /** Subscribe to the live agent event stream (one shared connection per tab — see lib/live.ts). */
 export function useLiveEvents(onEvent?: (e: LiveEvent) => void, max = 80) {
   const [events, setEvents] = useState<LiveEvent[]>([]);

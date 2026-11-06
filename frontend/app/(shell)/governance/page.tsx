@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useDialog } from "@/components/dialog";
+import { GovernedResult } from "@/components/governed";
 import { Button, Card, Empty, ErrorBanner, PageHeader, StatusBadge, Table } from "@/components/ui";
 import { ago, api, API_URL, getToken } from "@/lib/api";
 import { useApi } from "@/lib/hooks";
@@ -14,15 +15,7 @@ const TABS = [["policies", "Policies"], ["tools", "Tool security"], ["runs", "Ru
 const CAT_STATUS: Record<string, string> = { AUTONOMOUS: "permitted", SUPERVISED: "review_required", APPROVAL_REQUIRED: "pending", RESTRICTED: "restricted", PROHIBITED: "blocked" };
 const INV_STATUS: Record<string, string> = { ok: "succeeded", denied: "blocked", pending_approval: "pending", budget_exhausted: "blocked", not_configured: "missing_credentials", error: "failed", invalid: "rejected", blocked: "blocked" };
 
-function Pending({ res }: { res: any }) {
-  if (!res) return null;
-  if (res.status === "pending_approval") {
-    return <div role="status" className="mt-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-[13px] text-warning">
-      Filed as approval #{res.approval_id} ({res.category}). Another approver must approve it in the <Link className="underline" href="/approvals">Approval Center</Link>;
-      then repeat the change with that approval. Nothing has changed yet.</div>;
-  }
-  return <div role="status" className="mt-3 rounded-md border border-good/40 bg-good/10 px-3 py-2 text-[13px] text-good">Applied.</div>;
-}
+const Pending = GovernedResult;
 
 export default function Governance() {
   const [tab, setTab] = useState<string>("policies");
@@ -54,18 +47,40 @@ function Policies() {
   const [res, setRes] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
   const submit = async () => { try { setRes(await api("/api/policies", { method: "POST", json: form })); setErr(null); p.reload(); } catch (e) { setErr((e as Error).message); } };
+  const [hist, setHist] = useState<string | null>(null);
+  const [histRes, setHistRes] = useState<any>(null);
+  const history = useApi<any[]>(hist ? `/api/policies/history?key=${encodeURIComponent(hist)}` : null, [hist]);
+  const dlg = useDialog();
+  const governed = async (f: () => Promise<unknown>) => { try { setHistRes(await f()); setErr(null); p.reload(); history.reload(); } catch (e) { setErr((e as Error).message); } };
+  const disable = async (key: string) => {
+    if (!(await dlg.confirm({ title: `Disable rule ${key}?`, message: "Removing a rule loosens control, so a second approver must agree before it takes effect.", confirmLabel: "Request", danger: true }))) return;
+    governed(() => api(`/api/policies/${encodeURIComponent(key)}/disable`, { method: "POST" }));
+  };
+  const rollback = (key: string, v: number) => governed(() => api(`/api/policies/${encodeURIComponent(key)}/rollback`, { method: "POST", json: { to_version: v } }));
   const d = p.data;
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-4">
         <ErrorBanner error={p.error} />
         <Card title={`Active rules · policy version ${d?.version ?? "…"}`} pad={false}>
-          {d?.rules?.length ? <Table head={["Rule", "Action", "Category", "Conditions", "By"]} label="Policy rules">{d.rules.map((r: any) => (
+          {d?.rules?.length ? <Table head={["Rule", "Action", "Category", "Conditions", "By", ""]} label="Policy rules">{d.rules.map((r: any) => (
             <tr key={r.id}><td className="font-mono text-[12px]">{r.key}@{r.version}</td><td className="font-mono text-[12px]">{r.action}</td>
               <td><StatusBadge status={CAT_STATUS[d.categories[r.category]] ?? "unverified"} /> <span className="text-[11px] text-ink-3">{d.categories[r.category]}</span></td>
-              <td className="max-w-xs text-[11.5px] text-ink-3">{Object.keys(r.conditions || {}).length ? JSON.stringify(r.conditions) : "—"}</td><td className="text-ink-3">{r.created_by}</td></tr>))}</Table>
+              <td className="max-w-xs text-[11.5px] text-ink-3">{Object.keys(r.conditions || {}).length ? JSON.stringify(r.conditions) : "—"}</td><td className="text-ink-3">{r.created_by}</td>
+              <td><div className="flex gap-1.5"><Button onClick={() => setHist(hist === r.key ? null : r.key)}>{hist === r.key ? "Hide history" : "History"}</Button>
+                <Button variant="danger" onClick={() => disable(r.key)}>Disable</Button></div></td></tr>))}</Table>
             : <div className="p-4"><Empty title="No configurable rules yet">The built-in floors below already apply to every action.</Empty></div>}
         </Card>
+        {hist && <Card title={`History of ${hist}`} pad={false}>
+          <ErrorBanner error={history.error} />
+          {history.data?.length ? <Table head={["Version", "Action", "Category", "Reason", "By", "When", ""]} label={`History of ${hist}`}>{history.data.map((v: any) => (
+            <tr key={v.id}><td className="font-mono text-[12px]">v{v.version}{v.superseded_at ? "" : v.enabled === false ? " · disabled" : " · active"}</td>
+              <td className="font-mono text-[12px]">{v.action}</td><td className="text-[12px] text-ink-3">{d?.categories?.[v.category]}</td>
+              <td className="max-w-xs text-[12px] text-ink-3">{v.reason || "—"}</td><td className="text-ink-3">{v.created_by}</td><td className="text-ink-3">{ago(v.created_at)}</td>
+              <td>{v.superseded_at && <Button onClick={() => rollback(hist, v.version)}>Roll back to v{v.version}</Button>}</td></tr>))}</Table>
+            : <div className="p-4 text-[13px] text-ink-3">{history.loading ? "Loading…" : "No versions."}</div>}
+          <div className="px-4 pb-3"><Pending res={histRes} onApplied={() => { p.reload(); history.reload(); }} /></div>
+        </Card>}
         <Card title="Mandatory floors (rules can raise, never lower)">
           <div className="grid grid-cols-1 gap-x-6 gap-y-1 text-[12.5px] sm:grid-cols-2">
             {d && Object.entries(d.mandatory.floors).map(([k, v]: any) => <div key={k} className="flex justify-between gap-2"><span className="font-mono text-ink-2">{k}</span><span className="text-ink-3">{v}</span></div>)}
@@ -81,7 +96,7 @@ function Policies() {
             {d && Object.entries(d.categories).map(([n, name]: any) => <option key={n} value={n}>{n} · {name}</option>)}</select></label>
           <label className="block text-[12px] text-ink-3">Reason<input className="mt-1 w-full" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} /></label>
           <Button variant="primary" disabled={form.key.length < 3 || !form.action} onClick={submit}>Propose</Button>
-          <ErrorBanner error={err} /><Pending res={res} />
+          <ErrorBanner error={err} /><Pending res={res} onApplied={p.reload} />
         </div>
       </Card>
     </div>
@@ -201,6 +216,7 @@ function Audit() {
           <p className="mt-2 text-[12px] text-ink-3">{v.limitations ?? "Detects edits, deletions, re-ordering and truncation by anyone without the audit key."}</p></div>
           : <p className="text-[13px] text-ink-3">Verification walks every record from the retention anchor and reports the first one that does not match its seal.</p>}
       </Card>
+      <Retention />
       <Card title="Records" pad={false}>
         <div className="flex flex-wrap gap-2 p-3">
           <input aria-label="filter by actor" placeholder="actor" value={f.actor} onChange={(e) => setF({ ...f, actor: e.target.value })} />
@@ -213,6 +229,25 @@ function Audit() {
           : <div className="p-4"><Empty title="No matching records" /></div>}
       </Card>
     </div>
+  );
+}
+
+/** Retention: removing evidence is RESTRICTED — a second person approves this exact cut-off, and records younger than the
+ *  minimum retention age (AUDIT_MIN_RETENTION_DAYS, default 365) are always kept. */
+function Retention() {
+  const [before, setBefore] = useState("");
+  const [res, setRes] = useState<any>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const request = async () => { try { setRes(await api("/api/audit/prune", { method: "POST", json: { before: new Date(before).toISOString() } })); setErr(null); } catch (e) { setErr((e as Error).message); } };
+  return (
+    <Card title="Retention (prune old records — needs a second approver)">
+      <div className="flex flex-wrap items-end gap-2">
+        <label className="text-[12px] text-ink-3">Remove records created before<input type="date" className="mt-1 block" value={before} onChange={(e) => setBefore(e.target.value)} /></label>
+        <Button disabled={!before} onClick={request}>Request pruning</Button>
+      </div>
+      <p className="mt-2 text-[12px] text-ink-3">The chain stays verifiable: an anchor records where it continues. Records younger than the minimum retention age are never removed, whatever date is asked for.</p>
+      <ErrorBanner error={err} /><Pending res={res} />
+    </Card>
   );
 }
 
@@ -233,7 +268,7 @@ function Deployment() {
         <ErrorBanner error={d.error || err} />
         <ul className="space-y-1.5 text-[13px]">{d.data && Object.entries(d.data.profiles).map(([k, v]: any) => (
           <li key={k} className="flex flex-wrap items-center gap-2"><Button variant={d.data.deployment.profile === k ? "primary" : "ghost"} onClick={() => setProfile(k)} disabled={d.data.deployment.profile === k}>{k}</Button><span className="text-ink-3">{v}</span></li>))}</ul>
-        <Pending res={res} />
+        <Pending res={res} onApplied={d.reload} />
       </Card>
       <Card title="Outbound connections" action={<Button onClick={async () => setProbe(await api("/api/deployment/egress/verify"))}>Self-test</Button>}>
         {e && <div className="text-[13px]"><StatusBadge status={e.enforcing ? "restricted" : "permitted"} /> {e.enforcing ? "restricted" : "not restricted (online)"} · allowed {e.counts.allowed} · refused {e.counts.denied}
@@ -255,13 +290,19 @@ function Budgets() {
   const [res, setRes] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
   const submit = async () => { try { setRes(await api("/api/budgets", { method: "POST", json: form })); setErr(null); b.reload(); } catch (e) { setErr((e as Error).message); } };
+  const dlg = useDialog();
+  const remove = async (id: number) => {
+    if (!(await dlg.confirm({ title: `Remove budget #${id}?`, message: "Removing a limit loosens control, so a second approver must agree before it takes effect.", confirmLabel: "Request removal", danger: true }))) return;
+    try { setRes(await api(`/api/budgets/${id}`, { method: "DELETE" })); setErr(null); b.reload(); } catch (e) { setErr((e as Error).message); }
+  };
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
       <Card title="Hard limits (checked before a call runs — never bypassed)" pad={false}>
         <ErrorBanner error={b.error} />
-        {b.data?.length ? <Table head={["Scope", "Metric", "Limit", "Used today", "State"]} label="Budgets">{b.data.map((x) => (
+        {b.data?.length ? <Table head={["Scope", "Metric", "Limit", "Used today", "State", ""]} label="Budgets">{b.data.map((x) => (
           <tr key={x.id}><td>{x.scope_kind}:<span className="font-mono">{x.scope_id}</span></td><td>{x.metric}/{x.period}</td><td className="num">{x.limit}</td>
-            <td className="num">{x.used_today ?? "—"}</td><td><StatusBadge status={x.enabled ? "active" : "disabled"} /></td></tr>))}</Table>
+            <td className="num">{x.used_today ?? "—"}</td><td><StatusBadge status={x.enabled ? "active" : "disabled"} /></td>
+            <td>{x.enabled && <Button variant="danger" onClick={() => remove(x.id)}>Remove</Button>}</td></tr>))}</Table>
           : <div className="p-4"><Empty title="No budget rules">Global daily/monthly USD limits and per-agent token budgets (DAEMON CORE) still apply.</Empty></div>}
       </Card>
       <Card title="Propose a limit (second approver)">
@@ -272,7 +313,7 @@ function Budgets() {
           <label className="block">Per<select className="mt-1 w-full" value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })}><option>day</option><option>month</option></select></label>
           <label className="block">Limit<input type="number" min={0} className="mt-1 w-full" value={form.limit} onChange={(e) => setForm({ ...form, limit: Number(e.target.value) })} /></label>
           <Button variant="primary" onClick={submit} disabled={!(form.limit > 0)}>Propose</Button>
-          <ErrorBanner error={err} /><Pending res={res} />
+          <ErrorBanner error={err} /><Pending res={res} onApplied={b.reload} />
         </div>
       </Card>
     </div>

@@ -2,9 +2,10 @@
 import { useDialog } from "@/components/dialog";
 import { Fragment, useEffect, useState } from "react";
 import { GraphView } from "@/components/flare";
+import { GovernedResult } from "@/components/governed";
 import { Button, Card, Empty, ErrorBanner, EVIDENCE_CLASSES, EvidenceBadge, Field, PageHeader, Stat, StatusBadge, Table } from "@/components/ui";
 import { ago, api, API_URL, getToken } from "@/lib/api";
-import { useApi } from "@/lib/hooks";
+import { useApi, useMe } from "@/lib/hooks";
 
 const TABS = [["search", "Search"], ["ask", "Ask the Archive"], ["documents", "Documents"], ["entities", "Entities & graph"], ["memory", "Memory"]] as const;
 
@@ -114,6 +115,7 @@ function DocumentsTab({ docId, setDocId, onChange }: { docId: number | null; set
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
       <div className="space-y-4">
         <AddDocument onDone={(id) => { docs.reload(); onChange(); setDocId(id); }} onError={setErr} />
+        <Collections />
         <ErrorBanner error={err} />
         <Card title="Documents" action={<select value={ev} onChange={(e) => setEv(e.target.value)} aria-label="evidence filter"><option value="">all classes</option>{EVIDENCE_CLASSES.map((c) => <option key={c} value={c}>{c.replaceAll("_", " ")}</option>)}</select>} pad={false}>
           {docs.data?.length ? (
@@ -208,7 +210,79 @@ function DocumentDetail({ id, onChange, onClose }: { id: number; onChange: () =>
         <select value={note.evidence_class} onChange={(e) => setNote({ ...note, evidence_class: e.target.value })} aria-label="Annotation evidence class">{EVIDENCE_CLASSES.map((c) => <option key={c} value={c}>{c.replaceAll("_", " ")}</option>)}</select>
         <Button disabled={!note.text} onClick={annotate}>Add</Button>
       </div>
+      <DocumentAccess doc={x} onChange={() => { d.reload(); onChange(); }} />
       <div className="mt-4 border-t border-line pt-3"><Button variant="danger" onClick={del}>Delete document (admin)</Button></div>
+    </Card>
+  );
+}
+
+const CLASSES = ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED", "HIGHLY_SENSITIVE"];
+const list = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
+
+/** Who may read this document: classification, collection (its access is inherited) and explicit roles/people.
+ *  Narrowing applies at once; widening access is governed — a second person approves it first. */
+function DocumentAccess({ doc, onChange }: { doc: any; onChange: () => void }) {
+  const me = useMe();
+  const admin = me?.permissions?.includes("knowledge.admin");
+  const cols = useApi<any[]>(admin ? "/api/vault/collections" : null, [admin]);
+  const [f, setF] = useState({ classification: doc.classification ?? "INTERNAL", collection: doc.collection ?? "general",
+    roles: (doc.access?.roles ?? []).join(", "), users: (doc.access?.users ?? []).join(", ") });
+  const [res, setRes] = useState<any>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const save = async () => {
+    try {
+      setRes(await api(`/api/vault/documents/${doc.id}/access`, { method: "PATCH", json: { classification: f.classification, collection: f.collection,
+        access: { roles: list(f.roles), users: list(f.users) } } })); setErr(null); onChange();
+    } catch (e) { setErr((e as Error).message); }
+  };
+  return (
+    <div className="mt-4 border-t border-line pt-3">
+      <div className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-cyan">Access</div>
+      <p className="mt-1 text-[12px] text-ink-2">{doc.classification ?? "INTERNAL"} · collection <span className="font-mono">{doc.collection ?? "general"}</span>
+        {(doc.access?.roles?.length || doc.access?.users?.length) ? <> · only {[...(doc.access.roles ?? []), ...(doc.access.users ?? [])].join(", ")}</> : null}</p>
+      {admin ? (
+        <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <Field label="Classification"><select value={f.classification} onChange={(e) => setF({ ...f, classification: e.target.value })}>{CLASSES.map((c) => <option key={c}>{c}</option>)}</select></Field>
+          <Field label="Collection"><select value={f.collection} onChange={(e) => setF({ ...f, collection: e.target.value })}>
+            {(cols.data ?? [{ name: f.collection }]).map((c: any) => <option key={c.name} value={c.name}>{c.name}{c.classification ? ` (${c.classification})` : ""}</option>)}</select></Field>
+          <Field label="Only these roles (comma-separated, empty = by classification)"><input value={f.roles} onChange={(e) => setF({ ...f, roles: e.target.value })} placeholder="admin, auditor" /></Field>
+          <Field label="Only these people (e-mail, comma-separated)"><input value={f.users} onChange={(e) => setF({ ...f, users: e.target.value })} /></Field>
+          <div className="sm:col-span-2"><Button onClick={save}>Save access</Button> <span className="text-[11.5px] text-ink-3">Narrowing applies at once; widening needs a second approver.</span></div>
+          <div className="sm:col-span-2"><ErrorBanner error={err} /><GovernedResult res={res} onApplied={onChange} /></div>
+        </div>
+      ) : <p className="mt-1 text-[11.5px] text-ink-3">Changing access needs the knowledge administration permission.</p>}
+    </div>
+  );
+}
+
+/** Collections group documents under one classification and access list that every document in them inherits. */
+function Collections() {
+  const me = useMe();
+  const admin = me?.permissions?.includes("knowledge.admin");
+  const cols = useApi<any[]>("/api/vault/collections");
+  const [f, setF] = useState({ name: "", description: "", classification: "INTERNAL", roles: "" });
+  const [res, setRes] = useState<any>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const save = async () => {
+    try { setRes(await api("/api/vault/collections", { method: "POST", json: { name: f.name, description: f.description, classification: f.classification, access: { roles: list(f.roles) } } }));
+      setErr(null); cols.reload(); setF({ name: "", description: "", classification: "INTERNAL", roles: "" }); } catch (e) { setErr((e as Error).message); }
+  };
+  return (
+    <Card title="Collections (access is inherited by their documents)" pad={false}>
+      <ErrorBanner error={cols.error} />
+      {cols.data?.length ? <Table head={["Collection", "Classification", "Only for", "Documents"]} label="Collections">{cols.data.map((c) => (
+        <tr key={c.name}><td><span className="font-mono text-[12px]">{c.name}</span>{c.implicit && <span className="ml-1 text-[11px] text-ink-3">(default)</span>}<div className="text-[11.5px] text-ink-3">{c.description}</div></td>
+          <td className="text-[12px]">{c.classification}</td><td className="text-[12px] text-ink-3">{[...(c.access?.roles ?? []), ...(c.access?.users ?? [])].join(", ") || "—"}</td><td className="num">{c.documents}</td></tr>))}</Table>
+        : <div className="p-4 text-[13px] text-ink-3">{cols.loading ? "Loading…" : "No collections."}</div>}
+      {admin && (
+        <div className="grid grid-cols-1 gap-2 border-t border-line p-3 sm:grid-cols-4">
+          <Field label="Name (a-z, 0-9, . _ -)"><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value.toLowerCase() })} /></Field>
+          <Field label="Classification"><select value={f.classification} onChange={(e) => setF({ ...f, classification: e.target.value })}>{CLASSES.map((c) => <option key={c}>{c}</option>)}</select></Field>
+          <Field label="Only these roles"><input value={f.roles} onChange={(e) => setF({ ...f, roles: e.target.value })} placeholder="optional" /></Field>
+          <div className="flex items-end"><Button disabled={!/^[a-z0-9_.-]+$/.test(f.name)} onClick={save}>Create / update</Button></div>
+          <div className="sm:col-span-4"><ErrorBanner error={err} /><GovernedResult res={res} onApplied={cols.reload} /></div>
+        </div>
+      )}
     </Card>
   );
 }

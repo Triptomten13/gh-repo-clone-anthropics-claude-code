@@ -96,6 +96,7 @@ const STATUS: Record<string, { cls: string; icon: ReactNode; label?: string }> =
   removed: { cls: "text-ink-3 border-line-strong", icon: <OctagonX size={12} /> },
   disabled: { cls: "text-ink-3 border-line-strong", icon: <OctagonX size={12} /> },
   revoked: { cls: "text-ink-3 border-line-strong", icon: <OctagonX size={12} /> },
+  expired: { cls: "text-ink-3 border-line-strong", icon: <CircleDashed size={12} /> },
   paused: { cls: "text-warning border-warning/40", icon: <OctagonX size={12} /> },
   unreachable: { cls: "text-[#f08a8a] border-critical/50", icon: <AlertTriangle size={12} /> },
   does_not_fit: { cls: "text-[#f08a8a] border-critical/50", icon: <OctagonX size={12} />, label: "does not fit" },
