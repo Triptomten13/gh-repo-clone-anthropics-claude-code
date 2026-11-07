@@ -13,6 +13,6 @@ export async function openShell(page: Page, path = "/") {
 /** Every page in the navigation (the shell routes). */
 export const ROUTES = ["/", "/agents", "/ai", "/approvals", "/archive", "/archivum", "/chamber", "/control", "/daemon", "/experiments", "/field",
   "/finance", "/flare", "/flare/brands", "/flare/campaigns", "/flare/collab", "/flare/mutations", "/flare/personas", "/flare/portfolio",
-  "/flare/sideways", "/governance", "/hq", "/knowledge", "/lab", "/portfolio", "/radar", "/research", "/settings", "/demo", "/creative"];
+  "/flare/sideways", "/governance", "/hq", "/knowledge", "/lab", "/portfolio", "/radar", "/research", "/settings", "/demo", "/creative", "/autonomy"];
 /** Public pages (no sign-in, no app navigation). */
 export const PUBLIC_ROUTES = ["/welcome", "/status", "/login"];

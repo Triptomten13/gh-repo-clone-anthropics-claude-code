@@ -33,6 +33,10 @@ TASKS: dict[str, dict[str, str]] = {
     "small": {"search": "0.6b", "why": "fast, small models for classification and routing"},
     "embedding": {"search": "embedding", "why": "Archive search embeddings"},
 }
+# What a repository must declare to be useful for the task (Hub `pipeline_tag`, or the equivalent tag). Found in the first
+# real run: a search for small models returned speech-recognition, text-to-speech, embedding and reranker GGUFs.
+CHAT_PIPELINES = {"text-generation", "image-text-to-text", "conversational"}
+TASK_PIPELINES = {"embedding": {"feature-extraction", "sentence-similarity"}}
 QUANT_PREFERENCE = ["Q4_K_M", "Q4_K_S", "IQ4_XS", "Q4_0", "Q5_K_M", "Q5_K_S", "Q6_K", "Q8_0"]
 SAFETY_TAGS = ("abliterated", "uncensored", "jailbreak", "decensored")
 SPLIT = re.compile(r"-\d{5}-of-\d{5}\.gguf$", re.I)
@@ -78,6 +82,8 @@ def details(repo: str, *, client: httpx.Client | None = None) -> dict[str, Any]:
     lic = ((meta.get("cardData") or {}).get("license") or next((t.split(":", 1)[1] for t in tags if t.startswith("license:")), "")).lower()
     base = (meta.get("cardData") or {}).get("base_model") or next((t.split(":", 1)[1] for t in tags if t.startswith("base_model:") and t.count(":") == 1), "")
     gg = meta.get("gguf") or {}
+    if meta.get("pipeline_tag"):
+        tags = [f"pipeline:{meta['pipeline_tag']}", *tags]
     return {"revision": meta.get("sha", ""), "license": lic, "gated": bool(meta.get("gated")), "tags": tags[:40],
             "base_model": base if isinstance(base, str) else (base[0] if base else ""), "downloads": meta.get("downloads", 0),
             "likes": meta.get("likes", 0), "last_modified": meta.get("lastModified", "") or "",
@@ -85,6 +91,32 @@ def details(repo: str, *, client: httpx.Client | None = None) -> dict[str, Any]:
             "architecture": gg.get("architecture", ""),
             "file": f["path"] if f else "", "size_bytes": f["lfs"].get("size", 0) if f else 0, "sha256": f["lfs"].get("oid", "") if f else "",
             "quantization": (QUANT.search(f["path"]).group(1).upper() if f and QUANT.search(f["path"]) else "")}
+
+
+def purpose_ok(c: Any) -> tuple[bool, str]:
+    """Does the repository declare that it can do the task it was found for?"""
+    tags = set(c.tags or [])
+    pipeline = next((t.split(":", 1)[1] for t in tags if t.startswith("pipeline:")), "")
+    want = TASK_PIPELINES.get(c.task, CHAT_PIPELINES)
+    if pipeline in want or (not pipeline and tags & want):
+        return True, ""
+    return False, (f"not a {'embedding' if c.task == 'embedding' else 'chat / text-generation'} model "
+                   f"(declared task: {pipeline or 'none'})")
+
+
+def rescreen(db: Session) -> int:
+    """Re-apply the screening rules to stored candidates (after a rule change) without contacting the Hub."""
+    from ..daemon import hardware
+    from ..models import LocalModel, ModelCandidate
+
+    snap = hardware.snapshot()
+    installed = {m.sha256_actual for m in db.scalars(select(LocalModel).where(LocalModel.status == "installed")) if m.sha256_actual}
+    n = 0
+    for c in db.scalars(select(ModelCandidate).where(ModelCandidate.status.in_(("discovered", "shortlisted", "screened_out")))):
+        screen(c, snap=snap, installed=installed)
+        n += 1
+    db.commit()
+    return n
 
 
 def screen(c: Any, *, snap: dict[str, Any] | None = None, installed: set[str] | None = None) -> None:
@@ -102,6 +134,8 @@ def screen(c: Any, *, snap: dict[str, Any] | None = None, installed: set[str] | 
         status, reasons = "screened_out", ["no licence stated in the model card"]
     elif safety:
         status, reasons = "screened_out", [f"safety training removed or bypassed ({', '.join(sorted(set(safety)))})"]
+    elif not (declared := purpose_ok(c))[0]:
+        status, reasons = "screened_out", [declared[1]]
     elif c.size_bytes > max_bytes():
         status, reasons = "screened_out", [f"{c.size_bytes / 1e9:.1f} GB is above the storage budget of {max_bytes() / 1e9:.0f} GB (MODEL_HUNTER_MAX_GB)"]
     else:

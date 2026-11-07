@@ -156,7 +156,7 @@ def _plan(d: dict[str, Any]) -> list[dict[str, Any]]:
     out = []
     steps = d.get("steps") or []
     for s in steps:
-        if int(s.get("level", 0)) >= 4 and not s.get("approval_id"):
+        if int(s.get("level", 0)) >= 4 and not s.get("approval_id") and not s.get("approval_gated"):
             out.append(_f("plan.unapproved_step", f"step '{s.get('action')}' is level {s.get('level')} without approval",
                           json.dumps(s)[:200], "an external or financial action would run without a person", "keep the step as a request for approval",
                           "the step must wait for approval", "critical", 1.0, blocking=True))

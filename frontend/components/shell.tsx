@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Archive, Beaker, Telescope, BookOpen, Bot, Briefcase, Building2, CloudOff, Compass, Cpu, Flame, Dna, FlaskConical, Gauge, GitFork, Home, Landmark, Library, Lightbulb, Megaphone, MessagesSquare, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Palette, Power, Radar, Scale, Search, Settings, ShieldCheck, Sparkles, Trophy, UserCog, WandSparkles, WifiOff, X } from "lucide-react";
+import { Activity, Archive, Beaker, Crosshair, Telescope, BookOpen, Bot, Briefcase, Building2, CloudOff, Compass, Cpu, Flame, Dna, FlaskConical, Gauge, GitFork, Home, Landmark, Library, Lightbulb, Megaphone, MessagesSquare, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Palette, Power, Radar, Scale, Search, Settings, ShieldCheck, Sparkles, Trophy, UserCog, WandSparkles, WifiOff, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -13,6 +13,7 @@ type NavItem = { href: string; label: string; icon: typeof Gauge };
 const GSUS: NavItem[] = [
   { href: "/chamber", label: "G-sus Chamber", icon: Sparkles },
   { href: "/creative", label: "Creative Center", icon: Trophy },  // not "Creative Intelligence": Rocky Flare (/flare) already uses that name
+  { href: "/autonomy", label: "Model Hunter & Vault", icon: Crosshair },
   { href: "/knowledge", label: "The Archive", icon: Library },
   { href: "/archivum", label: "Archivum", icon: BookOpen },
   { href: "/flare/collab", label: "The Council", icon: MessagesSquare },

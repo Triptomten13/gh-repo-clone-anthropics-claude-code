@@ -224,6 +224,33 @@ def _steps(db: Session, run: GsusRun) -> list[GsusStep]:
     return db.scalars(select(GsusStep).where(GsusStep.run_id == run.id).order_by(GsusStep.ordinal)).all()
 
 
+def _challenged(db: Session, run: GsusRun, orch: Any, steps: list[Any]) -> bool:
+    """The Devil's Advocate reviews G-SUS's own plan before anything runs, when the plan is consequential (a step handled by
+    an agent of level ≥ 3: internal operations, publishing, money). Steps the platform will stop for a human approval are
+    marked as such, so the review never blocks what governance already gates; a BLOCK stops the run before execution."""
+    from ..autonomy import advocate
+
+    task_steps = [st for st in steps if st.kind == "task" and st.status == "pending"]
+    levels = {st.ordinal: int(getattr(orch.agents.get(orch.routes.get(st.task_type, "")), "level", 0) or 0) for st in task_steps}
+    if not task_steps or max(levels.values(), default=0) < 3:
+        return False
+    crit = advocate.review(db, {
+        "kind": "plan", "ref": f"gsus:{run.id}", "proposer": "agent:gsus", "summary": f"G-SUS plan for: {run.objective[:200]}",
+        "objective": run.objective, "evidence": [f"intents: {run.intent or '—'}", f"planned by {run.plan_method}"],
+        "alternatives": [], "assumptions": [], "risks": [f"step {st.task_type} runs with agent level {levels[st.ordinal]}" for st in task_steps if levels[st.ordinal] >= 3],
+        "verification": "G-SUS collects and checks each step's result" if any(st.kind != "task" for st in steps) else "",
+        "permissions": sorted({st.task_type for st in task_steps}),
+        "steps": [{"action": st.task_type, "level": levels[st.ordinal], "approval_gated": levels[st.ordinal] >= 4} for st in task_steps]},
+        actor="devils_advocate")
+    run.settings = {**(run.settings or {}), "critique_id": crit.id, "critique_verdict": crit.verdict}
+    if crit.verdict == "block":
+        run.status, run.answer = "blocked", f"The Devil's Advocate stopped this plan before anything ran (critique #{crit.id}): {crit.summary}"
+        db.commit()
+        return True
+    db.commit()
+    return False
+
+
 def execute(db: Session, run: GsusRun) -> GsusRun:
     if gov.kill_switch_engaged(db):
         run.status, run.answer = "cancelled", "Emergency stop is engaged; nothing was executed."
@@ -233,6 +260,8 @@ def execute(db: Session, run: GsusRun) -> GsusRun:
     run.status = "running"
     steps = _steps(db, run)
     by_ord = {s.ordinal: s for s in steps}
+    if _challenged(db, run, orch, steps):
+        return run
     # 1) submit every runnable task step (independent ones run in parallel order, dependent ones wait via depends_on)
     for st in steps:
         if st.kind != "task" or st.status != "pending":

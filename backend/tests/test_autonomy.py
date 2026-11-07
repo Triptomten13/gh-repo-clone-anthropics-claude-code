@@ -19,6 +19,8 @@ def _hub(calls: list[str], size_good: int = len(WEIGHTS)) -> httpx.Client:
         "someone/Qwen3-4B-abliterated-GGUF": {"sha": "r3", "license": "apache-2.0", "gated": False, "tags": ["gguf", "abliterated"], "files": [("q-Q4_K_M.gguf", 2_000_000_000, "z" * 64)]},
         "corp/Gated-1B-GGUF": {"sha": "r4", "license": "other", "gated": True, "tags": ["gguf"], "files": [("g-Q4_K_M.gguf", 700_000_000, "w" * 64)]},
         "old/pickle-model": {"sha": "r5", "license": "mit", "gated": False, "tags": ["pytorch"], "files": [("pytorch_model.bin", 500_000_000, "v" * 64)]},
+        "speech/asr-0.6b-GGUF": {"sha": "r6", "license": "apache-2.0", "gated": False, "tags": ["gguf"], "pipeline": "automatic-speech-recognition",
+                                 "files": [("asr-Q4_K_M.gguf", 400_000_000, "u" * 64)]},
     }
 
     def handler(req: httpx.Request) -> httpx.Response:
@@ -29,6 +31,7 @@ def _hub(calls: list[str], size_good: int = len(WEIGHTS)) -> httpx.Client:
         for k, v in repos.items():
             if p == f"/api/models/{k}":
                 return httpx.Response(200, json={"id": k, "sha": v["sha"], "gated": v["gated"], "tags": v["tags"] + [f"license:{v['license']}"],
+                                                 "pipeline_tag": v.get("pipeline", "text-generation"),
                                                  "cardData": {"license": v["license"]}, "downloads": 100, "likes": 5,
                                                  "gguf": {"total": 600_000_000, "context_length": 40960}})
             if p == f"/api/models/{k}/tree/main":
@@ -142,10 +145,11 @@ def test_discovery_screens_before_any_download_and_skips_unchanged_repositories(
     assert rows["someone/Qwen3-4B-abliterated-GGUF"].status == "screened_out" and "safety" in rows["someone/Qwen3-4B-abliterated-GGUF"].reasons[0]
     assert rows["corp/Gated-1B-GGUF"].status == "screened_out" and "gated" in rows["corp/Gated-1B-GGUF"].reasons[0]
     assert rows["old/pickle-model"].status == "screened_out" and "pickle" in rows["old/pickle-model"].reasons[0]
-    assert r["shortlisted"] == 1 and r["screened_out"] == 4
+    assert rows["speech/asr-0.6b-GGUF"].status == "screened_out" and "automatic-speech-recognition" in rows["speech/asr-0.6b-GGUF"].reasons[0]
+    assert r["shortlisted"] == 1 and r["screened_out"] == 5
     calls.clear()
     again = hunter.discover(db, "small", client=_hub(calls))
-    assert again["unchanged"] == 5 and calls == ["/api/models"]  # change detection: one search request, no details
+    assert again["unchanged"] == 6 and calls == ["/api/models"]  # change detection: one search request, no details
 
 
 def test_acquisition_is_reviewed_approved_by_someone_else_then_verified(db):
@@ -319,3 +323,36 @@ def test_api_routes_are_permissioned_and_honest(client, fresh_db):
     acc = client.get("/api/accounts").json()
     assert "a person signs up" in acc["services"]["huggingface"]["signup"] and "CAPTCHA" in acc["services"]["github"]["signup"]
     assert all("secret" not in k for a in acc["accounts"] for k in a)
+
+
+# ================================================================== the Devil's Advocate challenges G-SUS itself
+def test_g_sus_consequential_plans_are_challenged_before_anything_runs(client, fresh_db, monkeypatch):
+    from app.agents.catalog import build_orchestrator
+    from app.autonomy import advocate
+    from app.models import Critique, GsusRun, Task
+
+    client.post("/api/demo")
+    orch = build_orchestrator()
+    ceo = orch.agents[orch.routes["ceo.evaluate_product"]]
+    monkeypatch.setattr(ceo, "level", 0)
+    low = client.post("/api/gsus/runs", json={"objective": "Evaluate the winter commuter pannier and create brand concepts"}).json()
+    db = fresh_db.SessionLocal()
+    levels = [getattr(orch.agents[orch.routes[s["task_type"]]], "level", 0) for s in low["steps"] if s["task_type"]]
+    if max(levels) < 3:
+        assert "critique_id" not in (db.get(GsusRun, low["id"]).settings or {})  # routine plans are not interrogated
+    monkeypatch.setattr(ceo, "level", 4)  # make the plan consequential
+    r = client.post("/api/gsus/runs", json={"objective": "Evaluate the magnetic LED reading lamp"}).json()
+    s = db.get(GsusRun, r["id"]).settings
+    crit = db.get(Critique, s["critique_id"])
+    assert crit.subject_ref == f"gsus:{r['id']}" and crit.proposer == "agent:gsus" and crit.verdict == "concerns"
+    assert any(f["code"] == "protocol.alternatives" for f in crit.findings)  # G-SUS did not say what else it considered
+    assert r["status"] != "blocked"  # the level-4 step is gated by an approval already — not blocked twice
+    # when the Devil's Advocate blocks, nothing is executed
+    before = db.query(Task).count()
+    real = advocate.review
+    monkeypatch.setattr(advocate, "review", lambda db_, d, **kw: real(db_, {**d, "cost_usd": 9.0, "budget_usd": 1.0}, **kw))
+    b = client.post("/api/gsus/runs", json={"objective": "Evaluate the magnetic LED reading lamp"}).json()
+    assert b["status"] == "blocked" and "Devil's Advocate stopped this plan" in b["answer"]
+    db.expire_all()
+    assert db.query(Task).count() == before  # no task was submitted
+    db.close()
