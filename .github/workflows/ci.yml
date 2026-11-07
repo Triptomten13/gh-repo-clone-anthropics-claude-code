@@ -1,0 +1,139 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: rocky, POSTGRES_PASSWORD: rocky, POSTGRES_DB: rocky }
+        ports: ["5432:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 10
+    defaults: { run: { working-directory: backend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - run: pip install -r requirements-dev.txt "psycopg[binary]" ruff
+      - run: python -m pytest -q
+      - run: ruff check .
+      - name: PostgreSQL smoke (migrations + main endpoints)
+        run: python ../scripts/pg_smoke.py
+        env: { DATABASE_URL: "postgresql+psycopg://rocky:rocky@localhost/rocky" }
+      - name: Dependency audit
+        run: pip install pip-audit && pip-audit -r requirements.txt
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontend } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+
+  # Browser tests: the suite starts its own isolated stack (scripts/dev.sh --prod, throw-away SQLite DB).
+  e2e-chromium:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: pip install -r backend/requirements-dev.txt
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: unit, device workflows (desktop/iPad/iPhone/Android emulation), responsive, accessibility, PWA, performance
+        run: npx playwright test
+        working-directory: frontend
+        env: { CI: "true" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-chromium
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 14
+
+  # WebKit (Safari engine) and Firefox: never run in the development environment (only Chromium was installed there),
+  # so this job is informational until it has passed — its first results are the first evidence for those engines.
+  e2e-webkit-firefox:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: pip install -r backend/requirements-dev.txt
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps webkit firefox
+        working-directory: frontend
+      - run: npx playwright test --project=setup --project=desktop-webkit --project=tablet-webkit --project=phone-webkit --project=desktop-firefox --project=phone-firefox
+        working-directory: frontend
+        env: { CI: "true", E2E_ENGINES: "webkit,firefox" }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-webkit-firefox
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+          retention-days: 14
+
+  # Public demo as it ships: build the all-in-one image, start it with DEMO_MODE=1, wait for /ready, then run the
+  # public-demo suite against the running container (the same tests a deployed demo is checked with).
+  demo-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: compose file is valid (private stack + demo profile)
+        run: |
+          touch .env
+          docker compose config -q
+          docker compose --profile demo config -q
+      - name: build the all-in-one image
+        run: docker build --build-arg GIT_SHA=${GITHUB_SHA::12} -t demonkoncernen:ci .
+      - name: start the public demo container
+        run: |
+          docker run -d --name demo -p 3000:3000 -e DEMO_MODE=1 -e DEMO_SESSIONS_PER_CLIENT_HOUR=200 -e API_RATE_PER_MIN=20000 demonkoncernen:ci
+          for i in $(seq 1 90); do
+            curl -fsS http://127.0.0.1:3000/ready && break
+            [ "$(docker inspect -f '{{.State.Running}}' demo)" = "true" ] || { echo "container exited:"; docker logs demo 2>&1 | tail -n 60; exit 1; }
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:3000/ready
+          curl -fsS http://127.0.0.1:3000/api/version
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: public demo suite against the container (PASS/FAIL report)
+        run: npm run test:demo
+        working-directory: frontend
+        env: { DEMO_BASE_URL: "http://127.0.0.1:3000" }
+      - name: container log
+        if: always()
+        run: docker logs demo 2>&1 | tail -n 200
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-demo-report
+          path: |
+            frontend/test-results/demo-report.md
+            frontend/test-results/demo-results.json
+          retention-days: 30

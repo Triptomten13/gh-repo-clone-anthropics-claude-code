@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c0b11">
+<title>No connection · Demonkoncernen</title>
+<!-- Served by the service worker when a page that was never opened is requested without a connection.
+     Self-contained on purpose (no app JavaScript): it must work when nothing else can load. -->
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #0c0b11; color: #ecebf4;
+         font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; padding: max(1.5rem, env(safe-area-inset-top)) 1.25rem; box-sizing: border-box; }
+  main { max-width: 28rem; border: 1px solid #2a2937; background: #15141c; border-radius: 12px; padding: 1.75rem; }
+  h1 { font: 600 22px/1.3 "Iowan Old Style", Palatino, Georgia, serif; margin: .75rem 0 0; }
+  p { color: #c2c0d3; margin: .75rem 0 0; }
+  a { display: inline-flex; align-items: center; min-height: 44px; margin-top: 1.5rem; padding: 0 1rem; border-radius: 6px;
+      background: #a78bfa; color: #000; font-weight: 600; text-decoration: none; }
+  a:focus-visible { outline: 2px solid #ecebf4; outline-offset: 2px; }
+  .k { font: 11px ui-monospace, Menlo, monospace; letter-spacing: .16em; text-transform: uppercase; color: #fab219; }
+</style>
+</head>
+<body>
+<main>
+  <div class="k" id="state">No connection</div>
+  <h1>No connection to Demonkoncernen</h1>
+  <p>G-SUS, DAEMON CORE, the agents and the Archive all run on the Demonkoncernen server. None of it works without a
+     connection, and nothing shown offline would be current.</p>
+  <a href="/">Try again</a>
+</main>
+<script>
+  function s() { document.getElementById("state").textContent = navigator.onLine ? "Server not reachable" : "This device is offline"; }
+  s(); addEventListener("online", s); addEventListener("offline", s);
+</script>
+</body>
+</html>

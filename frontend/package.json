@@ -1,0 +1,38 @@
+{
+  "name": "rocky-command-center",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "dev:lan": "next dev -p 3000 -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc --noEmit",
+    "test": "playwright test",
+    "test:unit": "playwright test --project=unit",
+    "test:e2e": "playwright test --project=setup --project=desktop-chromium --project=tablet-chromium --project=phone-chromium --project=android-chromium",
+    "test:responsive": "playwright test --project=setup --project=matrix tests/matrix/responsive.spec.ts",
+    "test:a11y": "playwright test --project=setup --project=matrix tests/matrix/a11y.spec.ts",
+    "test:pwa": "playwright test --project=setup --project=matrix tests/matrix/pwa.spec.ts",
+    "test:perf": "playwright test --project=setup --project=matrix tests/matrix/perf.spec.ts",
+    "test:report": "playwright show-report",
+    "test:demo": "playwright test -c playwright.demo.config.ts; s=$?; node scripts/demo-report.mjs; r=$?; [ $s -eq 0 ] && [ $r -eq 0 ]"
+  },
+  "dependencies": {
+    "lucide-react": "1.69.0",
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "recharts": "3.10.1"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.63.0",
+    "@tailwindcss/postcss": "4.3.4",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tailwindcss": "4.3.4",
+    "typescript": "5.9.3"
+  }
+}

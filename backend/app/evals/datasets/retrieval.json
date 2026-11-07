@@ -1,0 +1,23 @@
+{
+  "corpus": [
+    {"title": "Babylonian exile overview", "evidence_class": "historical_fact",
+     "text": "Jerusalem was captured by Nebuchadnezzar II in 587 BCE. Many inhabitants of Judah were deported to Babylon; this period is known as the Babylonian exile. It ended after the Persian conquest of Babylon in 539 BCE."},
+    {"title": "Hermetic tradition notes", "evidence_class": "scholarly_hypothesis",
+     "text": "The Corpus Hermeticum is a collection of Greek texts attributed to Hermes Trismegistus, generally dated by scholars to the first centuries CE rather than to remote antiquity."},
+    {"title": "Archivum lore: the Ninth Archivist", "evidence_class": "fiction_canon",
+     "text": "In the internal canon, the Ninth Archivist hid a copper astrolabe inside the library of Alexandria to guard the forbidden index."},
+    {"title": "Ptolemaic astronomy", "evidence_class": "historical_fact",
+     "text": "Ptolemy's Almagest described a geocentric model in which the planets move on epicycles. It dominated astronomy until Copernicus proposed a heliocentric model."},
+    {"title": "Gnostic interpretation essay", "evidence_class": "religious_interpretation",
+     "text": "Some Gnostic readings interpret the serpent of Eden as a bringer of knowledge rather than a deceiver; this is an interpretation, not a consensus view."}
+  ],
+  "questions": [
+    {"q": "When did the Babylonian exile end?", "expect_title": "Babylonian exile overview", "expect_class": "historical_fact"},
+    {"q": "Who is the Corpus Hermeticum attributed to?", "expect_title": "Hermetic tradition notes", "expect_class": "scholarly_hypothesis"},
+    {"q": "Where did the Ninth Archivist hide the astrolabe?", "expect_title": "Archivum lore: the Ninth Archivist", "expect_class": "fiction_canon"},
+    {"q": "What model did the Almagest describe?", "expect_title": "Ptolemaic astronomy", "expect_class": "historical_fact"},
+    {"q": "How do Gnostic readings interpret the serpent of Eden?", "expect_title": "Gnostic interpretation essay", "expect_class": "religious_interpretation"},
+    {"q": "What did Copernicus propose?", "expect_title": "Ptolemaic astronomy", "expect_class": "historical_fact"}
+  ],
+  "unanswerable": ["What is the airspeed of an unladen swallow?", "Who won the 1994 football world cup?"]
+}

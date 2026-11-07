@@ -1,0 +1,8 @@
+[
+  {"concept": {"name": "EcoPro Smart Hub", "tagline": "Elevate your commute", "audience": "everyone", "story": "Cutting-edge."}, "revise": true},
+  {"concept": {"name": "Black Mirror EDC", "audience": "urban commuters riding through winter", "usp": "modular roll-top", "story": "word word word word word word word word word word word word word"}, "revise": true},
+  {"concept": {"name": "Cipher Fieldworks", "tagline": "Built for the dark half of the year.", "audience": "e-scooter commuters in Nordic cities riding year-round",
+               "usp": "Modular roll-top with reflective piping", "palette": ["#e6dfcf", "#1c1c1c", "#9e1b1b", "#3b3f32"],
+               "primary_genre": "tactical_utility", "secondary_genre": "secret_archive",
+               "story": "Cipher Fieldworks rebuilds the commuter bag around dossier aesthetics on top of tactical construction in 1000D nylon and hypalon for riders in darkness."}, "revise": false}
+]

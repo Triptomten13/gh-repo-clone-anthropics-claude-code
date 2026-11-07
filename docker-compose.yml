@@ -1,0 +1,92 @@
+# Local / single-host deployment. Secrets come from .env (see .env.example).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: rocky
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rocky}
+      POSTGRES_DB: rocky
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rocky"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      args: { LOCAL_AI: "${LOCAL_AI:-1}" }   # 1 = include llama.cpp so DAEMON CORE can run local models
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://rocky:${POSTGRES_PASSWORD:-rocky}@db/rocky
+      # trust X-Forwarded-For only from inside the compose network (the https proxy); the port below is loopback-only
+      FORWARDED_ALLOW_IPS: "*"
+    depends_on:
+      db: { condition: service_healthy }
+    volumes: ["models:/app/data/models", "archive:/app/data/archive"]   # weights + uploaded documents survive rebuilds
+    ports: ["127.0.0.1:8000:8000"]   # loopback only; phones and other computers come in through the https service
+
+  web:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_URL: http://api:8000   # the web server proxies /api to this; the browser only ever talks to one origin
+    depends_on: [api]
+    ports: ["127.0.0.1:3000:3000"]
+
+  https:
+    # TLS for phones, tablets and other computers: `DK_SITE=dk.example.com docker compose --profile https up -d`
+    # (DK_SITE=localhost → Caddy's local CA). Config: deploy/Caddyfile — not executed in the dev environment yet.
+    image: caddy:2.10.2-alpine
+    profiles: ["https"]
+    depends_on: [web, api]
+    environment:
+      DK_SITE: ${DK_SITE:-localhost}
+    ports: ["80:80", "443:443"]
+    volumes: ["./deploy/Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data", "caddy_config:/config"]
+
+  demo:
+    # PUBLIC DEMO — a separate instance with its OWN temporary database (container-local SQLite, reset every
+    # DEMO_RESET_HOURS and on restart), no credentials, no models, offline mode forced:
+    #   docker compose --profile demo up --build demo      → http://localhost:3300
+    # It shares nothing with the private stack above (no env_file, no volumes, no database).
+    profiles: ["demo"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args: { GIT_SHA: "${GIT_SHA:-unknown}" }
+    environment:
+      DEMO_MODE: "1"
+      DEMO_SESSION_TTL_MIN: "${DEMO_SESSION_TTL_MIN:-120}"
+      DEMO_RESET_HOURS: "${DEMO_RESET_HOURS:-6}"
+    ports: ["127.0.0.1:3300:3000"]   # put the https profile (or your platform's TLS) in front before exposing it
+
+  backup:
+    # Daily logical backup into ./backups; dumps older than 14 days are pruned.
+    image: postgres:16-alpine
+    depends_on: [db]
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-rocky}
+    volumes: ["./backups:/backups", "archive:/archive:ro"]
+    entrypoint: ["sh", "/backups-script/backup.sh"]
+    configs:
+      - source: backup_script
+        target: /backups-script/backup.sh
+
+configs:
+  backup_script:
+    content: |
+      while true; do
+        pg_dump -h db -U rocky rocky | gzip > "/backups/rocky-$$(date +%F).sql.gz"
+        tar -czf "/backups/archive-$$(date +%F).tar.gz" -C /archive .
+        find /backups -name 'rocky-*.sql.gz' -mtime +14 -delete
+        find /backups -name 'archive-*.tar.gz' -mtime +14 -delete
+        sleep 86400
+      done
+
+volumes:
+  caddy_data:
+  caddy_config:
+  pgdata:
+  models:
+  archive:

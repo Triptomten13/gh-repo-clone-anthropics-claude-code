@@ -1,0 +1,25 @@
+# Render Blueprint for the PUBLIC DEMO (https://render.com/docs/blueprint-spec).
+# Prepared, NOT deployed from the development environment (no Render account there). To use it: Render dashboard →
+# New → Blueprint → this repository and branch → review → Apply. You get an https://<name>.onrender.com URL.
+# One web service runs the all-in-one image (Dockerfile) with DEMO_MODE=1 and its own temporary SQLite database —
+# nothing from the private Control Center (no database, credentials or models) is connected to it.
+# Free instances sleep when idle and lose their disk on restart: acceptable for a demo that resets itself anyway.
+services:
+  - type: web
+    name: demonkoncernen-demo
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: frankfurt
+    healthCheckPath: /ready
+    autoDeploy: false        # deploy deliberately (dashboard or the deploy-demo workflow), never on every push
+    envVars:
+      - key: DEMO_MODE
+        value: "1"
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEMO_RESET_HOURS
+        value: "6"

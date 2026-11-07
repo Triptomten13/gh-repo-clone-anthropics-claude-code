@@ -1,0 +1,479 @@
+{
+  "ran_at": "2026-11-05T17:10:15Z",
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "ram_gb": 16.9,
+    "gpu": "none",
+    "runtime": {
+      "llama_cpp": true,
+      "llama_cpp_version": "0.3.36"
+    }
+  },
+  "models": {
+    "chat": "qwen2.5-1.5b-instruct-q4_k_m",
+    "eco": "qwen2.5-0.5b-instruct-q4_k_m",
+    "deep": "qwen3-4b-q4_k_m",
+    "embedding": "nomic-embed-text-v1.5-q8_0",
+    "replacement": "smollm2-360m-instruct-q8_0"
+  },
+  "all_passed": false,
+  "results": [
+    {
+      "test": "A",
+      "title": "External provider shutdown",
+      "passed": false,
+      "checks": [
+        {
+          "check": "no external AI credential exists (env stripped, none stored)",
+          "ok": true,
+          "evidence": []
+        },
+        {
+          "check": "independence verdict: no mandatory external runtime dependency",
+          "ok": true,
+          "evidence": {
+            "independent": true,
+            "mandatory_external_runtime_dependencies": [],
+            "optional_external": [],
+            "install_time_external": [
+              "Python packages (PyPI) and npm packages at install/build time",
+              "model weights from Hugging Face at install time (or offline import of a checksum-verified file)"
+            ],
+            "statement": "Core AI runs on this machine: local generation, local embeddings, local orchestration, local storage."
+          }
+        },
+        {
+          "check": "G-SUS chat answered by a local model",
+          "ok": true,
+          "evidence": {
+            "model": "qwen2.5-1.5b-instruct-q4_k_m",
+            "reply": "I am G-SUS, the intelligence orchestrator of Demonkoncernen AB.",
+            "seconds": 7.9
+          }
+        },
+        {
+          "check": "classification served locally (fast tier \u2192 eco model)",
+          "ok": true,
+          "evidence": {
+            "label": "negative",
+            "model": "qwen2.5-0.5b-instruct-q4_k_m"
+          }
+        },
+        {
+          "check": "structured generation served locally",
+          "ok": true,
+          "evidence": {
+            "product": "Aurora lamp",
+            "price": 49.0
+          }
+        },
+        {
+          "check": "deep reasoning on the local reasoning model (multi-step margin problem)",
+          "ok": false,
+          "evidence": {
+            "model": "qwen3-4b-q4_k_m",
+            "answer": "The profit per unit is calculated as follows:  \n- **Revenue from marketplace**: 15% of 200 SEK (sale price) = 30 SEK; plus fixed fee = 10 SEK. Total = **40 SEK**.  \n- **Cost to produce**: 80 SEK.  \n- **Profit**: 40 SEK (marketplace revenue) \u2212 80 SEK (cost) = **-40 SEK**.  \n\n**Answer**: -40",
+            "expected": 80,
+            "found": -40.0,
+            "reasoning_complete": true,
+            "reasoning_tail": "he profit per unit is negative 40 SEK. That means the company is losing 40 SEK per unit sold. But the user might be expecting a positive number, but according to the numbers given, it's a loss. So the answer would be -40 SEK. But I need to make sure I didn't miss anything. The problem says \"profit per unit,\" so I think that's correct. The cost is 80, the marketplace takes 40, so the profit is -40.",
+            "seconds": 129.3
+          }
+        },
+        {
+          "check": "G-sus orchestrated run completed using the local model",
+          "ok": true,
+          "evidence": {
+            "status": "completed",
+            "ai_calls": 1,
+            "ai_cost_usd": 0.0
+          }
+        },
+        {
+          "check": "zero external provider attempts recorded",
+          "ok": true,
+          "evidence": []
+        }
+      ],
+      "duration_s": 167.1
+    },
+    {
+      "test": "B",
+      "title": "Offline operation (network namespace: loopback only)",
+      "passed": true,
+      "checks": [
+        {
+          "check": "internet is unreachable from this namespace",
+          "ok": true,
+          "evidence": {
+            "https://huggingface.co": "unreachable: ConnectError",
+            "https://api.anthropic.com": "unreachable: ConnectError"
+          }
+        },
+        {
+          "check": "offline mode on: no external provider in any routing chain",
+          "ok": true,
+          "evidence": {
+            "fast": [
+              "anthropic:claude-haiku-5-5 \u2014 excluded_offline"
+            ],
+            "standard": [
+              "anthropic:claude-sonnet-5-5 \u2014 excluded_offline"
+            ],
+            "deep": [
+              "anthropic:claude-opus-5-5 \u2014 excluded_offline"
+            ]
+          }
+        },
+        {
+          "check": "local model processes prompts offline",
+          "ok": true,
+          "evidence": {
+            "model": "qwen2.5-1.5b-instruct-q4_k_m",
+            "reply": "Demonkoncernen AB is an entity that hosts a system known as G-SUS, which is an intelligence. The Archive is the memory of G-SUS, and the agents are the workforc",
+            "seconds": 9.2
+          }
+        },
+        {
+          "check": "deep reasoning works offline (multi-step VAT problem)",
+          "ok": true,
+          "evidence": {
+            "model": "qwen3-4b-q4_k_m",
+            "answer": "The total price of 240 SEK includes 25% VAT. To find the pre-VAT price, divide the total by 1.25 (since VAT is 25% of the original price).  \n\n**Calculation**:  \n240 SEK \u00f7 1.25 = **192 SEK**.  \n\nAssumption: The VAT rate is 25%, and no other taxes are involved.  \n\n**Answer**: 192",
+            "expected": 192,
+            "found": 192.0,
+            "reasoning_complete": true,
+            "reasoning_tail": "ed by 1.25 equals 192. So the price excluding VAT should be 192 SEK.\n\nWait, but I should make sure that the VAT is indeed 25% and that there's no other taxes involved. The problem states that the total is 240 SEK including 25% VAT, so that's the only tax considered here. The context is empty, so there's no additional information. Therefore, the calculation should be correct. The answer is 192 SEK.",
+            "seconds": 77.5
+          }
+        },
+        {
+          "check": "an agent executes a local task offline",
+          "ok": true,
+          "evidence": {
+            "agent": "self_improvement",
+            "status": "succeeded",
+            "error": null
+          }
+        },
+        {
+          "check": "memory works offline (write + read)",
+          "ok": true,
+          "evidence": {
+            "write": 200
+          }
+        },
+        {
+          "check": "model downloads are refused in offline mode",
+          "ok": true,
+          "evidence": null
+        },
+        {
+          "check": "zero external provider attempts recorded (despite a configured external key)",
+          "ok": true,
+          "evidence": []
+        }
+      ],
+      "duration_s": 87.0
+    },
+    {
+      "test": "C",
+      "title": "Model replacement through the same internal API",
+      "passed": true,
+      "checks": [
+        {
+          "check": "same /api/ai/chat call now served by a different model family",
+          "ok": true,
+          "evidence": {
+            "before": "qwen2.5-1.5b-instruct-q4_k_m",
+            "after": "smollm2-360m-instruct-q8_0",
+            "reply_after": "\"Red\""
+          }
+        },
+        {
+          "check": "classification still works on the replacement model",
+          "ok": true,
+          "evidence": {
+            "status": 200,
+            "body": {
+              "label": "positive",
+              "confidence": 0.9999999999999999,
+              "confidence_note": "self-reported by the model",
+              "provider": "local",
+              "model": "smollm2-360m-instruct-q8_0",
+              "served_from_cache": false,
+              "input_tokens": 87,
+              "output_tokens": 30,
+              "cost_usd": 0.0,
+              "latency_ms": 1269,
+              "attempts": [
+                {
+                  "provider": "anthropic",
+                  "model": "claude-haiku-5-5",
+                  "tier": "fast",
+                  "locality": "external",
+                  "status": "excluded_offline"
+                },
+                {
+                  "provider": "local",
+                  "model": "smollm2-360m-instruct-q8_0",
+                  "tier": "fast",
+                  "locality": "local",
+                  "status": "ok",
+                  "input_tokens": 87,
+                  "output_tokens": 30,
+                  "cost_usd": 0.0,
+                  "latency_ms": 1269
+                }
+              ],
+              "reasoning": "",
+              "reasoning_truncated": false
+            },
+            "note": "502 = the small model returned a label outside the allowed set; the API refuses to invent one"
+          }
+        },
+        {
+          "check": "agents keep working (G-sus run completes)",
+          "ok": true,
+          "evidence": {
+            "status": "completed",
+            "ai_calls": 2
+          }
+        },
+        {
+          "check": "rollback restores the previous models",
+          "ok": true,
+          "evidence": {
+            "chat": "qwen2.5-1.5b-instruct-q4_k_m",
+            "eco": "qwen2.5-0.5b-instruct-q4_k_m",
+            "deep": "qwen3-4b-q4_k_m",
+            "embedding": "nomic-embed-text-v1.5-q8_0"
+          }
+        }
+      ],
+      "duration_s": 21.3
+    },
+    {
+      "test": "D",
+      "title": "Local embeddings (index + search without external embedding APIs)",
+      "passed": true,
+      "checks": [
+        {
+          "check": "archive embedded with the local GGUF model",
+          "ok": true,
+          "evidence": {
+            "reembedded_chunks": 0,
+            "model": "gguf:nomic-embed-text-v1.5-q8_0"
+          }
+        },
+        {
+          "check": "semantic query with no shared keywords finds the right document",
+          "ok": true,
+          "evidence": {
+            "top": "lantern.txt",
+            "n": 1
+          }
+        },
+        {
+          "check": "every stored vector came from the local model",
+          "ok": true,
+          "evidence": [
+            "gguf:nomic-embed-text-v1.5-q8_0"
+          ]
+        }
+      ],
+      "duration_s": 0.7
+    },
+    {
+      "test": "E",
+      "title": "Agent continuity (local orchestration, no external orchestration service)",
+      "passed": true,
+      "checks": [
+        {
+          "check": "G-sus multi-step run completed offline",
+          "ok": true,
+          "evidence": {
+            "status": "completed",
+            "steps": [
+              [
+                "Evaluate 'Winter commuter pannier with reflective panels'",
+                "completed"
+              ],
+              [
+                "Creative council (8 seats)",
+                "completed"
+              ],
+              [
+                "Compare, verify and answer",
+                "completed"
+              ]
+            ]
+          }
+        },
+        {
+          "check": "several agents collaborated through the in-process orchestrator",
+          "ok": true,
+          "evidence": {
+            "agents": [
+              "advertising",
+              "brand_studio",
+              "ceo",
+              "cfo",
+              "flare_council",
+              "flare_engine",
+              "p_ancient_symbolism_ad",
+              "p_art_director",
+              "p_audience_analyst",
+              "p_brand_storyteller",
+              "p_commercial_analyst",
+              "p_emobility_engineer",
+              "p_survival_researcher",
+              "p_tactical_brand_strategist",
+              "p_tactical_design_director",
+              "product_analyst",
+              "risk",
+              "self_improvement",
+              "transformation_lab"
+            ],
+            "plan_hints": []
+          }
+        },
+        {
+          "check": "still zero external attempts",
+          "ok": true,
+          "evidence": []
+        }
+      ],
+      "duration_s": 21.4
+    },
+    {
+      "test": "F",
+      "title": "Recovery after a crash (SIGKILL) and restart",
+      "passed": true,
+      "checks": [
+        {
+          "check": "configuration recovered (offline mode, profile)",
+          "ok": true,
+          "evidence": {
+            "offline": true,
+            "profile": "ECO"
+          }
+        },
+        {
+          "check": "active models recovered",
+          "ok": true,
+          "evidence": {
+            "chat": "qwen2.5-1.5b-instruct-q4_k_m",
+            "eco": "qwen2.5-0.5b-instruct-q4_k_m",
+            "deep": "qwen3-4b-q4_k_m",
+            "embedding": "nomic-embed-text-v1.5-q8_0"
+          }
+        },
+        {
+          "check": "local model reloads and answers after restart",
+          "ok": true,
+          "evidence": {
+            "model": "qwen2.5-1.5b-instruct-q4_k_m",
+            "reply": "OK."
+          }
+        },
+        {
+          "check": "memory recovered",
+          "ok": true,
+          "evidence": null
+        },
+        {
+          "check": "archive documents still searchable",
+          "ok": true,
+          "evidence": null
+        },
+        {
+          "check": "interrupted task was requeued and finished after restart",
+          "ok": true,
+          "evidence": {
+            "status": "succeeded",
+            "attempts": 2
+          }
+        }
+      ],
+      "duration_s": 10.4
+    },
+    {
+      "test": "G",
+      "title": "Security (local services require authorisation)",
+      "passed": true,
+      "checks": [
+        {
+          "check": "anonymous requests are rejected (401)",
+          "ok": true,
+          "evidence": {
+            "/api/ai/status": 401,
+            "/api/ai/health": 401,
+            "/api/daemon/settings": 401,
+            "/api/daemon/library": 401,
+            "/api/memory": 401,
+            "/api/archive/stats": 401,
+            "/api/ai/chat": 401,
+            "/api/ai/generate": 401,
+            "/api/ai/embeddings": 401,
+            "/api/ai/agents/execute": 401
+          }
+        },
+        {
+          "check": "forged token rejected",
+          "ok": true,
+          "evidence": null
+        },
+        {
+          "check": "viewer cannot use AI, change settings, see credentials or install models (403)",
+          "ok": true,
+          "evidence": {
+            "chat": 403,
+            "settings": 403,
+            "credentials": 403,
+            "install": 403
+          }
+        },
+        {
+          "check": "operator cannot change settings, credentials or models (403)",
+          "ok": true,
+          "evidence": {
+            "settings": 403,
+            "credentials": 403,
+            "activate": 403
+          }
+        },
+        {
+          "check": "the only listening socket in the namespace is the API on loopback (model runtime has no listener)",
+          "ok": true,
+          "evidence": [
+            "v4:0100007F:8765"
+          ]
+        },
+        {
+          "check": "security headers present",
+          "ok": true,
+          "evidence": {
+            "x-content-type-options": "nosniff",
+            "x-frame-options": "DENY",
+            "content-security-policy": "default-src 'none'; frame-ancestors 'none'"
+          }
+        },
+        {
+          "check": "brute-force login is locked out",
+          "ok": true,
+          "evidence": [
+            401,
+            401,
+            401,
+            401,
+            401,
+            429
+          ]
+        }
+      ],
+      "duration_s": 0.6
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+# Never copy local state into an image: databases, model weights, uploaded Archive files, secrets.
+__pycache__
+*.db
+*.db-*
+.pytest_cache
+data/
+*.gguf
+*.gguf.part
+.env

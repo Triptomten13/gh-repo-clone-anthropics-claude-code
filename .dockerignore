@@ -1,0 +1,20 @@
+# Build context for the all-in-one image (Dockerfile). Local state never enters an image:
+# databases, model weights, uploaded Archive files, secrets, backups, logs, test output.
+.git
+.env
+**/.env
+**/*.db
+**/*.db-*
+**/*.gguf
+**/*.gguf.part
+backend/data/
+backups/
+.dev-logs/
+**/__pycache__
+**/.pytest_cache
+frontend/node_modules
+frontend/.next
+frontend/test-results
+frontend/playwright-report
+frontend/tests/.auth
+.demo-data/

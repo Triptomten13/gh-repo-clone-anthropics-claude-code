@@ -1,0 +1,210 @@
+{
+  "ran_at": "2026-11-05T20:16:59Z",
+  "hardware": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "ram_gb": 16.9,
+    "gpu": "none"
+  },
+  "models": {
+    "chat": "qwen2.5-1.5b-instruct-q4_k_m",
+    "eco": "qwen2.5-0.5b-instruct-q4_k_m",
+    "deep": "qwen3-4b-q4_k_m",
+    "embedding": "nomic-embed-text-v1.5-q8_0",
+    "replacement": "smollm2-360m-instruct-q8_0"
+  },
+  "scenarios": [
+    {
+      "scenario": "1 deterministic tasks",
+      "cases": 6,
+      "accuracy": 1.0,
+      "model_calls": 0,
+      "p50_ms": 5,
+      "p95_ms": 5,
+      "wall_s": 0.0,
+      "server_rss_peak_mb": 109,
+      "server_cpu_s": 0.3,
+      "network_bytes": 0,
+      "tokens": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "scenario": "2 simple tasks, small local model",
+      "cases": 3,
+      "accuracy": 1.0,
+      "model": "eco (local)",
+      "p50_ms": 856,
+      "p95_ms": 856,
+      "wall_s": 3.8,
+      "server_rss_peak_mb": 823,
+      "server_cpu_s": 10.3,
+      "network_bytes": 0,
+      "tokens": 284,
+      "cost_usd": 0.0
+    },
+    {
+      "scenario": "3 complex reasoning, local reasoning model",
+      "cases": 2,
+      "accuracy": 1.0,
+      "model": "qwen3-4b-q4_k_m",
+      "p50_ms": 66827,
+      "p95_ms": 42507,
+      "wall_s": 133.7,
+      "server_rss_peak_mb": 6389,
+      "server_cpu_s": 482.4,
+      "network_bytes": 0,
+      "tokens": 1367,
+      "cost_usd": 0.0
+    },
+    {
+      "scenario": "4 internet research (quick, standard, cached repeat)",
+      "quick": {
+        "status": "completed",
+        "sources": 2,
+        "ms": 726
+      },
+      "standard": {
+        "status": "completed",
+        "sources": 7,
+        "kind": "generated_conclusion",
+        "ms": 32373
+      },
+      "repeat_quick_cached": {
+        "cached": true,
+        "ms": 6
+      },
+      "completion": 1.0,
+      "wall_s": 33.1,
+      "server_rss_peak_mb": 8397,
+      "server_cpu_s": 107.1,
+      "network_bytes": 31506,
+      "tokens": 1483,
+      "cost_usd": 0.0
+    },
+    {
+      "scenario": "5 multi-agent workflow (G-sus)",
+      "completion": 1,
+      "steps": 3,
+      "ms": 20953,
+      "wall_s": 21.0,
+      "server_rss_peak_mb": 8402,
+      "server_cpu_s": 81.4,
+      "network_bytes": 0,
+      "tokens": 627,
+      "cost_usd": 0.0
+    },
+    {
+      "scenario": "6 semantic retrieval (no shared keywords)",
+      "cases": 3,
+      "top1_accuracy": 1.0,
+      "p50_ms": 41,
+      "p95_ms": 41,
+      "wall_s": 0.6,
+      "server_rss_peak_mb": 8592,
+      "server_cpu_s": 1.2,
+      "network_bytes": 0,
+      "tokens": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "scenario": "7 large document ingest + search",
+      "bytes": 1616670,
+      "ingest_ms": 6451,
+      "chunks": 2250,
+      "search_ms": 22544,
+      "completion": 1,
+      "wall_s": 29.0,
+      "server_rss_peak_mb": 8675,
+      "server_cpu_s": 80.1,
+      "network_bytes": 0,
+      "tokens": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "scenario": "8 high concurrency (50 mixed requests, 16 parallel)",
+      "requests": 50,
+      "concurrency": 16,
+      "errors": 0,
+      "p50_ms": 109,
+      "p95_ms": 150,
+      "wall_s": 0.4,
+      "server_rss_peak_mb": 8668,
+      "server_cpu_s": 1.1,
+      "network_bytes": 0,
+      "tokens": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "scenario": "9 low-memory operation (LOW_MEMORY profile)",
+      "completion": 1.0,
+      "resident_models_after": 1,
+      "limit": 1,
+      "wall_s": 69.8,
+      "server_rss_peak_mb": 8669,
+      "server_cpu_s": 226.2,
+      "network_bytes": 0,
+      "tokens": 577,
+      "cost_usd": 0.0
+    },
+    {
+      "scenario": "10 offline operation",
+      "deterministic_answer": "120",
+      "current_question_strategy": "archive",
+      "research_status": "offline",
+      "completion": 1,
+      "note": "policy-level offline; OS-level network isolation is Independence Test B",
+      "wall_s": 37.1,
+      "server_rss_peak_mb": 775,
+      "server_cpu_s": 120.2,
+      "network_bytes": 0,
+      "tokens": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "scenario": "11 provider failure \u2192 local fallback",
+      "served_by": "local",
+      "attempts": [
+        "anthropic:unavailable",
+        "local:ok"
+      ],
+      "ms": 8161,
+      "completion": 1,
+      "wall_s": 8.2,
+      "server_rss_peak_mb": 2153,
+      "server_cpu_s": 17.8,
+      "network_bytes": 0,
+      "tokens": 286,
+      "cost_usd": 0.0
+    },
+    {
+      "scenario": "12 network failure (dead proxy)",
+      "research_status": "insufficient_evidence",
+      "errors": [
+        "wikipedia: en.wikipedia.org: ConnectError",
+        "wikipedia: en.wikipedia.org: ConnectError",
+        "github: api.github.com: ConnectError"
+      ],
+      "ms": 30312,
+      "local_still_works": true,
+      "completion": 1,
+      "wall_s": 30.3,
+      "server_rss_peak_mb": 116,
+      "server_cpu_s": 0.5,
+      "network_bytes": 0,
+      "tokens": 0,
+      "cost_usd": 0.0
+    },
+    {
+      "scenario": "13 recovery after crash (SIGKILL)",
+      "restart_to_ready_ms": 1587,
+      "first_model_answer_ms": 249,
+      "completion": 1,
+      "wall_s": 0.3,
+      "server_rss_peak_mb": 110,
+      "server_cpu_s": 1.0,
+      "network_bytes": 0,
+      "tokens": 0,
+      "cost_usd": 0.0
+    }
+  ]
+}

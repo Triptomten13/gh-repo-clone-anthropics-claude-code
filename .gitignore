@@ -1,0 +1,22 @@
+.env
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+__pycache__/
+.pytest_cache/
+backups/
+node_modules/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+
+# local model weights and archive files (never commit)
+backend/data/
+*.gguf
+*.gguf.part
+.dev-logs/
+frontend/tests/.auth/
+frontend/test-results/
+frontend/playwright-report/
+.demo-data/
