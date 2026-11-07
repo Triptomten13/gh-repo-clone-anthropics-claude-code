@@ -245,10 +245,10 @@ function Vault() {
               {a.status === "connected" && <Button onClick={() => run(() => api(`/api/accounts/${a.id}/health`, { method: "POST" }), (r) => r.ok ? `Healthy: ${r.identity}` : `Not healthy: ${r.reason ?? r.status}`)}>Check</Button>}
               {!["revoked", "rejected"].includes(a.status) && <Button variant="danger" onClick={() => run(() => api(`/api/accounts/${a.id}/revoke`, { method: "POST" }), () => "Revoked: secret disconnected, tool grants removed.")}>Revoke</Button>}
             </div></td></tr>
-            {connect?.id === a.id && <tr><td colSpan={6}><div className="grid grid-cols-1 gap-2 py-2 md:grid-cols-[minmax(0,1fr)_auto]">
+            {connect && connect.id === a.id && <tr><td colSpan={6}><div className="grid grid-cols-1 gap-2 py-2 md:grid-cols-[minmax(0,1fr)_auto]">
               <Field label={`Token you created at ${d.services[a.service]?.token ?? a.service} (stored encrypted; never shown again)`}>
-                <input type="password" autoComplete="off" value={connect.secret} onChange={(e) => setConnect({ ...connect, secret: e.target.value })} /></Field>
-              <label className="flex items-start gap-2 text-[12px] text-ink-2 md:col-span-2"><input type="checkbox" checked={connect.accept} onChange={(e) => setConnect({ ...connect, accept: e.target.checked })} /> {d.attestation}</label>
+                <input type="password" autoComplete="off" value={connect.secret} onChange={(e) => setConnect((c) => c && { ...c, secret: e.target.value })} /></Field>
+              <label className="flex items-start gap-2 text-[12px] text-ink-2 md:col-span-2"><input type="checkbox" checked={connect.accept} onChange={(e) => setConnect((c) => c && { ...c, accept: e.target.checked })} /> {d.attestation}</label>
               <div><Button variant="primary" disabled={connect.secret.length < 8 || !connect.accept} onClick={() => run(() => api(`/api/accounts/${a.id}/connect`,
                 { method: "POST", json: { secret: connect.secret, attestation: d.attestation } }), (r) => { setConnect(null); return `Connected: ${r.health?.ok ? `verified as ${r.health.identity}` : `stored, but the check failed (${r.health?.reason ?? "see health"})`}`; })}>Connect</Button></div>
             </div></td></tr>}

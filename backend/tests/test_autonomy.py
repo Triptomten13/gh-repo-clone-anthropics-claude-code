@@ -356,3 +356,41 @@ def test_g_sus_consequential_plans_are_challenged_before_anything_runs(client, f
     db.expire_all()
     assert db.query(Task).count() == before  # no task was submitted
     db.close()
+
+
+def test_an_unchanged_model_scoring_differently_is_variance_not_progress(db, monkeypatch):
+    """Found in the first real championships: unchanged models moved by up to 0.29 between two runs (sampling at
+    temperature 0.2, random seed), and the comparison called it 'smarter'. Now: controls set a noise floor, only a new or
+    changed model leading by more than that floor counts — and championships decode greedily."""
+    from app.autonomy import championship as C
+    from app.models import LocalModel
+
+    for key in ("inc-a", "inc-b"):
+        db.add(LocalModel(key=key, display_name=key, family="x", kind="chat", status="installed", file_path=__file__, size_bytes=1))
+    db.commit()
+    seen = {}
+
+    def measure(db_, m, actor, provider):
+        from app.daemon.runtime import _DETERMINISTIC
+
+        seen[m.key] = _DETERMINISTIC.get()
+        return runs[m.key]
+
+    monkeypatch.setattr(C, "_measure", measure)
+    runs = {"inc-a": {**_result(0.60, 10, 0.001, 0.50), "version": "v1"}, "inc-b": {**_result(0.70, 5, 0.002, 0.70), "version": "v1"}}
+    C.run(db, actor="t", provider=object())
+    assert all(seen.values())  # every contender measured with greedy decoding
+    # same models, same versions, different luck: inc-a's songwriting jumps 0.50 → 0.80 and takes the lead
+    runs = {"inc-a": {**_result(0.60, 10, 0.001, 0.80), "version": "v1"}, "inc-b": {**_result(0.70, 5, 0.002, 0.70), "version": "v1"}}
+    b = C.run(db, actor="t", provider=object())
+    assert not b.deltas["changes"] and b.deltas["variance"][0]["category"] == "creative: songwriting"
+    assert "no attributable improvement" in b.deltas["verdict"] and "variance" in b.deltas["verdict"]
+    # a newcomer that leads by MORE than the noise floor is progress; one that leads by less is not
+    db.add(LocalModel(key="new", display_name="new", family="y", kind="chat", status="installed", file_path=__file__, size_bytes=1))
+    db.commit()
+    runs = {"inc-a": {**_result(0.60, 10, 0.001, 0.50), "version": "v1"}, "inc-b": {**_result(0.70, 5, 0.002, 0.70), "version": "v1"},
+            "new": {**_result(0.95, 6, 0.002, 0.85), "version": "n1"}}
+    c = C.run(db, actor="t", provider=object())
+    acc = next(x for x in c.deltas["changes"] if x["category"] == "accuracy (17 tasks)")
+    assert acc["kind"] == "smarter" and acc["attributed_to"] == "new"
+    assert not any(x["category"] == "creative: songwriting" for x in c.deltas["changes"])  # 0.85 vs 0.80: within inc-a's 0.30 noise

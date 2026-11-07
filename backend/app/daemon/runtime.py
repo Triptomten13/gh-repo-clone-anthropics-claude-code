@@ -8,6 +8,8 @@ LocalGGUFEmbedder    semantic embeddings from the active embedding model.
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import ipaddress
 import os
 import re
@@ -21,6 +23,21 @@ import httpx
 
 from ..ai.providers import Completion, ProviderUnavailable, _parse_json
 from . import catalog, hardware, state
+
+# Measurement mode: greedy decoding with a fixed seed, so the same model on the same task gives the same answer and a
+# championship measures models instead of sampling luck (found in the first real championship: unchanged models moved
+# by up to 0.29 between two runs at temperature 0.2 with a random seed).
+_DETERMINISTIC: contextvars.ContextVar[bool] = contextvars.ContextVar("daemon_deterministic", default=False)
+EVAL_SEED = 1234
+
+
+@contextlib.contextmanager
+def deterministic() -> Iterator[None]:
+    tok = _DETERMINISTIC.set(True)
+    try:
+        yield
+    finally:
+        _DETERMINISTIC.reset(tok)
 
 THINK = re.compile(r"<think>(.*?)</think>", re.S)
 
@@ -264,6 +281,8 @@ class LocalLlamaProvider:
                               not complete)
         kwargs: dict[str, Any] = {"messages": messages, "max_tokens": answer_tokens + (thinking_budget() if think else 0),
                                   "temperature": 0.6 if think else 0.2}
+        if _DETERMINISTIC.get():
+            kwargs.update(temperature=0.0, top_k=1, seed=EVAL_SEED)
         if schema is not None:
             kwargs["response_format"] = {"type": "json_object", "schema": schema}
         with self._locks[f"{m.key}|gen"]:

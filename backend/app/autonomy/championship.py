@@ -40,7 +40,8 @@ def suites() -> dict[str, Any]:
     from ..creative.perf import DATASET_VERSION
     from ..daemon import bench
 
-    return {"daemon": f"daemon-core-v1 ({len(bench.TASKS)} tasks)", "creative": DATASET_VERSION, "call": "by model key, thinking off, same token limits"}
+    return {"daemon": f"daemon-core-v1 ({len(bench.TASKS)} tasks)", "creative": DATASET_VERSION, "call": "by model key, thinking off, same token limits",
+            "decoding": "greedy (temperature 0, top_k 1, fixed seed)"}
 
 
 def contenders(db: Session) -> list[Any]:
@@ -96,33 +97,58 @@ def standings(results: dict[str, dict[str, Any]]) -> dict[str, list[dict[str, An
     return cats
 
 
-def compare(now: dict[str, list[dict[str, Any]]], before: dict[str, list[dict[str, Any]]] | None) -> dict[str, Any]:
-    """Best-of-organisation per category, now vs the previous championship. Smarter = quality up, faster = speed up or
-    latency down, cheaper = cost per success down. Ties and regressions are reported too."""
+def _value(results: dict[str, Any], model: str, cat: str) -> float | None:
+    r = results.get(model) or {}
+    return None if r.get("error") else _metrics(r).get(cat, (None, ""))[0]
+
+
+def compare(now: dict[str, list[dict[str, Any]]], before: dict[str, list[dict[str, Any]]] | None,
+            now_results: dict[str, Any] | None = None, before_results: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Best-of-organisation per category, now vs the previous championship — with ATTRIBUTION.
+
+    Models that ran unchanged in both championships (same key, same file version) are CONTROLS: how much their own
+    scores moved is the re-measurement noise of that category. A change counts as smarter / faster / cheaper only when
+    the new leader is a NEW or CHANGED model and it beats the previous best by more than max(2 %, the noise). Everything
+    else — an unchanged model scoring differently — is reported as variance, never as progress."""
     if not before:
-        return {"previous": None, "changes": [], "verdict": "first championship on this hardware — the baseline"}
-    changes = []
+        return {"previous": None, "changes": [], "variance": [], "noise": {}, "verdict": "first championship on this hardware — the baseline"}
+    now_results, before_results = now_results or {}, before_results or {}
+    controls = [m for m, r in now_results.items() if not r.get("error") and m in before_results and not before_results[m].get("error")
+                and r.get("version", "") == before_results[m].get("version", "")]
+    newcomers = sorted(m for m in now_results if m not in controls)
+    changes, variance, noise = [], [], {}
     for cat, rows in now.items():
         if not rows or not before.get(cat):
             continue
+        moves = [abs(a - b) for m in controls if (a := _value(now_results, m, cat)) is not None and (b := _value(before_results, m, cat)) is not None]
+        noise[cat] = round(max(moves), 4) if moves else 0.0
         b, a = before[cat][0], rows[0]
         direction = a["direction"]
         diff = (a["value"] - b["value"]) if direction == HIGHER_IS_BETTER else (b["value"] - a["value"])
         rel = diff / abs(b["value"]) if b["value"] else None
-        kind = ("faster" if "speed" in cat or "latency" in cat else "cheaper" if "cost" in cat else "smarter")
         if abs(diff) < 1e-9 or (rel is not None and abs(rel) < 0.02):
             continue
-        changes.append({"category": cat, "kind": kind if diff > 0 else "regressed", "before": b, "after": a,
-                        "change": round(diff, 4), "relative": round(rel, 3) if rel is not None else None,
-                        "new_leader": a["model"] != b["model"]})
+        kind = ("faster" if "speed" in cat or "latency" in cat else "cheaper" if "cost" in cat else "smarter")
+        entry = {"category": cat, "before": b, "after": a, "change": round(diff, 4), "relative": round(rel, 3) if rel is not None else None,
+                 "new_leader": a["model"] != b["model"], "noise": noise[cat]}
+        if a["model"] in newcomers and diff > noise[cat]:
+            changes.append({**entry, "kind": kind, "attributed_to": a["model"]})
+        elif b["model"] in newcomers and b["model"] not in now_results and diff < 0:
+            changes.append({**entry, "kind": "regressed", "attributed_to": f"{b['model']} left"})
+        else:
+            variance.append({**entry, "kind": "variance"})
     up = [c for c in changes if c["kind"] != "regressed"]
-    verdict = (", ".join(sorted({c["kind"] for c in up})) + f" in {len(up)} categor{'y' if len(up) == 1 else 'ies'}" if up else "no improvement") + \
-        (f"; {sum(1 for c in changes if c['kind'] == 'regressed')} regression(s)" if any(c["kind"] == "regressed" for c in changes) else "")
-    return {"changes": changes, "verdict": verdict}
+    verdict = (", ".join(sorted({c["kind"] for c in up})) + f" in {len(up)} categor{'y' if len(up) == 1 else 'ies'} (attributable to "
+               + ", ".join(sorted({c["attributed_to"] for c in up})) + ")" if up else "no attributable improvement")
+    if variance:
+        verdict += (f"; {len(variance)} categor{'y' if len(variance) == 1 else 'ies'} moved only because the same models scored differently "
+                    f"(re-measurement variance up to {max(v['noise'] for v in variance):g})")
+    return {"changes": changes, "variance": variance, "noise": noise, "controls": controls, "newcomers": newcomers, "verdict": verdict}
 
 
 def run(db: Session, *, actor: str, models: list[str] | None = None, max_seconds: int = 2700, provider: Any = None) -> Any:
     """Run a championship (blocking — call from a background thread or an agent task)."""
+    from ..daemon.runtime import deterministic
     from ..models import Championship
 
     if provider is None:
@@ -141,7 +167,8 @@ def run(db: Session, *, actor: str, models: list[str] | None = None, max_seconds
                 results[m.key] = {"error": f"not run: the championship's time budget ({max_seconds} s) was used up"}
                 continue
             try:
-                results[m.key] = _measure(db, m, actor, provider)
+                with deterministic():
+                    results[m.key] = _measure(db, m, actor, provider)
             except Exception as e:  # noqa: BLE001 — a contender that fails is a result
                 results[m.key] = {"error": f"{type(e).__name__}: {str(e)[:200]}"}
             ch.results = dict(results)
@@ -150,7 +177,7 @@ def run(db: Session, *, actor: str, models: list[str] | None = None, max_seconds
         prev = db.scalars(select(Championship).where(Championship.status == "completed", Championship.id != ch.id)
                           .order_by(Championship.id.desc())).all()
         prev = next((p for p in prev if p.hardware == ch.hardware and p.suites == ch.suites), None)
-        d = compare(st, prev.standings if prev else None)
+        d = compare(st, prev.standings if prev else None, results, prev.results if prev else None)
         d["previous"] = prev.id if prev else None
         lead = {cat: rows[0]["model"] for cat, rows in st.items() if rows}
         ch.results, ch.standings, ch.deltas = results, st, d
