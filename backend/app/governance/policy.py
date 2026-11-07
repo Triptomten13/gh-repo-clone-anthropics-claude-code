@@ -58,7 +58,10 @@ FLOORS = {"tool:*.DELETE": Category.APPROVAL_REQUIRED, "tool:*.EXECUTE.external"
           "tools.revoke": Category.SUPERVISED, "budget.*": Category.RESTRICTED, "gates.*": Category.RESTRICTED,
           "knowledge.reclassify": Category.SUPERVISED, "knowledge.declassify": Category.RESTRICTED,
           "knowledge.delete": Category.APPROVAL_REQUIRED, "audit.prune": Category.RESTRICTED,
-          "providers.approve": Category.RESTRICTED}  # making a provider routable is a governance change
+          "providers.approve": Category.RESTRICTED,  # making a provider routable is a governance change
+          # Model Hunter / Account Vault: downloading a discovered model and connecting an external account need a person
+          "models.acquire": Category.APPROVAL_REQUIRED, "accounts.provision": Category.APPROVAL_REQUIRED,
+          "accounts.paid": Category.RESTRICTED}
 
 
 class PolicyDenied(Exception):

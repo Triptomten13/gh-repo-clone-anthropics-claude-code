@@ -87,7 +87,15 @@ with TestClient(app) as c:
                                ("post", "/api/creative/tournaments", {"brief": "Write a haiku about rain", "wait": True}),
                                ("get", "/api/creative/tournaments", None), ("get", "/api/creative/models", None),
                                ("get", "/api/creative/providers", None), ("get", "/api/creative/costs", None),
-                               ("get", "/api/creative/discovery", None), ("get", "/api/creative/overview", None)]:
+                               ("get", "/api/creative/discovery", None), ("get", "/api/creative/overview", None),
+                               # Model Hunter / Championship / Devil's Advocate / Account Vault (JSON columns, governed approvals)
+                               ("get", "/api/hunter", None), ("get", "/api/championships", None), ("get", "/api/advocate", None),
+                               ("post", "/api/advocate/review", {"decision": {"kind": "model_acquisition", "ref": "pg", "summary": "pg smoke",
+                                                                              "format": "gguf", "license": "mit", "commercial_use": "permitted",
+                                                                              "fit_verdict": "fits", "measured": False}}),
+                               ("post", "/api/accounts", {"service": "huggingface", "identity": "pg-smoke", "purpose": "postgres smoke test",
+                                                          "scopes": ["read-repos"], "justification": {"service": "hf"}, "level": 2}),
+                               ("get", "/api/accounts", None), ("get", "/api/attention", None), ("get", "/api/search?q=pg", None)]:
         r = getattr(c, method)(path, json=body) if body is not None else getattr(c, method)(path)
         print(f"{r.status_code} {method.upper()} {path}")
         if r.status_code != 200:

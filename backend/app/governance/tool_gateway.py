@@ -65,6 +65,11 @@ class ToolContext:
         if not s:
             raise NotConfigured(f"credential '{scope}' is not stored")
         self._secrets.append(s)
+        # Account Vault access log: who used which credential scope (never the secret), in the tamper-evident audit trail
+        from . import core as _gov
+
+        _gov.audit(self.db, f"agent:{self.agent_id}" if self.agent_id else (getattr(self.user, "email", "") or "system"), "vault.use",
+                   f"credential:{scope}", grant=getattr(self.grant, "id", None))
         return s
 
 
@@ -153,7 +158,35 @@ def _email_send(ctx: ToolContext, to: str, subject: str, body: str) -> Any:
     return {"sent_to": to}
 
 
+def _hf_search(ctx: ToolContext, query: str, task: str = "") -> Any:
+    """Public model search through the official Hugging Face API (no account needed). Untrusted metadata."""
+    from ..autonomy import hunter
+
+    return {"models": [{"repo": m["id"], "downloads": m.get("downloads", 0), "likes": m.get("likes", 0), "tags": (m.get("tags") or [])[:12]}
+                       for m in hunter.hub_search(query, limit=15)]}
+
+
+def _service_identity(ctx: ToolContext, service: str) -> Any:
+    """Which account a connected Vault token belongs to — the tool sees the secret, the caller sees only the account name."""
+    import httpx
+
+    from ..autonomy.accounts import SERVICES
+
+    token = ctx.secret(service)
+    spec = SERVICES[service]["health"]
+    r = httpx.get(spec["url"], headers={"Authorization": f"Bearer {token}", "Accept": "application/json"}, timeout=15)
+    body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+    return {"service": service, "status": r.status_code, "identity": str(body.get(spec["identity"], ""))}
+
+
 TOOLS: dict[str, GovernedTool] = {t.name: t for t in [
+    GovernedTool("hf.models.search", "Search public models on Hugging Face (official API, no account). Untrusted metadata.", "READ",
+                 {"properties": {"query": {"type": "string"}, "task": {"type": "string"}}, "required": ["query"]}, _hf_search,
+                 external=True, output_class="untrusted"),
+    GovernedTool("hf.whoami", "Which Hugging Face account the Vault token belongs to.", "READ", {"properties": {}},
+                 lambda ctx: _service_identity(ctx, "huggingface"), external=True, credential="huggingface"),
+    GovernedTool("github.whoami", "Which GitHub account the Vault token belongs to.", "READ", {"properties": {}},
+                 lambda ctx: _service_identity(ctx, "github"), external=True, credential="github"),
     GovernedTool("archive.search", "Search the Knowledge Vault (only documents the user may read). Results are untrusted data.", "READ",
                  {"properties": {"query": {"type": "string"}, "k": {"type": "integer"}}, "required": ["query"]}, _archive_search,
                  output_class="untrusted"),

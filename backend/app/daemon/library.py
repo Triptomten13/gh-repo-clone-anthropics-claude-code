@@ -95,15 +95,28 @@ def verify_upstream(entry: catalog.CatalogEntry, client: httpx.Client | None = N
     return {"license": lic, "sha256": oid, "size": size, "gated": meta.get("gated"), "sha": meta.get("sha", "")}
 
 
+def _pinned_entry(db: Session, key: str) -> catalog.CatalogEntry | None:
+    """A model the Model Hunter acquired with approval: pinned to repo, file, licence and sha256 at approval time, and
+    downloaded through exactly the same checks as the curated catalogue (live re-check, trusted hosts, checksum)."""
+    m = db.scalars(select(LocalModel).where(LocalModel.key == key)).first()
+    if not m or m.source != "huggingface" or not (m.sha256_expected and m.source_repo and m.source_file and m.size_bytes):
+        return None
+    return catalog.CatalogEntry(key=m.key, display_name=m.display_name, family=m.family, kind=m.kind, parameters=m.parameters or "",
+                                quantization=m.quantization or "", repo=m.source_repo, file=m.source_file, license=m.license or "",
+                                sha256=m.sha256_expected, size_bytes=m.size_bytes, context_length=m.context_length or 4096,
+                                languages=tuple(m.languages or []), capabilities=tuple(m.capabilities or []), suggested_slot="chat",
+                                notes=m.notes or "")
+
+
 def install(db: Session, key: str, actor: str, *, client: httpx.Client | None = None) -> LocalModel:
     """Download from the trusted source, verify sha256, record licence. Blocking; call from a background task."""
     st = state.load(db)
     if st["offline_mode"]:
         raise LibraryError("offline mode is on — downloads are disabled; use import from a local file instead")
-    entry = catalog.BY_KEY.get(key)
-    if entry is None:
-        raise LibraryError("only catalogued models can be downloaded; register other files with import-file")
     ensure_rows(db)
+    entry = catalog.BY_KEY.get(key) or _pinned_entry(db, key)
+    if entry is None:
+        raise LibraryError("only catalogued or approved (pinned) models can be downloaded; register other files with import-file")
     m = get(db, key)
     f = hardware.fit(entry.size_bytes, ctx_for(entry, st))
     if f["verdict"] == "does_not_fit" or not f["disk_ok"]:

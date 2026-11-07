@@ -55,7 +55,12 @@ ACTION_LEVELS: dict[str, Level] = {
     "creative.tournament": Level.DRAFTING,       # local / verified-free models, within budget: autonomous, recorded
     "creative.benchmark": Level.ANALYSIS,
     "providers.discover": Level.RESEARCH,        # list candidates; never makes them routable
-    "creative.tournament.paid": Level.EXTERNAL_PUBLISH,  # paid model spend above CREATIVE_AUTONOMOUS_USD: a human approves
+    "creative.tournament.paid": Level.EXTERNAL_PUBLISH,
+    # Model Hunter / Devil's Advocate / Account Vault
+    "model.discover": Level.RESEARCH,            # public Hub metadata; downloads nothing
+    "model.championship": Level.ANALYSIS,        # local benchmark runs within the time budget
+    "model.request_acquisition": Level.ANALYSIS,  # files an approval; the download needs a person
+    "decision.review": Level.RESEARCH,  # paid model spend above CREATIVE_AUTONOMOUS_USD: a human approves
     # financial (approval required)
     "ads.launch_campaign": Level.FINANCIAL,
     "ads.budget_change": Level.FINANCIAL,

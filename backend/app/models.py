@@ -1357,6 +1357,101 @@ class ModelProfile(Base):
     measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
+class ModelCandidate(Base):
+    """A model the Model Hunter found in a public repository. Screened by deterministic rules (format, licence, gating,
+    hardware fit, storage budget, safety-modified weights) BEFORE anything is downloaded; acquired only with approval."""
+    __tablename__ = "model_candidates"
+    __table_args__ = (UniqueConstraint("repo", "file", name="uq_model_candidates_repo_file"),)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    repo: Mapped[str] = mapped_column(String(200), index=True)
+    file: Mapped[str] = mapped_column(String(255), default="")
+    revision: Mapped[str] = mapped_column(String(64), default="")
+    task: Mapped[str] = mapped_column(String(48), default="general", index=True)  # what it was searched for
+    license: Mapped[str] = mapped_column(String(64), default="")
+    commercial_use: Mapped[str] = mapped_column(String(24), default="unknown")
+    gated: Mapped[bool] = mapped_column(Boolean, default=False)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    sha256: Mapped[str] = mapped_column(String(64), default="")
+    parameters_b: Mapped[float | None] = mapped_column(Float, nullable=True)
+    quantization: Mapped[str] = mapped_column(String(24), default="")
+    base_model: Mapped[str] = mapped_column(String(200), default="")
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    downloads: Mapped[int] = mapped_column(Integer, default=0)
+    likes: Mapped[int] = mapped_column(Integer, default=0)
+    last_modified: Mapped[str] = mapped_column(String(40), default="")
+    status: Mapped[str] = mapped_column(String(24), default="discovered", index=True)  # discovered|screened_out|shortlisted|pending_approval|acquiring|installed|rejected|failed
+    reasons: Mapped[list[str]] = mapped_column(JSON, default=list)
+    fit: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    local_key: Mapped[str] = mapped_column(String(96), default="")
+    critique_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    approval_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    discovered_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Championship(Base):
+    """One Model Championship: every contender on the SAME tasks, the SAME hardware, in the same run."""
+    __tablename__ = "championships"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    status: Mapped[str] = mapped_column(String(16), default="running")  # running | completed | failed
+    created_by: Mapped[str] = mapped_column(String(255), default="")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    hardware: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)   # fingerprint: cpu, cores, ram, gpu, runtime
+    suites: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)     # suite + dataset versions
+    participants: Mapped[list[str]] = mapped_column(JSON, default=list)
+    results: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)    # model -> measured numbers
+    standings: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # category -> ranking
+    deltas: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)     # vs the previous championship on this hardware
+    summary: Mapped[str] = mapped_column(Text, default="")
+    error: Mapped[str] = mapped_column(Text, default="")
+
+
+class Critique(Base):
+    """A Devil's Advocate review of one decision: findings with evidence and alternatives, a verdict, and whether it blocks."""
+    __tablename__ = "critiques"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    subject_kind: Mapped[str] = mapped_column(String(32), index=True)  # model_acquisition | account_request | plan | model_selection | decision
+    subject_ref: Mapped[str] = mapped_column(String(96), default="", index=True)
+    summary: Mapped[str] = mapped_column(Text, default="")
+    mode: Mapped[str] = mapped_column(String(24), default="DEVILS_ADVOCATE")
+    verdict: Mapped[str] = mapped_column(String(16), default="sound")  # sound | concerns | block
+    findings: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    checks: Mapped[list[str]] = mapped_column(JSON, default=list)       # what was examined (so "sound" is explainable)
+    reviewer: Mapped[str] = mapped_column(String(160), default="rules")  # rules | rules+<model id>
+    proposer: Mapped[str] = mapped_column(String(160), default="")
+    independent: Mapped[bool] = mapped_column(Boolean, default=True)
+    status: Mapped[str] = mapped_column(String(16), default="open")    # open | resolved | escalated
+    response: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class ServiceAccount(Base):
+    """An external account Demonkoncernen uses (Account Vault). The secret itself lives encrypted in provider_credentials;
+    agents get a credential SCOPE through a tool grant and never see the secret."""
+    __tablename__ = "service_accounts"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    service: Mapped[str] = mapped_column(String(48), index=True)
+    identity: Mapped[str] = mapped_column(String(128), default="")     # account / organisation name
+    purpose: Mapped[str] = mapped_column(Text, default="")
+    level: Mapped[int] = mapped_column(Integer, default=1)             # 0 research … 4 sensitive
+    status: Mapped[str] = mapped_column(String(24), default="proposed", index=True)  # proposed|pending_approval|approved|connected|revoked|rejected
+    scopes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    justification: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    credential_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    credential_scope: Mapped[str] = mapped_column(String(96), default="")
+    requested_by: Mapped[str] = mapped_column(String(255), default="")
+    approval_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    critique_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_health_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    health: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_by: Mapped[str] = mapped_column(String(255), default="")
+
+
 # Archive index change tracking: every process that writes document_chunks must record change tokens (see knowledge/index.py)
 from .knowledge import index as _archive_index  # noqa: E402,F401
 # Audit chain: every process that writes audit records must seal them at commit (see governance/audit_chain.py)
