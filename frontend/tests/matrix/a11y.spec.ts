@@ -4,7 +4,8 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 
-const PAGES = ["/login", "/welcome", "/status", "/", "/control", "/chamber", "/knowledge", "/daemon", "/research", "/agents", "/approvals", "/settings", "/governance", "/demo", "/creative", "/autonomy"];
+const PAGES = ["/login", "/welcome", "/status", "/", "/control", "/chamber", "/knowledge", "/daemon", "/research", "/agents", "/approvals", "/settings", "/governance", "/demo", "/creative", "/autonomy",
+  "/personnel", "/personnel/model_hunter", "/personnel/create", "/bestiary", "/bestiary/sasquatch"];
 const report: Record<string, unknown> = {};
 
 for (const [label, viewport] of [["desktop", { width: 1440, height: 900 }], ["phone", { width: 390, height: 844 }]] as const) {

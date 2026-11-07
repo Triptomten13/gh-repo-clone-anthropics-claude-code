@@ -76,6 +76,32 @@ class Agent(Base):
     tasks_failed: Mapped[int] = mapped_column(Integer, default=0)
     tasks_blocked: Mapped[int] = mapped_column(Integer, default=0)
     last_active_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # ---- personnel identity (migration 0013): race, specialisation and role are SEPARATE dimensions; none of them, nor
+    # the rank or the personality, grants a permission (permission_level and tool grants do, through governance)
+    persona_name: Mapped[str] = mapped_column(String(80), default="")        # e.g. "Malphas"
+    species_key: Mapped[str] = mapped_column(String(64), default="", index=True)
+    specializations: Mapped[list[str]] = mapped_column(JSON, default=list)   # specialization keys (or custom labels)
+    title: Mapped[str] = mapped_column(String(128), default="")              # the role, e.g. "Model Hunter"
+    rank: Mapped[str] = mapped_column(String(48), default="Specialist")
+    department_key: Mapped[str] = mapped_column(String(64), default="", index=True)
+    supervisor_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    alt_names: Mapped[list[str]] = mapped_column(JSON, default=list)
+    traits: Mapped[list[str]] = mapped_column(JSON, default=list)            # personality chips — expression only
+    personality: Mapped[str] = mapped_column(Text, default="")               # structured/free-text personality summary
+    communication_style: Mapped[list[str]] = mapped_column(JSON, default=list)
+    languages: Mapped[list[str]] = mapped_column(JSON, default=list)
+    purpose: Mapped[str] = mapped_column(Text, default="")
+    mission: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)      # primary/secondary tasks, goals, outcomes, not_to_do
+    skills: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # {name, level, basis: assigned|tested|measured}
+    tool_suggestions: Mapped[list[str]] = mapped_column(JSON, default=list)  # wishes only — access comes from Tool Gateway grants
+    lifecycle: Mapped[str] = mapped_column(String(24), default="ACTIVE", index=True)  # DRAFT … ACTIVE … ARCHIVED, FAILED
+    source: Mapped[str] = mapped_column(String(16), default="CODE")          # CODE | GSUS_CHAT | BESTIARY | PERSONNEL | API | ADMIN
+    custom: Mapped[bool] = mapped_column(Boolean, default=False)
+    onboarding: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    created_by: Mapped[str] = mapped_column(String(255), default="system")
+    created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Task(Base):
@@ -1355,6 +1381,79 @@ class ModelProfile(Base):
     conditions: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)  # dataset version, max_tokens, hardware
     source: Mapped[str] = mapped_column(String(24), default="benchmark")  # benchmark | tournament
     measured_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class Species(Base):
+    """The Bestiary: an encyclopedia of beings. Folklore summaries, modern fiction and Demonkoncernen's own canon are kept
+    in separate fields so one is never presented as the other. A race never restricts what an agent may do."""
+    __tablename__ = "species"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(96))
+    category: Mapped[str] = mapped_column(String(32), index=True)       # fae | elves | spirits | elementals | nordic | european | asian | user
+    kind: Mapped[str] = mapped_column(String(16), default="being")      # being | category (e.g. Yokai is a broad category)
+    alt_names: Mapped[list[str]] = mapped_column(JSON, default=list)
+    subtypes: Mapped[list[str]] = mapped_column(JSON, default=list)
+    origin: Mapped[str] = mapped_column(String(160), default="")
+    folklore: Mapped[str] = mapped_column(Text, default="")             # summary of traditional belief (labelled folklore)
+    fiction: Mapped[str] = mapped_column(Text, default="")              # modern fantasy depictions (labelled fiction)
+    canon: Mapped[str] = mapped_column(Text, default="")                # Demonkoncernen's own invented interpretation
+    traits: Mapped[list[str]] = mapped_column(JSON, default=list)
+    abilities: Mapped[list[str]] = mapped_column(JSON, default=list)
+    strengths: Mapped[list[str]] = mapped_column(JSON, default=list)
+    weaknesses: Mapped[list[str]] = mapped_column(JSON, default=list)
+    symbolism: Mapped[str] = mapped_column(Text, default="")
+    relations: Mapped[list[str]] = mapped_column(JSON, default=list)
+    specializations: Mapped[list[str]] = mapped_column(JSON, default=list)  # suggestions only
+    example_roles: Mapped[list[str]] = mapped_column(JSON, default=list)
+    sources: Mapped[list[str]] = mapped_column(JSON, default=list)
+    caution: Mapped[str] = mapped_column(Text, default="")              # cultural context notes
+    user_created: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[str] = mapped_column(String(255), default="system")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class Specialization(Base):
+    __tablename__ = "specializations"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(96))
+    description: Mapped[str] = mapped_column(Text, default="")
+    competencies: Mapped[list[str]] = mapped_column(JSON, default=list)
+    tools: Mapped[list[str]] = mapped_column(JSON, default=list)
+    departments: Mapped[list[str]] = mapped_column(JSON, default=list)
+    example_tasks: Mapped[list[str]] = mapped_column(JSON, default=list)
+    keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
+    user_created: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class Department(Base):
+    """Functional departments — organised by work and responsibility, never by race."""
+    __tablename__ = "departments"
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(96))
+    description: Mapped[str] = mapped_column(Text, default="")
+    manager_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    divisions: Mapped[list[str]] = mapped_column(JSON, default=list)  # code divisions that belong here
+
+
+class AgentRelationship(Base):
+    __tablename__ = "agent_relationships"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_agent_id: Mapped[str] = mapped_column(String(64), index=True)
+    target_agent_id: Mapped[str] = mapped_column(String(64), index=True)
+    relationship_type: Mapped[str] = mapped_column(String(32))  # reports_to | challenges | rival | friend | mentor | collaborates
+    description: Mapped[str] = mapped_column(Text, default="")
+
+
+class AgentVersion(Base):
+    """Every identity/profile change keeps the previous version — editing never loses history."""
+    __tablename__ = "agent_versions"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    agent_id: Mapped[str] = mapped_column(String(64), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    note: Mapped[str] = mapped_column(String(255), default="")
+    changed_by: Mapped[str] = mapped_column(String(255), default="")
+    changed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class ModelCandidate(Base):

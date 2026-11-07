@@ -60,7 +60,9 @@ ACTION_LEVELS: dict[str, Level] = {
     "model.discover": Level.RESEARCH,            # public Hub metadata; downloads nothing
     "model.championship": Level.ANALYSIS,        # local benchmark runs within the time budget
     "model.request_acquisition": Level.ANALYSIS,  # files an approval; the download needs a person
-    "decision.review": Level.RESEARCH,  # paid model spend above CREATIVE_AUTONOMOUS_USD: a human approves
+    "decision.review": Level.RESEARCH,
+    # Custom Agent Creator: a custom agent's own work is analysis/drafting text; anything more goes through tools + approvals
+    "custom.task": Level.ANALYSIS,  # paid model spend above CREATIVE_AUTONOMOUS_USD: a human approves
     # financial (approval required)
     "ads.launch_campaign": Level.FINANCIAL,
     "ads.budget_change": Level.FINANCIAL,

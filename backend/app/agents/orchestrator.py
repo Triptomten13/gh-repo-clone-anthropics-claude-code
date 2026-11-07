@@ -73,6 +73,8 @@ class Orchestrator:
         overwrites a permission level or persona changed by a human admin."""
         from ..flare.service import seed_personas
         for a in self.agents.values():
+            if getattr(a, "custom", False):
+                continue  # a custom agent's row is its source of truth
             row = db.get(Agent, a.id)
             if row is None:
                 db.add(Agent(id=a.id, name=a.name, division=a.division, description=a.description,
@@ -81,6 +83,12 @@ class Orchestrator:
                 row.name, row.division, row.description = a.name, a.division, a.description
         db.flush()
         seed_personas(db)
+        from ..personnel import registry as personnel
+
+        personnel.seed(db)  # Bestiary, departments and the identities of agents that have none yet
+        from ..personnel import runtime as custom_runtime
+
+        custom_runtime.load(db, self)  # custom agents created with the Agent Creator (task type custom.<id>)
         db.commit()
 
     # ------------------------------------------------------------ governance checks

@@ -2,6 +2,21 @@
 
 Short records of decisions that shape the system. Newest first.
 
+### D-026 · 2026-11-07 · One personnel register; identity is never authority; one creation pipeline
+Owner's specifications "Astral Personnel & Governed Autonomy" and "Custom Agent Creator".
+* Race, specialization, role, rank, department and personality are separate columns on the EXISTING `agents` table
+  (migration 0013) — no parallel registry. Departments are functional; no view groups agents by race.
+* Identity grants nothing: permissions come only from `permission_level` and Tool Gateway grants. New agents start at
+  level 1; levels 2–3 are a RESTRICTED approval (`personnel.permission_level`, four eyes, single use) applied from
+  Approvals; levels 4–5 cannot be requested. Rank, title, traits and relationships are character colour.
+* One creation service (`app/personnel/creator.py`) behind G-SUS chat, The Bestiary, Personnel, the API and admin; the
+  three UI entry points are tested to run the same 22 recorded steps. G-SUS proposes in chat and creates only when the
+  person approves the card.
+* "ACTIVE" only after the onboarding checks: configuration checks must pass; behavioural checks need a model and are
+  recorded as skipped (never as passed) without one. AI-written skills are flagged and Unverified.
+* The Bestiary keeps folklore (our summary), fiction, system canon and cultural care in separate fields, with real works
+  as further reading; new beings are data, not code.
+
 ### D-025 · 2026-11-07 · Measure models ourselves, challenge every important decision, never hand a secret to a model
 Owner's priorities: the Model Hunter measures on this hardware and our tasks (not leaderboards); the Devil's Advocate
 can challenge G-SUS and must not just agree; the Account Vault gives agents autonomy without spreading secrets.

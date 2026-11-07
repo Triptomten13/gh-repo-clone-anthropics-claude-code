@@ -61,7 +61,9 @@ FLOORS = {"tool:*.DELETE": Category.APPROVAL_REQUIRED, "tool:*.EXECUTE.external"
           "providers.approve": Category.RESTRICTED,  # making a provider routable is a governance change
           # Model Hunter / Account Vault: downloading a discovered model and connecting an external account need a person
           "models.acquire": Category.APPROVAL_REQUIRED, "accounts.provision": Category.APPROVAL_REQUIRED,
-          "accounts.paid": Category.RESTRICTED}
+          "accounts.paid": Category.RESTRICTED,
+          # Custom Agent Creator: raising a new agent above level 1 is a governance change decided by a second person
+          "personnel.permission_level": Category.RESTRICTED}
 
 
 class PolicyDenied(Exception):

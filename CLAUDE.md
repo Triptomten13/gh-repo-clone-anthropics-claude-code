@@ -9,6 +9,8 @@ G-SUS is the intelligence, Demonkoncernen AB the infrastructure, the Archive the
   DAEMON CORE (sovereign local AI), cost intelligence, install/admin access, backup. `progress.md` = current state.
 - `backend/app/daemon/` local model runtime, residency, routing policy, orchestrator (`intel.py`), caches, telemetry, model library,
   credentials, costs. `backend/app/internet/` official-API research, monitors. Admin CLI: `python -m app.cli`.
+- `backend/app/personnel/` personnel register, The Bestiary data, Custom Agent Creator (the ONE agent creation service), custom-agent runtime
+  (docs/PERSONNEL.md). Race, rank and personality never grant permissions.
 - Performance work: measure first (`scripts/perf_bench.py --label … --compare baseline`); never claim an improvement without it.
 
 ## Non-negotiables

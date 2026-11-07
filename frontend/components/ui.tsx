@@ -102,6 +102,21 @@ const STATUS: Record<string, { cls: string; icon: ReactNode; label?: string }> =
   does_not_fit: { cls: "text-[#f08a8a] border-critical/50", icon: <OctagonX size={12} />, label: "does not fit" },
   no_runtime: { cls: "text-[#f08a8a] border-critical/50", icon: <OctagonX size={12} />, label: "no runtime" },
   blocked_no_consent: { cls: "text-[#f08a8a] border-critical/50", icon: <OctagonX size={12} />, label: "blocked: no consent" },
+  // agent lifecycle (Custom Agent Creator) and whether G-SUS can observe the agent
+  draft: { cls: "text-ink-3 border-line-strong", icon: <CircleDashed size={12} /> },
+  pending_review: { cls: "text-warning border-warning/40", icon: <ShieldQuestion size={12} />, label: "pending review" },
+  approval_required: { cls: "text-warning border-warning/40", icon: <ShieldQuestion size={12} />, label: "approval required" },
+  ready: { cls: "text-series-1 border-series-1/40", icon: <CircleDashed size={12} /> },
+  initializing: { cls: "text-series-1 border-series-1/40", icon: <Loader2 size={12} className="animate-spin" /> },
+  archived: { cls: "text-ink-3 border-line-strong", icon: <OctagonX size={12} /> },
+  observed: { cls: "text-cyan border-cyan/40", icon: <CheckCircle2 size={12} />, label: "observed" },
+  never_observed: { cls: "text-ink-3 border-line-strong", icon: <CircleDashed size={12} />, label: "not run yet" },
+  offline: { cls: "text-warning border-warning/40", icon: <AlertTriangle size={12} />, label: "not observed recently" },
+  not_active: { cls: "text-ink-3 border-line-strong", icon: <CircleDashed size={12} />, label: "not active" },
+  pass: { cls: "text-[#5fd35f] border-good/40", icon: <CheckCircle2 size={12} /> },
+  fail: { cls: "text-[#f08a8a] border-critical/50", icon: <AlertTriangle size={12} /> },
+  skipped: { cls: "text-ink-3 border-line-strong", icon: <CircleDashed size={12} /> },
+  ok: { cls: "text-[#5fd35f] border-good/40", icon: <CheckCircle2 size={12} /> },
 };
 
 /** Status chip: always icon + label, never color alone. */

@@ -1,5 +1,5 @@
 "use client";
-import { Activity, Archive, Beaker, Crosshair, Telescope, BookOpen, Bot, Briefcase, Building2, CloudOff, Compass, Cpu, Flame, Dna, FlaskConical, Gauge, GitFork, Home, Landmark, Library, Lightbulb, Megaphone, MessagesSquare, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Palette, Power, Radar, Scale, Search, Settings, ShieldCheck, Sparkles, Trophy, UserCog, WandSparkles, WifiOff, X } from "lucide-react";
+import { Activity, Archive, Beaker, Crosshair, ScrollText, Users, Telescope, BookOpen, Bot, Briefcase, Building2, CloudOff, Compass, Cpu, Flame, Dna, FlaskConical, Gauge, GitFork, Home, Landmark, Library, Lightbulb, Megaphone, MessagesSquare, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Palette, Power, Radar, Scale, Search, Settings, ShieldCheck, Sparkles, Trophy, UserCog, WandSparkles, WifiOff, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -16,10 +16,12 @@ const GSUS: NavItem[] = [
   { href: "/autonomy", label: "Model Hunter & Vault", icon: Crosshair },
   { href: "/knowledge", label: "The Archive", icon: Library },
   { href: "/archivum", label: "Archivum", icon: BookOpen },
+  { href: "/bestiary", label: "The Bestiary", icon: ScrollText },
   { href: "/flare/collab", label: "The Council", icon: MessagesSquare },
 ];
 const DEMON: NavItem[] = [
   { href: "/hq", label: "Demonkoncernen HQ", icon: Building2 },
+  { href: "/personnel", label: "Personnel", icon: Users },
   { href: "/control", label: "Control Center", icon: Gauge },
   { href: "/daemon", label: "DAEMON CORE", icon: Flame },
   { href: "/research", label: "Research & Monitoring", icon: Telescope },

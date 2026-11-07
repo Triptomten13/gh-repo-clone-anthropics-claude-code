@@ -36,7 +36,15 @@ from ..models import AgentMessage, Approval, CollaborationSession, Document, Gsu
 from ..security import untrusted
 from . import modes as MODES
 
+_BEINGS = (r"agents?|medarbetare|employee|colleague|kollega|specialist|assistent|assistant|demon|djinn|fairy|fé|elf|alv|"
+           r"leprechaun|sasquatch|bigfoot|goblin|tomte|troll|spirit|ande|väsen|being|dragon|drake|kobold|gnome|undine|salamander")
 INTENTS: list[tuple[str, str]] = [
+    # Custom Agent Creator / personnel register — exclusive intents (see plan())
+    ("create_agent", rf"\b(skapa|create|make|gör|bygg|build|summon|frammana|recruit|rekrytera|anställ|hire|design)\b[^.?!]{{0,60}}"
+                     rf"\b({_BEINGS})\b|\b(we need|i need|jag behöver|vi behöver|jag vill ha|i want)\b[^.?!]{{0,30}}"
+                     rf"\b(someone|somebody|någon|a new|en ny|ett nytt|an? ({_BEINGS})|en ({_BEINGS}))\b"),
+    ("personnel_query", r"\b(who can|which agents?|vem kan|vilken agent|vilka agenter|who (handles|does|is responsible)|"
+                        r"vem (ansvarar|sköter))\b"),
     ("approval_action", r"\b(launch|publish|buy|purchase|spend|place an order|send (an )?(email|message)|delete|lansera|publicera|köp|spendera|skicka|radera)\b"),
     ("product_evaluation", r"\b(evaluat\w*|analy[sz]\w*|assess\w*|scor\w*|economics|profitab\w*|margin|utvärdera|analysera|bedöm\w*|lönsam\w*)"),
     ("brand_creation", r"\b(brand\w*|concepts?|identit\w*|varumärke\w*|koncept\w*)"),
@@ -96,6 +104,25 @@ def _llm_intents(objective: str, tier: str, run: GsusRun, db: Session) -> list[s
     return [i for i in (res.data or {}).get("intents", []) if i in dict(INTENTS) or i == "risk_review"] or None
 
 
+def _has_model() -> bool:
+    return getattr(get_provider(), "name", "none") != "none"
+
+
+def _custom_delegate(db: Session, objective: str) -> dict[str, Any] | None:
+    """G-SUS uses the personnel register when choosing whom to delegate to: an ACTIVE custom agent whose
+    specializations clearly match takes objectives no built-in capability covers."""
+    from ..personnel import registry
+
+    for c in registry.find_agents(db, objective, limit=3):
+        if c["custom"] and c["match"]["score"] >= 3:
+            return c
+    return None
+
+
+def _swedish(text: str) -> bool:
+    return bool(re.search(r"[åäö]|\b(och|jag|vi|som|skapa|behöver|vem|kan|en ny)\b", text, re.I))
+
+
 # ----------------------------------------------------------------------------- planning
 def plan(db: Session, run: GsusRun) -> list[dict[str, Any]]:
     s = run.settings
@@ -106,8 +133,14 @@ def plan(db: Session, run: GsusRun) -> list[dict[str, Any]]:
     for extra in MODES.MODES[s["mode"]]["extra_intents"]:
         if extra not in intents and (extra != "archive_question" or not (set(intents) & NEEDS_PRODUCT)):
             intents.append(extra)
+    for exclusive in ("create_agent", "personnel_query"):  # recruiting or asking about staff is not product work
+        if exclusive in intents:
+            intents = [exclusive]
+            break
     if not intents:
         intents = ["archive_question"] if db.query(Document).filter(Document.status == "ready").count() else []
+        if (hit := _custom_delegate(db, run.objective)) is not None:  # a custom agent whose specialization matches
+            intents = ["delegate_custom"]
     run.intent = ",".join(intents)
     product, cands = (None, [])
     if set(intents) & (NEEDS_PRODUCT | {"risk_review", "approval_action"}):
@@ -128,6 +161,26 @@ def plan(db: Session, run: GsusRun) -> list[dict[str, Any]]:
         steps.append({"ordinal": len(steps), "title": title, "kind": kind, "task_type": task_type, "payload": payload or {}, "depends_on": deps or []})
         return len(steps) - 1
 
+    if intents == ["create_agent"]:
+        from ..personnel import creator
+
+        if not creator.detect_specializations(db, run.objective) and not (s.get("use_llm") and _has_model()):
+            run.status = "needs_clarification"
+            run.clarification = ("What should the new agent work on? One line is enough — e.g. research, software, "
+                                 "monitoring, botany, costs, music — and I will propose the rest.")
+            return []
+        add("Agent Creator: duplicate check + proposal (nothing is created until you confirm)", "agent_proposal",
+            payload={"idea": run.objective})
+        add("Compare, verify and answer", "synthesis", deps=[0])
+        return steps
+    if intents == ["personnel_query"]:
+        add("Personnel register: who can do this?", "personnel_lookup", payload={"question": run.objective})
+        add("Compare, verify and answer", "synthesis", deps=[0])
+        return steps
+    if intents == ["delegate_custom"]:
+        add(f"Delegate to {hit['display']}", "task", f"custom.{hit['id']}", {"objective": run.objective})
+        add("Compare, verify and answer", "synthesis", deps=[0])
+        return steps
     pid = product.id if product else None
     marker = f"gsus-{run.id}"
     ev = add(f"Evaluate '{product.name}'", "task", "ceo.evaluate_product", {"product_id": pid, "refresh": marker}) \
@@ -292,7 +345,9 @@ def execute(db: Session, run: GsusRun) -> GsusRun:
             msg = db.scalars(select(AgentMessage).where(AgentMessage.task_id == t.id).order_by(AgentMessage.id.desc())).first()
             st.status = {"succeeded": "completed", "blocked": "blocked", "failed": "failed", "cancelled": "cancelled"}.get(t.status, st.status)
             st.summary = (msg.summary if msg else t.error or t.status)[:2000]
-            st.output = _digest(db, st, t)
+            from ..personnel import registry
+
+            st.output = _digest(db, st, t) | {"delegated_to": {"id": t.agent_id, "display": registry.identity_line(db, t.agent_id)}}
             _step_event(st)
     # 3) inline steps: canon, retrieval, approval gates
     for st in _steps(db, run):
@@ -312,6 +367,20 @@ def execute(db: Session, run: GsusRun) -> GsusRun:
             ans.pop("llm_result", None)
             st.status, st.output = "completed", ans
             st.summary = f"{len(ans['citations'])} cited passage(s); method {ans['method']}"
+        elif st.kind == "agent_proposal":
+            from ..personnel import creator
+
+            prop = creator.design(db, st.payload["idea"], use_model=bool(run.settings.get("use_llm")), source="GSUS_CHAT")
+            first = prop["proposals"][0]
+            st.status, st.output = "completed", {"proposal": prop, "run_id": run.id}
+            st.summary = (f"proposed {first['preview']['display']} ({prop['method']})"
+                          + (f"; {len(prop['duplicates'])} similar agent(s) found" if prop["duplicates"] else "; no similar agent"))
+        elif st.kind == "personnel_lookup":
+            from ..personnel import registry
+
+            hits = registry.find_agents(db, st.payload["question"], limit=5, only_active=False)
+            st.status, st.output = "completed", {"agents": hits}
+            st.summary = f"{len(hits)} matching agent(s)" if hits else "nobody in the register matches — the Agent Creator can propose one"
         elif st.kind == "approval_gate":
             deps = [by_ord[d] for d in st.depends_on]
             if any(d.status == "running" for d in deps):
@@ -465,6 +534,49 @@ def _llm_fn(db: Session, run: GsusRun):
     return call
 
 
+def _proposal_lines(prop: dict[str, Any], sv: bool) -> list[str]:
+    p = prop["proposals"][0]
+    spec, pv = p["spec"], p["preview"]
+    tasks = "; ".join(spec["mission"]["primary"][:2])
+    skills = ", ".join(k["name"] for k in spec["skills"][:5])
+    dups = prop["duplicates"]
+    if sv:
+        out = ["Jag föreslår en ny medarbetare:", "", pv["display"], spec["purpose"], "", f"Huvuduppgift: {tasks}",
+               f"Personlighet: {', '.join(spec['traits']) or '—'}", f"Avdelning: {(pv.get('department') or {}).get('name', '—')}",
+               f"Möjliga kompetenser (förslag, inte verifierade): {skills or '—'}"]
+        if dups:
+            out += ["", "Befintliga agenter med liknande ansvar: " + "; ".join(
+                f"{d['agent']['display']} ({d['score']:.2f} → {d['recommendation']})" for d in dups[:3])]
+        out += ["", "Vill du granska och justera profilen innan registrering? Inget är skapat ännu."]
+    else:
+        out = ["I propose a new colleague:", "", pv["display"], spec["purpose"], "", f"Main task: {tasks}",
+               f"Personality: {', '.join(spec['traits']) or '—'}", f"Department: {(pv.get('department') or {}).get('name', '—')}",
+               f"Possible skills (suggestions, not verified): {skills or '—'}"]
+        if dups:
+            out += ["", "Existing agents with similar responsibilities: " + "; ".join(
+                f"{d['agent']['display']} ({d['score']:.2f} → {d['recommendation']})" for d in dups[:3])]
+        out += ["", "Review and adjust the profile before registration? Nothing has been created yet."]
+    if prop["method"] == "rules":
+        out.append("(Assembled by deterministic rules — no language model was used.)" if not sv
+                   else "(Sammanställt med deterministiska regler — ingen språkmodell användes.)")
+    return out
+
+
+def _lookup_lines(agents: list[dict[str, Any]], sv: bool) -> list[str]:
+    if not agents:
+        return ["Ingen i personalregistret matchar. Vill du att jag föreslår en ny agent?" if sv else
+                "Nobody in the register matches. Shall I propose a new agent?"]
+    head = "Det här är de som kan hjälpa till:" if sv else "These agents can help:"
+    rows = []
+    for c in agents:
+        obs = c["observation"]
+        state = {"observed": "observerad" if sv else "observed", "never_observed": "aldrig körd" if sv else "never run",
+                 "offline": "offline", "suspended": "pausad" if sv else "suspended", "not_active": c["lifecycle"]}.get(obs["state"], obs["state"])
+        rows.append(f"  • {c['display']} — {c['title']} ({c['department']['name'] if c['department'] else '—'}; {state}) — "
+                    + "; ".join(c["match"]["why"][:2]))
+    return [head, *rows]
+
+
 def compose(db: Session, run: GsusRun, steps: list[GsusStep]) -> tuple[str, str]:
     mode = MODES.MODES[run.settings["mode"]]
     lines = [f"G-sus · {mode['title']} — objective: {run.objective}", ""]
@@ -475,6 +587,10 @@ def compose(db: Session, run: GsusRun, steps: list[GsusStep]) -> tuple[str, str]
         lines.append(f"{icon} {s.title}: {s.summary}")
         if s.kind == "retrieval" and s.output.get("answer"):
             lines += ["", "RESEARCH (grounded in the Archive):", s.output["answer"], ""]
+        if s.kind == "agent_proposal" and (s.output or {}).get("proposal"):
+            lines += ["", *_proposal_lines(s.output["proposal"], _swedish(run.objective)), ""]
+        if s.kind == "personnel_lookup":
+            lines += ["", *_lookup_lines(s.output.get("agents") or [], _swedish(run.objective)), ""]
         council = (s.output or {}).get("council")
         if council:
             lines.append(f"   next experiment: {council['recommended_next_experiment']['type']}")

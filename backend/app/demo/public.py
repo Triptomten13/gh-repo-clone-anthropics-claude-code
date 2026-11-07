@@ -76,6 +76,16 @@ CATALOG: list[dict[str, Any]] = [
      "shows": "Retrieval over the sample vault (the platform's own documentation) with citations. A RESTRICTED sample "
               "memo exists too — your session is not allowed to read it, so it is filtered out before ranking.",
      "expect": "completed"},
+    {"key": "recruit", "kind": "gsus", "title": "Ask G-SUS to propose a new agent",
+     "objective": "Skapa en fairy som är specialist på växter, botanik och trädgårdsodling.", "mode": "gsus",
+     "shows": "The Custom Agent Creator behind G-SUS: a duplicate check against the personnel register, a species "
+              "recommendation that keeps folklore, canon and suggestion apart, and a full editable proposal. Nothing is "
+              "created — creating an agent needs the agent.develop permission, which a demo session does not have.",
+     "expect": "completed"},
+    {"key": "who", "kind": "gsus", "title": "Ask who can do a job",
+     "objective": "Vem kan övervaka infrastrukturen?", "mode": "gsus",
+     "shows": "G-SUS answers from the shared personnel register — name · race · specialization, department and whether the "
+              "agent is actually observed — instead of guessing.", "expect": "completed"},
     {"key": "calc", "kind": "ask", "title": "Deterministic answer (no model)", "question": "What is 25% of 480?",
      "shows": "The orchestrator recognises arithmetic and solves it exactly — no model call, with an execution trace.",
      "expect": "answered"},

@@ -646,7 +646,8 @@ def gates_check(c: GateCheckIn, db: Session = Depends(get_db), user: User = Depe
 # permission, the policy decision, approval bound to the exact payload, decided by someone else, not expired, revoked or used.
 _APPLY: dict[str, str] = {"policy.write": "policy.write", "audit.prune": "audit.retention", "tools.grant": "tools.grant",
                           "knowledge.declassify": "knowledge.admin", "budget.change": "system.configure",
-                          "deploy.loosen_egress": "system.configure", "gates.change": "gates.write"}
+                          "deploy.loosen_egress": "system.configure", "gates.change": "gates.write",
+                          "personnel.permission_level": "agent.develop"}
 
 
 @router.post("/approvals/{aid}/apply")
@@ -679,4 +680,14 @@ def approval_apply(aid: int, db: Session = Depends(get_db), user: User = Depends
         return budgets_disable(p["disable"], aid, db, user) if "disable" in p else budgets_create(BudgetIn(**p, approval_id=aid), db, user)
     if a.action == "deploy.loosen_egress":
         return deployment_set(DeploymentIn(**p, approval_id=aid), db, user)
+    if a.action == "personnel.permission_level":
+        from ..personnel import creator
+
+        try:
+            agent = creator.apply_elevation(db, aid, actor=user.email, role=user.role)
+        except creator.CreatorError as e:
+            db.rollback()
+            raise HTTPException(e.status, str(e)) from e
+        db.commit()
+        return {"status": "applied", "agent": agent.id, "permission_level": agent.permission_level, "lifecycle": agent.lifecycle}
     return gates_upsert(GateIn(**p, approval_id=aid), db, user)

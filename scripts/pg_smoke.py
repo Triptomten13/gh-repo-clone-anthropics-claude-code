@@ -95,7 +95,24 @@ with TestClient(app) as c:
                                                                               "fit_verdict": "fits", "measured": False}}),
                                ("post", "/api/accounts", {"service": "huggingface", "identity": "pg-smoke", "purpose": "postgres smoke test",
                                                           "scopes": ["read-repos"], "justification": {"service": "hf"}, "level": 2}),
-                               ("get", "/api/accounts", None), ("get", "/api/attention", None), ("get", "/api/search?q=pg", None)]:
+                               ("get", "/api/accounts", None), ("get", "/api/attention", None), ("get", "/api/search?q=pg", None),
+                               # Astral personnel, The Bestiary, Custom Agent Creator
+                               ("get", "/api/personnel", None), ("get", "/api/personnel?specialization=decision_review&sort=rank", None),
+                               ("get", "/api/personnel/meta", None), ("get", "/api/personnel/hierarchy", None),
+                               ("get", "/api/personnel/model_hunter", None), ("get", "/api/bestiary?q=sidhe", None),
+                               ("get", "/api/bestiary/sasquatch", None), ("get", "/api/specializations", None), ("get", "/api/departments", None),
+                               ("post", "/api/personnel/design", {"idea": "Skapa en fairy som är specialist på växter", "use_model": False}),
+                               ("post", "/api/personnel/agents", {"spec": {"persona_name": "Pg Moth", "species_key": "", "custom_species":
+                                                                           {"name": "Pg Moth Kind", "description": "smoke"},
+                                                                           "specializations": ["infrastructure", "Pg Whispering"],
+                                                                           "department_key": "infrastructure_operations",
+                                                                           "purpose": "PostgreSQL smoke test agent for the creator pipeline.",
+                                                                           "permission_level": 2},
+                                                                  "source": "API", "duplicate_choice": "new", "use_model": False}),
+                               ("get", "/api/personnel/agents/c_pg_moth/status", None),
+                               ("patch", "/api/personnel/agents/c_pg_moth", {"changes": {"traits": ["Calm"]}, "note": "pg"}),
+                               ("post", "/api/personnel/agents/c_pg_moth/lifecycle", {"action": "archive"}),
+                               ("post", "/api/gsus/runs", {"objective": "Vem kan övervaka infrastrukturen?", "settings": {"use_llm": False}})]:
         r = getattr(c, method)(path, json=body) if body is not None else getattr(c, method)(path)
         print(f"{r.status_code} {method.upper()} {path}")
         if r.status_code != 200:

@@ -3,15 +3,17 @@ import Link from "next/link";
 import { useState } from "react";
 import { Button, Card, Empty, ErrorBanner, EvidenceBadge, Field, PageHeader, StatusBadge } from "@/components/ui";
 import { ago, api, API_URL, getToken } from "@/lib/api";
-import { useApi } from "@/lib/hooks";
+import { useApi, useMe } from "@/lib/hooks";
+import { ProposalCard, Sigil } from "@/components/personnel";
 
-type Step = { id: number; ordinal: number; title: string; kind: string; task_type: string; status: string; summary: string; depends_on: number[]; approval_id: number | null; task_id: number | null };
+type Step = { id: number; ordinal: number; title: string; kind: string; task_type: string; status: string; summary: string; depends_on: number[]; approval_id: number | null; task_id: number | null; output?: any };
 type Run = { id: number; objective: string; mode: string; status: string; intent: string; clarification: string; answer: string; answer_method: string;
   citations: any[]; contradictions: { between: string; detail: string }[]; verification: any; steps: Step[]; ai_cost_usd: number; ai_calls: number; created_at: string; trace_run_id?: number | null };
 
 const STEP_STATUS: Record<string, string> = { completed: "succeeded", running: "running", pending: "queued", waiting_for_approval: "pending", blocked: "blocked", failed: "failed", cancelled: "cancelled" };
 const EXAMPLES = ["Evaluate the winter commuter pannier and create brand concepts", "What do the sources say about the Babylonian exile?",
-  "Convene a council on the hand-crank emergency radio", "Check the Archivum canon for contradictions", "Launch the roll-top stem bag", "Utvärdera nödradion"];
+  "Convene a council on the hand-crank emergency radio", "Check the Archivum canon for contradictions", "Launch the roll-top stem bag", "Utvärdera nödradion",
+  "Skapa en fairy som är specialist på växter, botanik och trädgårdsodling.", "Vem kan övervaka infrastrukturen?"];
 
 export default function Chamber() {
   const meta = useApi<any>("/api/gsus/modes");
@@ -99,6 +101,10 @@ export default function Chamber() {
 }
 
 function RunView({ run, onResume, onCancel }: { run: Run; onResume: () => void; onCancel: () => void }) {
+  const me = useMe();
+  const canCreate = !!me?.permissions?.includes("agent.develop");
+  const proposal = run.steps.find((s) => s.kind === "agent_proposal" && s.output?.proposal);
+  const lookup = run.steps.find((s) => s.kind === "personnel_lookup");
   return (
     <Card title={`Run #${run.id} · ${run.mode} · ${run.status.replaceAll("_", " ")}`} action={<span className="num text-[11.5px] text-ink-3">{run.ai_calls} model calls · ${run.ai_cost_usd.toFixed(4)}</span>}>
       {run.status === "needs_clarification" && <div className="mb-3 rounded-md border border-warning/50 bg-warning/10 px-3 py-2 text-[13px] text-ink">G-sus asks: {run.clarification}</div>}
@@ -111,6 +117,7 @@ function RunView({ run, onResume, onCancel }: { run: Run; onResume: () => void; 
               <div className="min-w-0 flex-1">
                 <div className="text-ink">{s.title} <span className="font-mono text-[10.5px] text-ink-3">{s.task_type || s.kind}{s.depends_on.length ? ` ← ${s.depends_on.map((d) => d + 1).join(",")}` : ""}</span></div>
                 {s.summary && <div className="text-[12px] text-ink-3">{s.summary}</div>}
+                {s.output?.delegated_to && <div className="text-[11.5px] text-ink-3">delegated to <Link className="underline decoration-dotted hover:text-violet" href={`/personnel/${s.output.delegated_to.id}`}>{s.output.delegated_to.display}</Link></div>}
                 {s.approval_id && s.status === "waiting_for_approval" && <Link href="/approvals" className="text-[12px] text-violet hover:underline">Decide approval #{s.approval_id} →</Link>}
               </div>
             </li>
@@ -125,6 +132,11 @@ function RunView({ run, onResume, onCancel }: { run: Run; onResume: () => void; 
           <ul className="space-y-1 text-[12.5px] text-ink-2">{run.contradictions.map((c, i) => <li key={i}><b className="text-ink">{c.between}:</b> {c.detail}</li>)}</ul>
         </div>
       )}
+      {proposal && <div className="mb-3"><ProposalCard key={proposal.id} proposal={proposal.output.proposal} runId={run.id} canCreate={canCreate} /></div>}
+      {lookup && lookup.output?.agents?.length > 0 && (
+        <ul className="mb-3 space-y-1.5" aria-label="Matching agents">{lookup.output.agents.map((a: any) => (
+          <li key={a.id} className="flex items-center gap-2 text-[12.5px]"><Sigil species={a.species} name={a.persona_name} size={28} />
+            <Link href={`/personnel/${a.id}`} className="text-ink hover:text-violet">{a.display}</Link><span className="text-ink-3">{a.title}</span><StatusBadge status={a.observation.state} /></li>))}</ul>)}
       {run.answer && <pre className="whitespace-pre-wrap rounded-md bg-bg p-3 font-serif text-[13.5px] leading-relaxed text-ink-2">{run.answer}</pre>}
       {run.citations?.length > 0 && (
         <div className="mt-3">

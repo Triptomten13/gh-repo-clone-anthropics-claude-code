@@ -1,4 +1,4 @@
-# Progress — current state (2026-11-06)
+# Progress — current state (2026-11-07)
 
 ## Done and verified
 
@@ -17,11 +17,14 @@
 | **Creative Intelligence** (docs/CREATIVE_INTELLIGENCE.md): Creative Tournament Mode (candidates from several models, independent critics, synthesis, targeted revision, hard budgets, stop conditions), provider selection with 10 routing modes on the existing router, rule-based quality checks (≥ 60 % weight) + critics, versioned benchmark profiles with staleness, Creative Director agent, G-sus delegation, Creative Intelligence Center (`/creative`), migration 0011 | `test_creative.py` (18 acceptance criteria + 10 more), PostgreSQL smoke, Playwright (CI run 34), three real local-model runs: mechanics verified, but **no quality gain over the best single model** on this hardware (§7) |
 | **Autonomy** (docs/AUTONOMY.md): Model Hunter (HF discovery, pre-download screening, governed verified acquisition), Model Championship (same tasks/hardware/run, greedy decoding, attribution against controls), Devil's Advocate (rule layer, independent-family model review, calibration, agreement monitor, G-SUS plan review), Account Vault (grants not secrets, four eyes, audit, revoke) | `test_autonomy.py` (17), e2e autonomy spec, migration 0012 SQLite + PostgreSQL, real runs: 60 repos screened, 1 model acquired, 4 championships |
 | **Completion round** (docs/COMPLETION_AUDIT.md — finish before adding): measured audit (crawler of every page and tab, endpoint map); approved governance changes can now be applied (was impossible from the interface); approval lifecycle, policy history/rollback/disable, budget removal, audit retention, Vault collections and document access, ledger entry reachable; deep links between agents, tasks, runs, approvals, tournaments, documents; permission-aware global search; attention-first command center; settings map | `test_completion.py`, `tests/e2e/completion.spec.ts` (desktop + phone), responsive/a11y/CSP/PWA/performance matrices with data, re-crawl |
+| **Astral Personnel, The Bestiary, Custom Agent Creator** (docs/PERSONNEL.md): one shared register on the existing `agents` table (race, specialization, role, rank, department, personality as separate dimensions; functional departments; identities for all 65 agents across 64 races; chain of command to G-SUS); The Bestiary (102 entries, folklore/fiction/canon/cultural care apart, 37 real works as further reading, 49 specializations, new beings via API); one creation pipeline for G-SUS chat, Bestiary, Personnel, API, admin (AI via the gateway + labelled rules fallback, duplicates, validation, governance defaults, onboarding checks, lifecycle, versions); G-SUS proposal card, "who can…", delegation to custom agents; migration 0013 | `test_personnel.py` (36), full backend suite, PostgreSQL smoke + 0013 up/down/up on SQLite and PostgreSQL, Playwright personnel journeys on 4 device profiles (24), axe desktop + phone; behavioural onboarding checks verified only with scripted models (no real-model run yet); **not committed — awaiting the owner's approval**, not deployed |
 | DAEMON COST INTELLIGENCE: registry, credentials, routing, quota backoff, spend limits, caches, benchmarks, dashboard, proposals | `test_daemon.py`, real benchmark runs on two local models |
 | Backup / restore | round-trip + tamper refusal tested (docs/BACKUP_RECOVERY.md) |
 | Docs restructure | docs/ holds architecture, AI system, knowledge, agents, security, design system, decisions, testing, roadmap, DAEMON, cost, install, backup |
 
-Totals: 291 backend tests pass; ruff clean; Playwright 121 passed (Chromium: unit, 4 device profiles, matrices incl. /autonomy) and WebKit + Firefox
+Totals (2026-11-07): 327 backend tests pass; ruff clean; tsc + production build pass; Playwright desktop + unit 39 passed
+(1 skipped: needs a chat model), personnel journeys 24/24 on 4 device profiles, axe matrix incl. the new pages passes.
+Earlier (2026-11-06): Playwright 121 passed (Chromium: unit, 4 device profiles, matrices incl. /autonomy) and WebKit + Firefox
 green (CI); public demo suite 10/10; migrations 0001–0011 verified on SQLite and PostgreSQL; PostgreSQL smoke passes; Independence Tests A–G pass with real local models (2026-11-06T05:10Z).
 CI was red from the cost-intelligence phase until 2026-11-06 (`cryptography` undeclared) — fixed; CI run 29 green.
 
