@@ -121,6 +121,7 @@ def _model_acquisition(d: dict[str, Any]) -> list[dict[str, Any]]:
                       f"evidence: {', '.join(d.get('evidence') or ['none'])[:200]}",
                       "a model can rank high elsewhere and lose on Swedish, rhyme or our code", "run it in the Model Championship against the installed models",
                       "decide on the championship result", "important", 0.9))
+    out += _evidence_strength(d)
     pb, best = d.get("parameters_b"), d.get("incumbent_parameters_b")
     if pb and best and pb > 2 * best and not d.get("measured"):
         out.append(_f("model.bigger_not_better", "a much larger model is assumed to be better", f"{pb} B vs incumbent {best} B",
@@ -166,8 +167,24 @@ def _plan(d: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-def _model_selection(d: dict[str, Any]) -> list[dict[str, Any]]:
+def _evidence_strength(d: dict[str, Any]) -> list[dict[str, Any]]:
+    """Presence of evidence is not enough: how many tasks does the deciding difference rest on? (Found in the first real
+    review: a switch backed by one task out of 17 passed as sound.)"""
     out = []
+    n, margin = d.get("sample_size"), d.get("margin_tasks")
+    if n is not None and int(n) < 30:
+        out.append(_f("evidence.small_sample", f"the evidence rests on {n} task(s)", f"sample_size={n}" + (f", deciding margin {margin} task(s)" if margin is not None else ""),
+                      "the difference may not hold on real work", "extend the task set or repeat the comparison before switching",
+                      "treat the result as a lead, not a proof", "important" if (margin is not None and int(margin) <= 2) else "optional", 0.8))
+    if d.get("conditions_note"):
+        out.append(_f("evidence.conditions", "the test conditions may favour one side", str(d["conditions_note"])[:200],
+                      "the winner may lose under the conditions it will really run in", "measure under the real conditions too",
+                      "add a run under production conditions", "important", 0.75))
+    return out
+
+
+def _model_selection(d: dict[str, Any]) -> list[dict[str, Any]]:
+    out = _evidence_strength(d)
     if not d.get("measured"):
         out.append(_f("selection.unmeasured", "the chosen model has no measured profile for this task", f"model {d.get('model')}",
                       "it may be worse than an alternative already installed", "a measured model", "benchmark it", "important", 0.85))

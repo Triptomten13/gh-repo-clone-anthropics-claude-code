@@ -394,3 +394,16 @@ def test_an_unchanged_model_scoring_differently_is_variance_not_progress(db, mon
     acc = next(x for x in c.deltas["changes"] if x["category"] == "accuracy (17 tasks)")
     assert acc["kind"] == "smarter" and acc["attributed_to"] == "new"
     assert not any(x["category"] == "creative: songwriting" for x in c.deltas["changes"])  # 0.85 vs 0.80: within inc-a's 0.30 noise
+
+
+def test_thin_evidence_is_challenged_even_when_every_question_is_answered(db):
+    """Real review 2026-11-07: switching the chat model on a one-task margin (17 tasks) passed as sound."""
+    from app.autonomy import advocate
+
+    base = {"kind": "model_selection", "ref": "chat", "summary": "switch the chat model", "objective": "better answers", "evidence": ["0.706 vs 0.588"],
+            "alternatives": ["keep it"], "assumptions": ["tasks are representative"], "risks": ["small sample"], "verification": "next championship",
+            "would_change_if": "no gain next time", "permissions": ["daemon.slot.activate"], "cost_usd": 0, "measured": True}
+    assert advocate.review(db, base).verdict == "sound"
+    thin = advocate.review(db, {**base, "sample_size": 17, "margin_tasks": 1, "conditions_note": "thinking off for all; the incumbent is a thinking model"})
+    codes = {f["code"] for f in thin.findings}
+    assert thin.verdict == "concerns" and {"evidence.small_sample", "evidence.conditions"} <= codes

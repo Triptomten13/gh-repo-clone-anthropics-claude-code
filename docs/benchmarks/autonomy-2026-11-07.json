@@ -1,0 +1,2941 @@
+{
+ "what": "Model Hunter discovery and acquisition, four Model Championships and Devil's Advocate reviews on this machine's local models",
+ "date": "2026-11-07",
+ "hardware": "Intel Xeon @ 2.10GHz, 4 cores, ~17 GB RAM, no GPU; llama.cpp 0.3.36",
+ "discovery": {
+  "runs": [
+   {
+    "task": "swedish",
+    "searched": 15,
+    "new": 15,
+    "changed": 0,
+    "unchanged": 0,
+    "shortlisted": 2,
+    "screened_out": 13,
+    "seconds": 3.0
+   },
+   {
+    "task": "small",
+    "searched": 15,
+    "new": 15,
+    "changed": 0,
+    "unchanged": 0,
+    "shortlisted": 2,
+    "screened_out": 13,
+    "seconds": 2.2
+   },
+   {
+    "task": "general",
+    "searched": 15,
+    "new": 15,
+    "changed": 0,
+    "unchanged": 0,
+    "shortlisted": 5,
+    "screened_out": 8,
+    "installed": 2,
+    "seconds": 2.4
+   },
+   {
+    "task": "coding",
+    "searched": 15,
+    "new": 14,
+    "changed": 0,
+    "unchanged": 1,
+    "shortlisted": 3,
+    "screened_out": 11,
+    "seconds": 2.1
+   }
+  ],
+  "shortlisted": [
+   {
+    "id": 2,
+    "repo": "mradermacher/SwedishBeagle-dare-GGUF",
+    "file": "SwedishBeagle-dare.Q4_K_M.gguf",
+    "task": "swedish",
+    "license": "apache-2.0",
+    "parameters_b": 7.24,
+    "quantization": "Q4_K_M",
+    "size_bytes": 4368439808,
+    "downloads": 1176,
+    "status": "shortlisted",
+    "reasons": [
+     "not yet measured on our tasks — the Model Championship decides"
+    ]
+   },
+   {
+    "id": 7,
+    "repo": "mradermacher/hyperllama-180m-swedish-1x-GGUF",
+    "file": "hyperllama-180m-swedish-1x.Q4_K_M.gguf",
+    "task": "swedish",
+    "license": "apache-2.0",
+    "parameters_b": 0.18,
+    "quantization": "Q4_K_M",
+    "size_bytes": 159919968,
+    "downloads": 204,
+    "status": "shortlisted",
+    "reasons": [
+     "not yet measured on our tasks — the Model Championship decides"
+    ]
+   },
+   {
+    "id": 22,
+    "repo": "Qwen/Qwen3-0.6B-GGUF",
+    "file": "Qwen3-0.6B-Q8_0.gguf",
+    "task": "small",
+    "license": "apache-2.0",
+    "parameters_b": 0.6,
+    "quantization": "Q8_0",
+    "size_bytes": 639446688,
+    "downloads": 226817,
+    "status": "shortlisted",
+    "reasons": [
+     "not yet measured on our tasks — the Model Championship decides"
+    ]
+   },
+   {
+    "id": 26,
+    "repo": "unsloth/Qwen3-0.6B-GGUF",
+    "file": "Qwen3-0.6B-Q4_K_M.gguf",
+    "task": "small",
+    "license": "apache-2.0",
+    "parameters_b": 0.6,
+    "quantization": "Q4_K_M",
+    "size_bytes": 396705472,
+    "downloads": 161756,
+    "status": "shortlisted",
+    "reasons": [
+     "not yet measured on our tasks — the Model Championship decides"
+    ]
+   },
+   {
+    "id": 32,
+    "repo": "Qwen/Qwen3-VL-8B-Instruct-GGUF",
+    "file": "Qwen3VL-8B-Instruct-Q4_K_M.gguf",
+    "task": "general",
+    "license": "apache-2.0",
+    "parameters_b": 8.19,
+    "quantization": "Q4_K_M",
+    "size_bytes": 5027784800,
+    "downloads": 1725606,
+    "status": "shortlisted",
+    "reasons": [
+     "not yet measured on our tasks — the Model Championship decides"
+    ]
+   },
+   {
+    "id": 33,
+    "repo": "rippertnt/HyperCLOVAX-SEED-Text-Instruct-1.5B-Q4_K_M-GGUF",
+    "file": "hyperclovax-seed-text-instruct-1.5b-q4_k_m.gguf",
+    "task": "general",
+    "license": "other",
+    "parameters_b": 1.81,
+    "quantization": "Q4_K_M",
+    "size_bytes": 1133974368,
+    "downloads": 1151279,
+    "status": "shortlisted",
+    "reasons": [
+     "licence 'other': commercial use needs a person's review",
+     "not yet measured on our tasks — the Model Championship decides"
+    ]
+   },
+   {
+    "id": 37,
+    "repo": "Qwen/Qwen3-VL-4B-Instruct-GGUF",
+    "file": "Qwen3VL-4B-Instruct-Q4_K_M.gguf",
+    "task": "general",
+    "license": "apache-2.0",
+    "parameters_b": 4.02,
+    "quantization": "Q4_K_M",
+    "size_bytes": 2497281664,
+    "downloads": 703466,
+    "status": "shortlisted",
+    "reasons": [
+     "not yet measured on our tasks — the Model Championship decides"
+    ]
+   },
+   {
+    "id": 38,
+    "repo": "unsloth/Qwen3-4B-Instruct-2507-GGUF",
+    "file": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+    "task": "general",
+    "license": "apache-2.0",
+    "parameters_b": 4.02,
+    "quantization": "Q4_K_M",
+    "size_bytes": 2497281120,
+    "downloads": 701201,
+    "status": "shortlisted",
+    "reasons": [
+     "not yet measured on our tasks — the Model Championship decides"
+    ]
+   },
+   {
+    "id": 44,
+    "repo": "unsloth/Qwen3-VL-4B-Instruct-GGUF",
+    "file": "Qwen3-VL-4B-Instruct-Q4_K_M.gguf",
+    "task": "general",
+    "license": "apache-2.0",
+    "parameters_b": 4.02,
+    "quantization": "Q4_K_M",
+    "size_bytes": 2497282336,
+    "downloads": 377295,
+    "status": "shortlisted",
+    "reasons": [
+     "not yet measured on our tasks — the Model Championship decides"
+    ]
+   },
+   {
+    "id": 52,
+    "repo": "Qwen/Qwen2.5-Coder-7B-Instruct-GGUF",
+    "file": "qwen2.5-coder-7b-instruct-q4_k_m.gguf",
+    "task": "coding",
+    "license": "apache-2.0",
+    "parameters_b": 7.62,
+    "quantization": "Q4_K_M",
+    "size_bytes": 4683073536,
+    "downloads": 348564,
+    "status": "shortlisted",
+    "reasons": [
+     "not yet measured on our tasks — the Model Championship decides"
+    ]
+   },
+   {
+    "id": 57,
+    "repo": "Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
+    "file": "qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
+    "task": "coding",
+    "license": "apache-2.0",
+    "parameters_b": 1.78,
+    "quantization": "Q4_K_M",
+    "size_bytes": 1117320768,
+    "downloads": 222013,
+    "status": "shortlisted",
+    "reasons": [
+     "not yet measured on our tasks — the Model Championship decides"
+    ]
+   },
+   {
+    "id": 59,
+    "repo": "ccore/Qwen3.5-4B-3D-Coder",
+    "file": "Qwen3.5-4B-3D-Coder-Q4_K_M.gguf",
+    "task": "coding",
+    "license": "apache-2.0",
+    "parameters_b": 4.21,
+    "quantization": "Q4_K_M",
+    "size_bytes": 2708804096,
+    "downloads": 190243,
+    "status": "shortlisted",
+    "reasons": [
+     "not yet measured on our tasks — the Model Championship decides"
+    ]
+   }
+  ],
+  "screened_out": [
+   {
+    "repo": "KBLab/sentence-bert-swedish-cased",
+    "task": "swedish",
+    "reason": "no single-file GGUF in a supported quantization — other formats (pickle weights, repository code) are not run here"
+   },
+   {
+    "repo": "neph1/llama-3.1-instruct-bellman-8b-swedish",
+    "task": "swedish",
+    "reason": "no single-file GGUF in a supported quantization — other formats (pickle weights, repository code) are not run here"
+   },
+   {
+    "repo": "mradermacher/SwedishBellmanBeagle-dareties-GGUF",
+    "task": "swedish",
+    "reason": "no licence stated in the model card"
+   },
+   {
+    "repo": "featherless-ai-quants/FredrikBL-SwedishBeagle-dare-GGUF",
+    "task": "swedish",
+    "reason": "no licence stated in the model card"
+   },
+   {
+    "repo": "neph1/llama-3-instruct-bellman-8b-swedish",
+    "task": "swedish",
+    "reason": "no single-file GGUF in a supported quantization — other formats (pickle weights, repository code) are not run here"
+   },
+   {
+    "repo": "RichardErkhov/ssmits_-_Falcon2-5.5B-Swedish-gguf",
+    "task": "swedish",
+    "reason": "no licence stated in the model card"
+   },
+   {
+    "repo": "NikolayKozloff/Llama-3-8B-Swedish-Norwegian-Danish-Q8_0-GGUF",
+    "task": "swedish",
+    "reason": "no licence stated in the model card"
+   },
+   {
+    "repo": "mradermacher/nemotron-cc-swedish-tower72b-GGUF",
+    "task": "swedish",
+    "reason": "no licence stated in the model card"
+   },
+   {
+    "repo": "marma/sentence-bert-swedish-cased",
+    "task": "swedish",
+    "reason": "no single-file GGUF in a supported quantization — other formats (pickle weights, repository code) are not run here"
+   },
+   {
+    "repo": "lorinet3/gemma-4-E2B-swedish-exercise-generation-correction-v2-gguf",
+    "task": "swedish",
+    "reason": "no licence stated in the model card"
+   },
+   {
+    "repo": "PapaMoth/sentence-bert-swedish-cased",
+    "task": "swedish",
+    "reason": "no single-file GGUF in a supported quantization — other formats (pickle weights, repository code) are not run here"
+   },
+   {
+    "repo": "PierreMesure/sentence-bert-swedish-cased-gguf",
+    "task": "swedish",
+    "reason": "no single-file GGUF in a supported quantization — other formats (pickle weights, repository code) are not run here"
+   },
+   {
+    "repo": "lorinet3/qwen-3.5-0.8B-swedish-exercise-generation-correction-v2-gguf",
+    "task": "swedish",
+    "reason": "no licence stated in the model card"
+   },
+   {
+    "repo": "handy-computer/parakeet-unified-en-0.6b-gguf",
+    "task": "small",
+    "reason": "not a chat / text-generation model (declared task: automatic-speech-recognition)"
+   },
+   {
+    "repo": "handy-computer/nemotron-3.5-asr-streaming-0.6b-gguf",
+    "task": "small",
+    "reason": "not a chat / text-generation model (declared task: automatic-speech-recognition)"
+   },
+   {
+    "repo": "handy-computer/parakeet-tdt-0.6b-v3-gguf",
+    "task": "small",
+    "reason": "not a chat / text-generation model (declared task: automatic-speech-recognition)"
+   },
+   {
+    "repo": "nvidia/nemotron-3.5-asr-streaming-0.6b",
+    "task": "small",
+    "reason": "not a chat / text-generation model (declared task: automatic-speech-recognition)"
+   },
+   {
+    "repo": "nvidia/parakeet-tdt-0.6b-v3",
+    "task": "small",
+    "reason": "not a chat / text-generation model (declared task: automatic-speech-recognition)"
+   },
+   {
+    "repo": "handy-computer/Qwen3-ASR-0.6B-gguf",
+    "task": "small",
+    "reason": "not a chat / text-generation model (declared task: automatic-speech-recognition)"
+   },
+   {
+    "repo": "handy-computer/parakeet-tdt-0.6b-v2-gguf",
+    "task": "small",
+    "reason": "not a chat / text-generation model (declared task: automatic-speech-recognition)"
+   },
+   {
+    "repo": "Qwen/Qwen3-Embedding-0.6B-GGUF",
+    "task": "small",
+    "reason": "not a chat / text-generation model (declared task: none)"
+   },
+   {
+    "repo": "bartowski/Qwen_Qwen3-0.6B-GGUF",
+    "task": "small",
+    "reason": "no licence stated in the model card"
+   },
+   {
+    "repo": "ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF",
+    "task": "small",
+    "reason": "not a chat / text-generation model (declared task: text-ranking)"
+   },
+   {
+    "repo": "nvidia/nemotron-speech-streaming-en-0.6b",
+    "task": "small",
+    "reason": "not a chat / text-generation model (declared task: automatic-speech-recognition)"
+   },
+   {
+    "repo": "cstr/qwen3-tts-0.6b-customvoice-GGUF",
+    "task": "small",
+    "reason": "not a chat / text-generation model (declared task: text-to-speech)"
+   },
+   {
+    "repo": "js-byte/Audio8-TTS-Preview-0.6b-GGUF",
+    "task": "small",
+    "reason": "not a chat / text-generation model (declared task: text-to-speech)"
+   },
+   {
+    "repo": "scragnog/MOSS-Music-8B-Instruct-GGUF",
+    "task": "general",
+    "reason": "not a chat / text-generation model (declared task: audio-text-to-text)"
+   },
+   {
+    "repo": "DavidAU/Qwen3.8-27B-Turbo-Brilliance-50X-Reasoning-Instruct-NEO-MAX-MTP-GGUF",
+    "task": "general",
+    "reason": "16.5 GB is above the storage budget of 6 GB (MODEL_HUNTER_MAX_GB)"
+   },
+   {
+    "repo": "bartowski/Qwen2.5-32B-Instruct-GGUF",
+    "task": "general",
+    "reason": "19.9 GB is above the storage budget of 6 GB (MODEL_HUNTER_MAX_GB)"
+   },
+   {
+    "repo": "Qwen/Qwen2.5-7B-Instruct-GGUF",
+    "task": "general",
+    "reason": "no single-file GGUF in a supported quantization — other formats (pickle weights, repository code) are not run here"
+   },
+   {
+    "repo": "mradermacher/Qwen3-VL-8B-Instruct-abliterated-GGUF",
+    "task": "general",
+    "reason": "safety training removed or bypassed (abliterated, base_model:prithivMLmods/Qwen3-VL-8B-Instruct-abliterated-v1, base_model:quantized:prithivMLmods/Qwen3-VL-8B-Instruct-abliterated-v1)"
+   },
+   {
+    "repo": "unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF",
+    "task": "general",
+    "reason": "18.6 GB is above the storage budget of 6 GB (MODEL_HUNTER_MAX_GB)"
+   },
+   {
+    "repo": "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
+    "task": "general",
+    "reason": "18.6 GB is above the storage budget of 6 GB (MODEL_HUNTER_MAX_GB)"
+   },
+   {
+    "repo": "nerualdreming/MOSS-Music-8B-Instruct-GGUF",
+    "task": "general",
+    "reason": "not a chat / text-generation model (declared task: none)"
+   },
+   {
+    "repo": "peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF-MTP",
+    "task": "coding",
+    "reason": "21.3 GB is above the storage budget of 6 GB (MODEL_HUNTER_MAX_GB)"
+   },
+   {
+    "repo": "DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NEO-CODER-MAX-MTP-GGUF",
+    "task": "coding",
+    "reason": "safety training removed or bypassed (abliterated, base_model:DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU, base_model:quantized:DavidAU/Qwen3.8-27B-TURBO-Fable-Cold-Fusion-735-882-Heretic-Uncensored-NM-DAU, uncensored)"
+   },
+   {
+    "repo": "peculiar-ragdoll/Cyber-Tiel-Coder-35B-A3B-GGUF-MTP",
+    "task": "coding",
+    "reason": "safety training removed or bypassed (abliterated, base_model:huihui-ai/Huihui-Ornith-1.5-35B-A3B-abliterated, base_model:quantized:huihui-ai/Huihui-Ornith-1.5-35B-A3B-abliterated, uncensored)"
+   },
+   {
+    "repo": "nerkyor/Qwen3.8-27B-Coder390-EfficientThink-Opus5.5-GPT6Astra-Grok4.7-DSV4Pro-K3-SFT-RLOO-MTP-DFlash2",
+    "task": "coding",
+    "reason": "no single-file GGUF in a supported quantization — other formats (pickle weights, repository code) are not run here"
+   },
+   {
+    "repo": "ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-Coder-GGUF",
+    "task": "coding",
+    "reason": "no single-file GGUF in a supported quantization — other formats (pickle weights, repository code) are not run here"
+   },
+   {
+    "repo": "mudler/KAT-Coder-V2.5-Dev-APEX-GGUF",
+    "task": "coding",
+    "reason": "no single-file GGUF in a supported quantization — other formats (pickle weights, repository code) are not run here"
+   },
+   {
+    "repo": "peculiar-ragdoll/Tiel-Coder-35B-A3B-GGUF",
+    "task": "coding",
+    "reason": "20.9 GB is above the storage budget of 6 GB (MODEL_HUNTER_MAX_GB)"
+   },
+   {
+    "repo": "bartowski/Kwaipilot_KAT-Coder-V2.5-Dev-GGUF",
+    "task": "coding",
+    "reason": "21.4 GB is above the storage budget of 6 GB (MODEL_HUNTER_MAX_GB)"
+   },
+   {
+    "repo": "nerkyor/Qwen3.8-27B-Coder390-EfficientThink-Opus5.5-GPT6Astra-Grok4.7-DSV4Pro-K3-SFT-RLOO-GGUF-NInfer",
+    "task": "coding",
+    "reason": "no single-file GGUF in a supported quantization — other formats (pickle weights, repository code) are not run here"
+   },
+   {
+    "repo": "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-Coder-GGUF",
+    "task": "coding",
+    "reason": "no single-file GGUF in a supported quantization — other formats (pickle weights, repository code) are not run here"
+   },
+   {
+    "repo": "Jackrong/Qwopus3.6-35B-A3B-Coder-MTP-GGUF",
+    "task": "coding",
+    "reason": "21.7 GB is above the storage budget of 6 GB (MODEL_HUNTER_MAX_GB)"
+   }
+  ]
+ },
+ "acquisition": {
+  "candidate": 38,
+  "status_after_request": "pending_approval",
+  "approval": 1,
+  "critique": {
+   "verdict": "concerns",
+   "summary": "1 concern(s): the case for this model rests on popularity or public leaderboards, not on our tasks",
+   "findings": [
+    {
+     "code": "evidence.not_measured",
+     "severity": "important",
+     "weakness": "the case for this model rests on popularity or public leaderboards, not on our tasks",
+     "alternative": "run it in the Model Championship against the installed models"
+    }
+   ]
+  },
+  "before_approval": "approval #1 is not approved yet",
+  "download_seconds": 22,
+  "status": "installed",
+  "reasons": [
+   "not yet measured on our tasks — the Model Championship decides"
+  ],
+  "local_key": "qwen3-4b-instruct-2507-q4_k_m",
+  "sha256": "3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597",
+  "license": "apache-2.0",
+  "evidence": "Hugging Face model-card metadata (cardData.license) for unsloth/Qwen3-4B-Instruct-2507-GGUF@a06e946bb6b6",
+  "size": 2497281120
+ },
+ "championships_sampled": {
+  "note": "temperature 0.2, random seed — unchanged models moved between runs; led to greedy decoding and attribution",
+  "baseline": {
+   "id": 1,
+   "seconds": 978,
+   "status": "completed",
+   "summary": "Baseline: 5 contenders on Intel(R) Xeon(R) Processor @ 2.10GHz.",
+   "participants": [
+    "smollm2-360m-instruct-q8_0",
+    "qwen2.5-0.5b-instruct-q4_k_m",
+    "qwen2.5-1.5b-instruct-q4_k_m",
+    "qwen3-4b-q4_k_m",
+    "qwen3-8b-q4_k_m"
+   ],
+   "hardware": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "ram_gb": 17,
+    "gpus": [],
+    "accelerator": "cpu",
+    "runtime": "0.3.36"
+   },
+   "suites": {
+    "daemon": "daemon-core-v1 (17 tasks)",
+    "creative": "creative-bench-2026-11-06.2",
+    "call": "by model key, thinking off, same token limits"
+   },
+   "results": {
+    "smollm2-360m-instruct-q8_0": {
+     "benchmark_run": 6,
+     "accuracy": 0.588,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.14,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 427,
+     "tokens_per_s": 26.74,
+     "cost_per_success_usd": 3e-06,
+     "energy_wh": 0.1594,
+     "creative": {
+      "songwriting": 0.464,
+      "poetry": 0.7472,
+      "brainstorming": 0.6012,
+      "storytelling": 0.9167,
+      "business": 0.6732,
+      "general": 0.8749,
+      "programming": 0.8834
+     },
+     "seconds": 50.4,
+     "size_gb": 0.39,
+     "version": "48ab3034d0dd401f"
+    },
+    "qwen2.5-0.5b-instruct-q4_k_m": {
+     "benchmark_run": 7,
+     "accuracy": 0.647,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 1.0,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.14,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 433,
+     "tokens_per_s": 14.06,
+     "cost_per_success_usd": 2e-06,
+     "energy_wh": 0.131,
+     "creative": {
+      "songwriting": 0.4207,
+      "poetry": 0.7689,
+      "brainstorming": 0.5238,
+      "storytelling": 0.9167,
+      "business": 0.7801,
+      "general": 0.9001,
+      "programming": 0.9834
+     },
+     "seconds": 55.4,
+     "size_gb": 0.49,
+     "version": "74a4da8c9fdbcd15"
+    },
+    "qwen2.5-1.5b-instruct-q4_k_m": {
+     "benchmark_run": 8,
+     "accuracy": 0.647,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.29,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 664,
+     "tokens_per_s": 8.57,
+     "cost_per_success_usd": 5e-06,
+     "energy_wh": 0.2591,
+     "creative": {
+      "songwriting": 0.6555,
+      "poetry": 0.7232,
+      "brainstorming": 0.8827,
+      "storytelling": 0.9167,
+      "business": 0.7999,
+      "general": 0.85,
+      "programming": 0.9834
+     },
+     "seconds": 113.5,
+     "size_gb": 1.12,
+     "version": "6a1a2eb6d15622bf"
+    },
+    "qwen3-4b-q4_k_m": {
+     "benchmark_run": 9,
+     "accuracy": 0.588,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.14,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 2574,
+     "tokens_per_s": 4.15,
+     "cost_per_success_usd": 2.2e-05,
+     "energy_wh": 1.0888,
+     "creative": {
+      "songwriting": 0.7935,
+      "poetry": 0.7782,
+      "brainstorming": 0.8856,
+      "storytelling": 0.9167,
+      "business": 0.7999,
+      "general": 0.8749,
+      "programming": 0.9666
+     },
+     "seconds": 296.3,
+     "size_gb": 2.5,
+     "version": "7485fe6f11af2943"
+    },
+    "qwen3-8b-q4_k_m": {
+     "benchmark_run": 10,
+     "accuracy": 0.647,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.29,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 4532,
+     "tokens_per_s": 2.02,
+     "cost_per_success_usd": 2.7e-05,
+     "energy_wh": 1.4665,
+     "creative": {
+      "songwriting": 0.7932,
+      "poetry": 0.7508,
+      "brainstorming": 0.9553,
+      "storytelling": 0.859,
+      "business": 0.7999,
+      "general": 0.85,
+      "programming": 0.8834
+     },
+     "seconds": 462.1,
+     "size_gb": 5.03,
+     "version": "d98cdcbd03e17ce4"
+    }
+   },
+   "deltas": {
+    "previous": null,
+    "changes": [],
+    "verdict": "first championship on this hardware — the baseline"
+   },
+   "standings_top": {
+    "accuracy (17 tasks)": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.647,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.647,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.647,
+      "direction": "higher"
+     }
+    ],
+    "speed (tokens/s)": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 26.74,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 14.06,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 8.57,
+      "direction": "higher"
+     }
+    ],
+    "latency p50 (ms)": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 427,
+      "direction": "lower"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 433,
+      "direction": "lower"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 664,
+      "direction": "lower"
+     }
+    ],
+    "cost per success (USD)": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 2e-06,
+      "direction": "lower"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 3e-06,
+      "direction": "lower"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 5e-06,
+      "direction": "lower"
+     }
+    ],
+    "skill: classification": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: structured_output": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: instruction_adherence": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: reasoning": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.5,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.5,
+      "direction": "higher"
+     }
+    ],
+    "skill: hallucination": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: context_retention": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: coding": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: deep_reasoning": [
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.29,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.29,
+      "direction": "higher"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.14,
+      "direction": "higher"
+     }
+    ],
+    "skill: tool_use": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "creative: songwriting": [
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.7935,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.7932,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.6555,
+      "direction": "higher"
+     }
+    ],
+    "creative: poetry": [
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.7782,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.7689,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.7508,
+      "direction": "higher"
+     }
+    ],
+    "creative: brainstorming": [
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.9553,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.8856,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.8827,
+      "direction": "higher"
+     }
+    ],
+    "creative: storytelling": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.9167,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.9167,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.9167,
+      "direction": "higher"
+     }
+    ],
+    "creative: business": [
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.7999,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.7999,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.7999,
+      "direction": "higher"
+     }
+    ],
+    "creative: general": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.9001,
+      "direction": "higher"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.8749,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.8749,
+      "direction": "higher"
+     }
+    ],
+    "creative: programming": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.9834,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.9834,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.9666,
+      "direction": "higher"
+     }
+    ]
+   }
+  },
+  "with_newcomer": {
+   "id": 2,
+   "seconds": 920,
+   "status": "completed",
+   "summary": "6 of 6 contenders measured on Intel(R) Xeon(R) Processor @ 2.10GHz (4 cores, 17 GB). Leaders: accuracy qwen2.5-0.5b-instruct-q4_k_m, speed smollm2-360m-instruct-q8_0, songwriting qwen3-8b-q4_k_m. Versus #1: faster, smarter in 5 categories; 2 regression(s).",
+   "participants": [
+    "smollm2-360m-instruct-q8_0",
+    "qwen2.5-0.5b-instruct-q4_k_m",
+    "qwen2.5-1.5b-instruct-q4_k_m",
+    "qwen3-4b-q4_k_m",
+    "qwen3-4b-instruct-2507-q4_k_m",
+    "qwen3-8b-q4_k_m"
+   ],
+   "hardware": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "ram_gb": 17,
+    "gpus": [],
+    "accelerator": "cpu",
+    "runtime": "0.3.36"
+   },
+   "suites": {
+    "daemon": "daemon-core-v1 (17 tasks)",
+    "creative": "creative-bench-2026-11-06.2",
+    "call": "by model key, thinking off, same token limits"
+   },
+   "results": {
+    "smollm2-360m-instruct-q8_0": {
+     "benchmark_run": 11,
+     "accuracy": 0.647,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.29,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 402,
+     "tokens_per_s": 26.09,
+     "cost_per_success_usd": 3e-06,
+     "energy_wh": 0.1605,
+     "creative": {
+      "songwriting": 0.6659,
+      "poetry": 0.4681,
+      "brainstorming": 0.8301,
+      "storytelling": 0.9167,
+      "business": 0.7132,
+      "general": 0.925,
+      "programming": 0.8834
+     },
+     "seconds": 35.3,
+     "size_gb": 0.39,
+     "version": "48ab3034d0dd401f"
+    },
+    "qwen2.5-0.5b-instruct-q4_k_m": {
+     "benchmark_run": 12,
+     "accuracy": 0.706,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 1.0,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.29,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 326,
+     "tokens_per_s": 15.98,
+     "cost_per_success_usd": 2e-06,
+     "energy_wh": 0.1153,
+     "creative": {
+      "songwriting": 0.4738,
+      "poetry": 0.7266,
+      "brainstorming": 0.5962,
+      "storytelling": 0.9167,
+      "business": 0.8332,
+      "general": 0.9001,
+      "programming": 0.9834
+     },
+     "seconds": 33.6,
+     "size_gb": 0.49,
+     "version": "74a4da8c9fdbcd15"
+    },
+    "qwen2.5-1.5b-instruct-q4_k_m": {
+     "benchmark_run": 13,
+     "accuracy": 0.706,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.43,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 655,
+     "tokens_per_s": 9.02,
+     "cost_per_success_usd": 4e-06,
+     "energy_wh": 0.2442,
+     "creative": {
+      "songwriting": 0.7172,
+      "poetry": 0.7574,
+      "brainstorming": 0.9365,
+      "storytelling": 0.9167,
+      "business": 0.7999,
+      "general": 0.85,
+      "programming": 0.9834
+     },
+     "seconds": 81.8,
+     "size_gb": 1.12,
+     "version": "6a1a2eb6d15622bf"
+    },
+    "qwen3-4b-q4_k_m": {
+     "benchmark_run": 14,
+     "accuracy": 0.588,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.14,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 2510,
+     "tokens_per_s": 4.57,
+     "cost_per_success_usd": 2e-05,
+     "energy_wh": 0.987,
+     "creative": {
+      "songwriting": 0.7861,
+      "poetry": 0.7379,
+      "brainstorming": 0.8881,
+      "storytelling": 0.889,
+      "business": 0.8332,
+      "general": 0.8749,
+      "programming": 0.9666
+     },
+     "seconds": 224.9,
+     "size_gb": 2.5,
+     "version": "7485fe6f11af2943"
+    },
+    "qwen3-4b-instruct-2507-q4_k_m": {
+     "benchmark_run": 15,
+     "accuracy": 0.706,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 1.0,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.29,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 2143,
+     "tokens_per_s": 5.98,
+     "cost_per_success_usd": 2.3e-05,
+     "energy_wh": 1.3955,
+     "creative": {
+      "songwriting": 0.78,
+      "poetry": 0.7365,
+      "brainstorming": 0.955,
+      "storytelling": 0.861,
+      "business": 0.7999,
+      "general": 0.8749,
+      "programming": 0.9666
+     },
+     "seconds": 228.3,
+     "size_gb": 2.5,
+     "version": "3605803b982cb64a"
+    },
+    "qwen3-8b-q4_k_m": {
+     "benchmark_run": 16,
+     "accuracy": 0.647,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.29,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 4201,
+     "tokens_per_s": 2.01,
+     "cost_per_success_usd": 2.6e-05,
+     "energy_wh": 1.4285,
+     "creative": {
+      "songwriting": 0.8032,
+      "poetry": 0.7143,
+      "brainstorming": 0.955,
+      "storytelling": 0.9167,
+      "business": 0.8668,
+      "general": 0.85,
+      "programming": 0.8834
+     },
+     "seconds": 315.8,
+     "size_gb": 5.03,
+     "version": "d98cdcbd03e17ce4"
+    }
+   },
+   "deltas": {
+    "changes": [
+     {
+      "category": "accuracy (17 tasks)",
+      "kind": "smarter",
+      "before": {
+       "model": "qwen2.5-0.5b-instruct-q4_k_m",
+       "value": 0.647,
+       "direction": "higher"
+      },
+      "after": {
+       "model": "qwen2.5-0.5b-instruct-q4_k_m",
+       "value": 0.706,
+       "direction": "higher"
+      },
+      "change": 0.059,
+      "relative": 0.091,
+      "new_leader": false
+     },
+     {
+      "category": "speed (tokens/s)",
+      "kind": "regressed",
+      "before": {
+       "model": "smollm2-360m-instruct-q8_0",
+       "value": 26.74,
+       "direction": "higher"
+      },
+      "after": {
+       "model": "smollm2-360m-instruct-q8_0",
+       "value": 26.09,
+       "direction": "higher"
+      },
+      "change": -0.65,
+      "relative": -0.024,
+      "new_leader": false
+     },
+     {
+      "category": "latency p50 (ms)",
+      "kind": "faster",
+      "before": {
+       "model": "smollm2-360m-instruct-q8_0",
+       "value": 427,
+       "direction": "lower"
+      },
+      "after": {
+       "model": "qwen2.5-0.5b-instruct-q4_k_m",
+       "value": 326,
+       "direction": "lower"
+      },
+      "change": 101,
+      "relative": 0.237,
+      "new_leader": true
+     },
+     {
+      "category": "skill: deep_reasoning",
+      "kind": "smarter",
+      "before": {
+       "model": "qwen2.5-1.5b-instruct-q4_k_m",
+       "value": 0.29,
+       "direction": "higher"
+      },
+      "after": {
+       "model": "qwen2.5-1.5b-instruct-q4_k_m",
+       "value": 0.43,
+       "direction": "higher"
+      },
+      "change": 0.14,
+      "relative": 0.483,
+      "new_leader": false
+     },
+     {
+      "category": "creative: poetry",
+      "kind": "regressed",
+      "before": {
+       "model": "qwen3-4b-q4_k_m",
+       "value": 0.7782,
+       "direction": "higher"
+      },
+      "after": {
+       "model": "qwen2.5-1.5b-instruct-q4_k_m",
+       "value": 0.7574,
+       "direction": "higher"
+      },
+      "change": -0.0208,
+      "relative": -0.027,
+      "new_leader": true
+     },
+     {
+      "category": "creative: business",
+      "kind": "smarter",
+      "before": {
+       "model": "qwen2.5-1.5b-instruct-q4_k_m",
+       "value": 0.7999,
+       "direction": "higher"
+      },
+      "after": {
+       "model": "qwen3-8b-q4_k_m",
+       "value": 0.8668,
+       "direction": "higher"
+      },
+      "change": 0.0669,
+      "relative": 0.084,
+      "new_leader": true
+     },
+     {
+      "category": "creative: general",
+      "kind": "smarter",
+      "before": {
+       "model": "qwen2.5-0.5b-instruct-q4_k_m",
+       "value": 0.9001,
+       "direction": "higher"
+      },
+      "after": {
+       "model": "smollm2-360m-instruct-q8_0",
+       "value": 0.925,
+       "direction": "higher"
+      },
+      "change": 0.0249,
+      "relative": 0.028,
+      "new_leader": true
+     }
+    ],
+    "verdict": "faster, smarter in 5 categories; 2 regression(s)",
+    "previous": 1
+   },
+   "standings_top": {
+    "accuracy (17 tasks)": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.706,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.706,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-instruct-2507-q4_k_m",
+      "value": 0.706,
+      "direction": "higher"
+     }
+    ],
+    "speed (tokens/s)": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 26.09,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 15.98,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 9.02,
+      "direction": "higher"
+     }
+    ],
+    "latency p50 (ms)": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 326,
+      "direction": "lower"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 402,
+      "direction": "lower"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 655,
+      "direction": "lower"
+     }
+    ],
+    "cost per success (USD)": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 2e-06,
+      "direction": "lower"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 3e-06,
+      "direction": "lower"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 4e-06,
+      "direction": "lower"
+     }
+    ],
+    "skill: classification": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: structured_output": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: instruction_adherence": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: reasoning": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-instruct-2507-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.5,
+      "direction": "higher"
+     }
+    ],
+    "skill: hallucination": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: context_retention": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: coding": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: deep_reasoning": [
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.43,
+      "direction": "higher"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.29,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.29,
+      "direction": "higher"
+     }
+    ],
+    "skill: tool_use": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "creative: songwriting": [
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.8032,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.7861,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-instruct-2507-q4_k_m",
+      "value": 0.78,
+      "direction": "higher"
+     }
+    ],
+    "creative: poetry": [
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.7574,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.7379,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-instruct-2507-q4_k_m",
+      "value": 0.7365,
+      "direction": "higher"
+     }
+    ],
+    "creative: brainstorming": [
+     {
+      "model": "qwen3-4b-instruct-2507-q4_k_m",
+      "value": 0.955,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.955,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.9365,
+      "direction": "higher"
+     }
+    ],
+    "creative: storytelling": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.9167,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.9167,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.9167,
+      "direction": "higher"
+     }
+    ],
+    "creative: business": [
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.8668,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.8332,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.8332,
+      "direction": "higher"
+     }
+    ],
+    "creative: general": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.925,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.9001,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.8749,
+      "direction": "higher"
+     }
+    ],
+    "creative: programming": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.9834,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.9834,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.9666,
+      "direction": "higher"
+     }
+    ]
+   }
+  }
+ },
+ "championships_greedy": {
+  "baseline": {
+   "id": 3,
+   "seconds": 714,
+   "status": "completed",
+   "summary": "Baseline: 5 contenders on Intel(R) Xeon(R) Processor @ 2.10GHz.",
+   "participants": [
+    "smollm2-360m-instruct-q8_0",
+    "qwen2.5-0.5b-instruct-q4_k_m",
+    "qwen2.5-1.5b-instruct-q4_k_m",
+    "qwen3-4b-q4_k_m",
+    "qwen3-8b-q4_k_m"
+   ],
+   "hardware": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "ram_gb": 17,
+    "gpus": [],
+    "accelerator": "cpu",
+    "runtime": "0.3.36"
+   },
+   "suites": {
+    "daemon": "daemon-core-v1 (17 tasks)",
+    "creative": "creative-bench-2026-11-06.2",
+    "call": "by model key, thinking off, same token limits",
+    "decoding": "greedy (temperature 0, top_k 1, fixed seed)"
+   },
+   "results": {
+    "smollm2-360m-instruct-q8_0": {
+     "benchmark_run": 17,
+     "accuracy": 0.529,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 0.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.14,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 372,
+     "tokens_per_s": 29.43,
+     "cost_per_success_usd": 4e-06,
+     "energy_wh": 0.1626,
+     "creative": {
+      "songwriting": 0.441,
+      "poetry": 0.7107,
+      "brainstorming": 0.6012,
+      "storytelling": 0.9167,
+      "business": 0.7199,
+      "general": 0.8749,
+      "programming": 0.8834
+     },
+     "seconds": 40.7,
+     "size_gb": 0.39,
+     "version": "48ab3034d0dd401f"
+    },
+    "qwen2.5-0.5b-instruct-q4_k_m": {
+     "benchmark_run": 18,
+     "accuracy": 0.647,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 1.0,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.14,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 325,
+     "tokens_per_s": 15.2,
+     "cost_per_success_usd": 2e-06,
+     "energy_wh": 0.1211,
+     "creative": {
+      "songwriting": 0.4207,
+      "poetry": 0.7387,
+      "brainstorming": 0.5962,
+      "storytelling": 0.8868,
+      "business": 0.8201,
+      "general": 0.8749,
+      "programming": 0.9834
+     },
+     "seconds": 37.9,
+     "size_gb": 0.49,
+     "version": "74a4da8c9fdbcd15"
+    },
+    "qwen2.5-1.5b-instruct-q4_k_m": {
+     "benchmark_run": 19,
+     "accuracy": 0.647,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.29,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 671,
+     "tokens_per_s": 8.99,
+     "cost_per_success_usd": 4e-06,
+     "energy_wh": 0.2471,
+     "creative": {
+      "songwriting": 0.7375,
+      "poetry": 0.7619,
+      "brainstorming": 0.939,
+      "storytelling": 0.9167,
+      "business": 0.7999,
+      "general": 0.8749,
+      "programming": 0.9834
+     },
+     "seconds": 77.6,
+     "size_gb": 1.12,
+     "version": "6a1a2eb6d15622bf"
+    },
+    "qwen3-4b-q4_k_m": {
+     "benchmark_run": 20,
+     "accuracy": 0.588,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.14,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 2419,
+     "tokens_per_s": 4.65,
+     "cost_per_success_usd": 1.9e-05,
+     "energy_wh": 0.9708,
+     "creative": {
+      "songwriting": 0.7742,
+      "poetry": 0.734,
+      "brainstorming": 0.9131,
+      "storytelling": 0.889,
+      "business": 0.7999,
+      "general": 0.8749,
+      "programming": 0.9666
+     },
+     "seconds": 215.0,
+     "size_gb": 2.5,
+     "version": "7485fe6f11af2943"
+    },
+    "qwen3-8b-q4_k_m": {
+     "benchmark_run": 21,
+     "accuracy": 0.647,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.29,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 4268,
+     "tokens_per_s": 2.02,
+     "cost_per_success_usd": 2.6e-05,
+     "energy_wh": 1.4179,
+     "creative": {
+      "songwriting": 0.7961,
+      "poetry": 0.749,
+      "brainstorming": 0.9525,
+      "storytelling": 0.889,
+      "business": 0.7999,
+      "general": 0.85,
+      "programming": 0.8834
+     },
+     "seconds": 342.6,
+     "size_gb": 5.03,
+     "version": "d98cdcbd03e17ce4"
+    }
+   },
+   "deltas": {
+    "previous": null,
+    "changes": [],
+    "variance": [],
+    "noise": {},
+    "verdict": "first championship on this hardware — the baseline"
+   },
+   "standings_top": {
+    "accuracy (17 tasks)": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.647,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.647,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.647,
+      "direction": "higher"
+     }
+    ],
+    "speed (tokens/s)": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 29.43,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 15.2,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 8.99,
+      "direction": "higher"
+     }
+    ],
+    "latency p50 (ms)": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 325,
+      "direction": "lower"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 372,
+      "direction": "lower"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 671,
+      "direction": "lower"
+     }
+    ],
+    "cost per success (USD)": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 2e-06,
+      "direction": "lower"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 4e-06,
+      "direction": "lower"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 4e-06,
+      "direction": "lower"
+     }
+    ],
+    "skill: classification": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: structured_output": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: instruction_adherence": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: reasoning": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.5,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.5,
+      "direction": "higher"
+     }
+    ],
+    "skill: hallucination": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: context_retention": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: coding": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: deep_reasoning": [
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.29,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.29,
+      "direction": "higher"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.14,
+      "direction": "higher"
+     }
+    ],
+    "skill: tool_use": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "creative: songwriting": [
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.7961,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.7742,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.7375,
+      "direction": "higher"
+     }
+    ],
+    "creative: poetry": [
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.7619,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.749,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.7387,
+      "direction": "higher"
+     }
+    ],
+    "creative: brainstorming": [
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.9525,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.939,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.9131,
+      "direction": "higher"
+     }
+    ],
+    "creative: storytelling": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.9167,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.9167,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.889,
+      "direction": "higher"
+     }
+    ],
+    "creative: business": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.8201,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.7999,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.7999,
+      "direction": "higher"
+     }
+    ],
+    "creative: general": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.8749,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.8749,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.8749,
+      "direction": "higher"
+     }
+    ],
+    "creative: programming": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.9834,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.9834,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.9666,
+      "direction": "higher"
+     }
+    ]
+   }
+  },
+  "with_newcomer": {
+   "id": 4,
+   "seconds": 975,
+   "status": "completed",
+   "summary": "6 of 6 contenders measured on Intel(R) Xeon(R) Processor @ 2.10GHz (4 cores, 17 GB). Leaders: accuracy qwen3-4b-instruct-2507-q4_k_m, speed smollm2-360m-instruct-q8_0, songwriting qwen3-4b-instruct-2507-q4_k_m. Versus #3: smarter in 2 categories (attributable to qwen3-4b-instruct-2507-q4_k_m); 2 categories moved only because the same models scored differently (re-measurement variance up to 494).",
+   "participants": [
+    "smollm2-360m-instruct-q8_0",
+    "qwen2.5-0.5b-instruct-q4_k_m",
+    "qwen2.5-1.5b-instruct-q4_k_m",
+    "qwen3-4b-q4_k_m",
+    "qwen3-4b-instruct-2507-q4_k_m",
+    "qwen3-8b-q4_k_m"
+   ],
+   "hardware": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "ram_gb": 17,
+    "gpus": [],
+    "accelerator": "cpu",
+    "runtime": "0.3.36"
+   },
+   "suites": {
+    "daemon": "daemon-core-v1 (17 tasks)",
+    "creative": "creative-bench-2026-11-06.2",
+    "call": "by model key, thinking off, same token limits",
+    "decoding": "greedy (temperature 0, top_k 1, fixed seed)"
+   },
+   "results": {
+    "smollm2-360m-instruct-q8_0": {
+     "benchmark_run": 22,
+     "accuracy": 0.529,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 0.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.14,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 437,
+     "tokens_per_s": 27.27,
+     "cost_per_success_usd": 4e-06,
+     "energy_wh": 0.1754,
+     "creative": {
+      "songwriting": 0.441,
+      "poetry": 0.7107,
+      "brainstorming": 0.6012,
+      "storytelling": 0.9167,
+      "business": 0.7199,
+      "general": 0.8749,
+      "programming": 0.8834
+     },
+     "seconds": 39.7,
+     "size_gb": 0.39,
+     "version": "48ab3034d0dd401f"
+    },
+    "qwen2.5-0.5b-instruct-q4_k_m": {
+     "benchmark_run": 23,
+     "accuracy": 0.647,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 1.0,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.14,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 346,
+     "tokens_per_s": 14.68,
+     "cost_per_success_usd": 2e-06,
+     "energy_wh": 0.1255,
+     "creative": {
+      "songwriting": 0.4207,
+      "poetry": 0.7387,
+      "brainstorming": 0.5962,
+      "storytelling": 0.8868,
+      "business": 0.8201,
+      "general": 0.8749,
+      "programming": 0.9834
+     },
+     "seconds": 36.6,
+     "size_gb": 0.49,
+     "version": "74a4da8c9fdbcd15"
+    },
+    "qwen2.5-1.5b-instruct-q4_k_m": {
+     "benchmark_run": 24,
+     "accuracy": 0.647,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.29,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 702,
+     "tokens_per_s": 8.63,
+     "cost_per_success_usd": 5e-06,
+     "energy_wh": 0.2574,
+     "creative": {
+      "songwriting": 0.7375,
+      "poetry": 0.7619,
+      "brainstorming": 0.939,
+      "storytelling": 0.9167,
+      "business": 0.7999,
+      "general": 0.8749,
+      "programming": 0.9834
+     },
+     "seconds": 78.9,
+     "size_gb": 1.12,
+     "version": "6a1a2eb6d15622bf"
+    },
+    "qwen3-4b-q4_k_m": {
+     "benchmark_run": 25,
+     "accuracy": 0.588,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.14,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 2402,
+     "tokens_per_s": 4.63,
+     "cost_per_success_usd": 1.9e-05,
+     "energy_wh": 0.9748,
+     "creative": {
+      "songwriting": 0.7742,
+      "poetry": 0.734,
+      "brainstorming": 0.9131,
+      "storytelling": 0.889,
+      "business": 0.7999,
+      "general": 0.8749,
+      "programming": 0.9666
+     },
+     "seconds": 214.3,
+     "size_gb": 2.5,
+     "version": "7485fe6f11af2943"
+    },
+    "qwen3-4b-instruct-2507-q4_k_m": {
+     "benchmark_run": 26,
+     "accuracy": 0.706,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 1.0,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.29,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 2451,
+     "tokens_per_s": 5.45,
+     "cost_per_success_usd": 2.6e-05,
+     "energy_wh": 1.5311,
+     "creative": {
+      "songwriting": 0.8121,
+      "poetry": 0.7236,
+      "brainstorming": 0.9578,
+      "storytelling": 0.861,
+      "business": 0.7999,
+      "general": 0.85,
+      "programming": 0.9666
+     },
+     "seconds": 250.7,
+     "size_gb": 2.5,
+     "version": "3605803b982cb64a"
+    },
+    "qwen3-8b-q4_k_m": {
+     "benchmark_run": 27,
+     "accuracy": 0.647,
+     "by_skill": {
+      "classification": 1.0,
+      "structured_output": 1.0,
+      "instruction_adherence": 1.0,
+      "reasoning": 0.5,
+      "hallucination": 1.0,
+      "context_retention": 1.0,
+      "coding": 1.0,
+      "deep_reasoning": 0.29,
+      "tool_use": 1.0
+     },
+     "latency_p50_ms": 4762,
+     "tokens_per_s": 1.96,
+     "cost_per_success_usd": 2.7e-05,
+     "energy_wh": 1.4621,
+     "creative": {
+      "songwriting": 0.7961,
+      "poetry": 0.749,
+      "brainstorming": 0.9525,
+      "storytelling": 0.889,
+      "business": 0.7999,
+      "general": 0.85,
+      "programming": 0.8834
+     },
+     "seconds": 354.6,
+     "size_gb": 5.03,
+     "version": "d98cdcbd03e17ce4"
+    }
+   },
+   "deltas": {
+    "changes": [
+     {
+      "category": "accuracy (17 tasks)",
+      "before": {
+       "model": "qwen2.5-0.5b-instruct-q4_k_m",
+       "value": 0.647,
+       "direction": "higher"
+      },
+      "after": {
+       "model": "qwen3-4b-instruct-2507-q4_k_m",
+       "value": 0.706,
+       "direction": "higher"
+      },
+      "change": 0.059,
+      "relative": 0.091,
+      "new_leader": true,
+      "noise": 0.0,
+      "kind": "smarter",
+      "attributed_to": "qwen3-4b-instruct-2507-q4_k_m"
+     },
+     {
+      "category": "creative: songwriting",
+      "before": {
+       "model": "qwen3-8b-q4_k_m",
+       "value": 0.7961,
+       "direction": "higher"
+      },
+      "after": {
+       "model": "qwen3-4b-instruct-2507-q4_k_m",
+       "value": 0.8121,
+       "direction": "higher"
+      },
+      "change": 0.016,
+      "relative": 0.02,
+      "new_leader": true,
+      "noise": 0.0,
+      "kind": "smarter",
+      "attributed_to": "qwen3-4b-instruct-2507-q4_k_m"
+     }
+    ],
+    "variance": [
+     {
+      "category": "speed (tokens/s)",
+      "before": {
+       "model": "smollm2-360m-instruct-q8_0",
+       "value": 29.43,
+       "direction": "higher"
+      },
+      "after": {
+       "model": "smollm2-360m-instruct-q8_0",
+       "value": 27.27,
+       "direction": "higher"
+      },
+      "change": -2.16,
+      "relative": -0.073,
+      "new_leader": false,
+      "noise": 2.16,
+      "kind": "variance"
+     },
+     {
+      "category": "latency p50 (ms)",
+      "before": {
+       "model": "qwen2.5-0.5b-instruct-q4_k_m",
+       "value": 325,
+       "direction": "lower"
+      },
+      "after": {
+       "model": "qwen2.5-0.5b-instruct-q4_k_m",
+       "value": 346,
+       "direction": "lower"
+      },
+      "change": -21,
+      "relative": -0.065,
+      "new_leader": false,
+      "noise": 494,
+      "kind": "variance"
+     }
+    ],
+    "noise": {
+     "accuracy (17 tasks)": 0.0,
+     "speed (tokens/s)": 2.16,
+     "latency p50 (ms)": 494,
+     "cost per success (USD)": 0.0,
+     "skill: classification": 0.0,
+     "skill: structured_output": 0.0,
+     "skill: instruction_adherence": 0.0,
+     "skill: reasoning": 0.0,
+     "skill: hallucination": 0.0,
+     "skill: context_retention": 0.0,
+     "skill: coding": 0.0,
+     "skill: deep_reasoning": 0.0,
+     "skill: tool_use": 0.0,
+     "creative: songwriting": 0.0,
+     "creative: poetry": 0.0,
+     "creative: brainstorming": 0.0,
+     "creative: storytelling": 0.0,
+     "creative: business": 0.0,
+     "creative: general": 0.0,
+     "creative: programming": 0.0
+    },
+    "controls": [
+     "smollm2-360m-instruct-q8_0",
+     "qwen2.5-0.5b-instruct-q4_k_m",
+     "qwen2.5-1.5b-instruct-q4_k_m",
+     "qwen3-4b-q4_k_m",
+     "qwen3-8b-q4_k_m"
+    ],
+    "newcomers": [
+     "qwen3-4b-instruct-2507-q4_k_m"
+    ],
+    "verdict": "smarter in 2 categories (attributable to qwen3-4b-instruct-2507-q4_k_m); 2 categories moved only because the same models scored differently (re-measurement variance up to 494)",
+    "previous": 3
+   },
+   "standings_top": {
+    "accuracy (17 tasks)": [
+     {
+      "model": "qwen3-4b-instruct-2507-q4_k_m",
+      "value": 0.706,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.647,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.647,
+      "direction": "higher"
+     }
+    ],
+    "speed (tokens/s)": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 27.27,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 14.68,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 8.63,
+      "direction": "higher"
+     }
+    ],
+    "latency p50 (ms)": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 346,
+      "direction": "lower"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 437,
+      "direction": "lower"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 702,
+      "direction": "lower"
+     }
+    ],
+    "cost per success (USD)": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 2e-06,
+      "direction": "lower"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 4e-06,
+      "direction": "lower"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 5e-06,
+      "direction": "lower"
+     }
+    ],
+    "skill: classification": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: structured_output": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: instruction_adherence": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: reasoning": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-instruct-2507-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.5,
+      "direction": "higher"
+     }
+    ],
+    "skill: hallucination": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: context_retention": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: coding": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "skill: deep_reasoning": [
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.29,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-instruct-2507-q4_k_m",
+      "value": 0.29,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.29,
+      "direction": "higher"
+     }
+    ],
+    "skill: tool_use": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 1.0,
+      "direction": "higher"
+     }
+    ],
+    "creative: songwriting": [
+     {
+      "model": "qwen3-4b-instruct-2507-q4_k_m",
+      "value": 0.8121,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.7961,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.7742,
+      "direction": "higher"
+     }
+    ],
+    "creative: poetry": [
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.7619,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.749,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.7387,
+      "direction": "higher"
+     }
+    ],
+    "creative: brainstorming": [
+     {
+      "model": "qwen3-4b-instruct-2507-q4_k_m",
+      "value": 0.9578,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-8b-q4_k_m",
+      "value": 0.9525,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.939,
+      "direction": "higher"
+     }
+    ],
+    "creative: storytelling": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.9167,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.9167,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.889,
+      "direction": "higher"
+     }
+    ],
+    "creative: business": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.8201,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.7999,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.7999,
+      "direction": "higher"
+     }
+    ],
+    "creative: general": [
+     {
+      "model": "smollm2-360m-instruct-q8_0",
+      "value": 0.8749,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.8749,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.8749,
+      "direction": "higher"
+     }
+    ],
+    "creative: programming": [
+     {
+      "model": "qwen2.5-0.5b-instruct-q4_k_m",
+      "value": 0.9834,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen2.5-1.5b-instruct-q4_k_m",
+      "value": 0.9834,
+      "direction": "higher"
+     },
+     {
+      "model": "qwen3-4b-q4_k_m",
+      "value": 0.9666,
+      "direction": "higher"
+     }
+    ]
+   }
+  }
+ },
+ "advocate_reviews": {
+  "before_sample_size_rule": {
+   "seconds": 4,
+   "verdict": "sound",
+   "reviewer": "rules+local:smollm2-360m-instruct-q8_0",
+   "summary": "Sound — 13 checks passed, no significant problem found.",
+   "findings": []
+  },
+  "after_sample_size_rule": {
+   "seconds": 4,
+   "verdict": "concerns",
+   "reviewer": "rules+local:smollm2-360m-instruct-q8_0",
+   "summary": "2 concern(s): the evidence rests on 17 task(s); the test conditions may favour one side",
+   "findings": [
+    {
+     "source": "rules",
+     "severity": "important",
+     "weakness": "the evidence rests on 17 task(s)",
+     "evidence": "sample_size=17, deciding margin 1 task(s)",
+     "alternative": "extend the task set or repeat the comparison before switching"
+    },
+    {
+     "source": "rules",
+     "severity": "important",
+     "weakness": "the test conditions may favour one side",
+     "evidence": "championships run every model with thinking off; the incumbent Qwen3 4B scored 17/17 WITH thinking",
+     "alternative": "measure under the real conditions too"
+    }
+   ]
+  }
+ }
+}

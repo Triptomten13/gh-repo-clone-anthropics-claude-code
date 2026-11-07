@@ -22,7 +22,7 @@ stack:
   frontend: Next.js 16.4, React 19.3, Tailwind CSS 4.3, TypeScript 5.9, Recharts 3, lucide-react
   local_ai: llama.cpp via llama-cpp-python 0.3.36 (GGUF models, CPU), optional Ollama, LAN workers
   external_ai: Anthropic API adapter (Claude models) — implemented, never called live here (no key)
-  tests: pytest (289 backend tests), Playwright (109 Chromium + WebKit/Firefox), axe-core accessibility
+  tests: pytest (291 backend tests), Playwright (121 Chromium + WebKit/Firefox), axe-core accessibility
   deploy: Docker Compose (private), all-in-one image + Render Blueprint (public demo), Caddy TLS profile
 size: ~22,000 lines backend Python (app) + ~4,900 lines tests; ~6,800 lines frontend TS/TSX; 24 docs (~2,600 lines)
 pages: 35 Next.js pages; ~282 HTTP endpoints
@@ -375,8 +375,9 @@ def approval_apply(aid: int, db: Session = Depends(get_db), user: User = Depends
 | Critic noise | the same 8B critic scored identical text 0.11 and 0.38 in two runs | same |
 | Model Hunter, live discovery (60 HF repositories, 4 tasks) | 12 shortlisted; screened out: 14 not chat models (speech recognition, TTS, embeddings, rerankers found by "0.6b"), 12 no single-file GGUF, 8 no licence, 3 safety-stripped, 7 above the 6 GB budget | 2026-11-07 run |
 | Real acquisition | Qwen3-4B-Instruct-2507 (2.5 GB): Devil's Advocate "concerns: popularity is not evidence — measure first"; download refused before approval; after a second person approved: 22 s download, sha256 verified, licence re-checked live | 2026-11-07 run |
-| Model Championship (thinking off for all) | in progress at the time of writing; first measurements: SmolLM2 360M 0.588 accuracy, 26.7 tokens/s, songwriting 0.46; Qwen2.5 0.5B 0.647, 14.1 tok/s, 0.42; Qwen2.5 1.5B 0.647, 8.6 tok/s, 0.66 | docs/AUTONOMY.md §6 when complete |
-| Tests | 289 backend (pytest), Playwright 109 passed / 4 skipped (Chromium: unit, 4 device profiles, responsive 11 sizes × all pages, axe accessibility, CSP, PWA, performance) + WebKit/Firefox in CI; public demo suite 10/10 | CI runs 29–43 green |
+| Model Championships (4 real runs) | sampled runs (temp 0.2) showed unchanged models moving by up to 0.29 → greedy decoding + attribution; greedy runs: unchanged models identical (noise 0.0); newcomer **Qwen3-4B-Instruct-2507 leads accuracy 0.706 (vs 0.647) and songwriting 0.812 (vs 0.796)** — evidence thin (1 task of 17; 2 songwriting tasks; thinking off) | docs/AUTONOMY.md §6, docs/benchmarks/autonomy-2026-11-07.json |
+| Devil's Advocate, real review of switching the chat model | first: 'sound' (rules checked presence, not strength; the only non-Qwen reviewer, SmolLM2 360M, found nothing) → evidence-strength rule added → 'concerns: 17 tasks; conditions favour one side' | docs/AUTONOMY.md §6.5 |
+| Tests | 291 backend (pytest), Playwright 121 passed (Chromium: unit, 4 device profiles, responsive 11 sizes × all pages, axe accessibility, CSP, PWA, performance) + WebKit/Firefox in CI; public demo suite 10/10 | CI runs 29–43 green |
 
 ---
 

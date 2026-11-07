@@ -137,6 +137,57 @@ noise floor, and only a new or changed model that leads by more than that floor 
 
 **Championships #3 and #4** (greedy): results in §6.4.
 
-### 6.4 Greedy championships
+### 6.4 Greedy championships (#3 baseline 714 s, #4 with the newcomer 975 s)
 
-Pending — running at the time of writing.
+**Reproducible now**: every unchanged model scored *exactly* the same on every quality category in #3 and #4 (noise
+0.0). Only speed and latency moved (up to 2.2 tokens/s and 0.49 s — a shared CPU), and the comparison reported those as
+variance, not progress.
+
+| Model (thinking off for all) | Accuracy /17 | Tokens/s | Songwriting | Brainstorming | Programming | Time |
+|---|---|---|---|---|---|---|
+| SmolLM2 360M | 0.529 | 27.3 | 0.441 | 0.601 | 0.883 | 40 s |
+| Qwen2.5 0.5B | 0.647 | 14.7 | 0.421 | 0.596 | 0.983 | 37 s |
+| Qwen2.5 1.5B | 0.647 | 8.6 | 0.738 | 0.939 | 0.983 | 79 s |
+| Qwen3 4B | 0.588 | 4.6 | 0.774 | 0.913 | 0.967 | 214 s |
+| **Qwen3-4B-Instruct-2507 (newcomer)** | **0.706** | 5.5 | **0.812** | **0.958** | 0.967 | 251 s |
+| Qwen3 8B | 0.647 | 2.0 | 0.796 | 0.953 | 0.883 | 355 s |
+
+Verdict of #4 vs #3: **smarter in 2 categories, attributable to Qwen3-4B-Instruct-2507** — accuracy 0.647 → 0.706
+and songwriting 0.796 (Qwen3 8B) → 0.812; brainstorming 0.953 → 0.958 is under the 2 % threshold and was not claimed.
+It is also 18 % faster than the Qwen3 4B it would replace (5.5 vs 4.6 tokens/s).
+
+**How strong is that?** Weak but real: accuracy +0.059 is **one more task out of 17**; songwriting rests on **2 tasks**
+and clears the 2 % threshold by a hair; and championships run every model **without its thinking phase** — the
+incumbent Qwen3 4B scores 17/17 *with* thinking in the deep slot. Nothing was switched automatically.
+
+### 6.5 Devil's Advocate on the switch (real, with its model layer)
+
+Decision record: "replace Qwen3 4B with Qwen3-4B-Instruct-2507 as the default chat model", with the championship as
+evidence. First review (4 s): **sound** — every protocol question was answered, and the rules checked that evidence
+*existed*, not how strong it was. The independent model layer had only **SmolLM2 360M** available: independence
+excludes the proposer's family, and every other installed model is a Qwen. It produced no usable finding. A rule for
+evidence strength (sample size, deciding margin, test conditions) was added; the second review returned **concerns:
+"the evidence rests on 17 task(s)"** and **"the test conditions may favour one side"**. Lesson: a critic needs a
+capable model from *another* family — the next thing the Model Hunter should bring in (Llama, Gemma, Mistral or Phi).
+
+## 7. Capability matrix
+
+| Capability | Status | Evidence / remaining |
+|---|---|---|
+| Model discovery on Hugging Face (official API, change detection) | **IMPLEMENTED AND VERIFIED** | tests + real run (60 repositories) |
+| Pre-download screening (format, declared task, licence, gating, safety, budget, RAM) | **IMPLEMENTED AND VERIFIED** | tests + real run; the declared-task rule came from the real run |
+| Governed acquisition + verified download | **IMPLEMENTED AND VERIFIED** — REQUIRES USER APPROVAL | real 2.5 GB acquisition, four eyes |
+| Model registry with licence, sha256, revision, provenance | **IMPLEMENTED AND VERIFIED** | the existing library, pinned entries |
+| Runtimes beyond llama.cpp (vLLM, Transformers, MLX, ONNX), vision/audio inference | **NOT IMPLEMENTED** | the Hunter screens such models out because nothing can run them |
+| Model Championship (same tasks, hardware, run; attribution) | **IMPLEMENTED AND VERIFIED** | 4 real championships; greedy decoding and attribution came from the first two |
+| Championship statistics (repeats, confidence intervals, larger task sets) | **NOT IMPLEMENTED** | 17 + 10 tasks today |
+| Scheduled scans and championships | **PARTIALLY IMPLEMENTED** | agent task types exist (`model.discover`, `model.championship`); no recurring schedule configured |
+| Devil's Advocate rule layer, calibration, agreement monitor | **IMPLEMENTED AND VERIFIED** | 9/9 calibration; evidence-strength rule from the real review |
+| Devil's Advocate on G-SUS plans | **IMPLEMENTED AND VERIFIED** | tests; G-SUS plans do not yet record alternatives, so reviewed plans carry that concern |
+| Independent-family model review | **IMPLEMENTED**, weak in practice | only SmolLM2 360M is outside the Qwen family here |
+| Account Vault: proposals, critique, four eyes, encrypted storage, grants, audit, revoke | **IMPLEMENTED AND VERIFIED** | tests incl. a token that never appears in results, API, audit, model calls or tool records |
+| Live account health checks (Hugging Face, GitHub, GitLab) | **REQUIRES CREDENTIALS** | official endpoints implemented; no account is connected here |
+| OAuth flows, automatic rotation | **NOT IMPLEMENTED** | token paste by the owner; expiry warnings only |
+| Account creation on third-party sites | **BLOCKED BY PLATFORM** (by design) | e-mail/phone verification and CAPTCHAs are never bypassed — a person signs up |
+| GitHub development division (repositories, PRs, CI via agents) | **NOT IMPLEMENTED** | identity check only (`github.whoami`) |
+| Model Council beyond Creative Tournaments, Innovation Board, multimodal learning | **NOT IMPLEMENTED** | deferred under the "finish before adding" principle |
