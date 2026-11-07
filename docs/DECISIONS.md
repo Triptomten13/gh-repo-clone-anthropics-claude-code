@@ -2,6 +2,19 @@
 
 Short records of decisions that shape the system. Newest first.
 
+### D-025 · 2026-11-07 · Measure models ourselves, challenge every important decision, never hand a secret to a model
+Owner's priorities: the Model Hunter measures on this hardware and our tasks (not leaderboards); the Devil's Advocate
+can challenge G-SUS and must not just agree; the Account Vault gives agents autonomy without spreading secrets.
+* Discovery screens deterministically before any download; popularity is metadata, never evidence. Acquisition needs a
+  Devil's Advocate review and a second person's approval, and goes through the existing verified installer.
+* Championships decode greedily and attribute changes: unchanged models are controls whose own movement is the noise
+  floor; only a new or changed model leading by more than that floor is "smarter / faster / cheaper". (The first two real
+  championships, sampled at temperature 0.2, reported progress that was sampling noise.)
+* The Devil's Advocate's first layer is rule-based so no model can talk it into agreeing; a model from a different
+  family may add evidence-backed concerns but can never block; blocking is reserved for policy and security; its
+  calibration and agreement rate are measured and shown.
+* Agents get tool grants that name a Vault account, never the secret; sign-ups are done by a person.
+
 ### D-024 · 2026-11-06 · Finish before adding: approved changes are applied by repeating the original request
 Owner's principle for this round: complete and connect what exists before building new features (docs/COMPLETION_AUDIT.md).
 A governed change is applied through `POST /api/approvals/{id}/apply`, which repeats the stored request through the

@@ -83,6 +83,60 @@ It asks for auditable decision records, never for a model's hidden chain of thou
 `frontend/tests/e2e/autonomy.spec.ts`; migration 0012 up/down/up on SQLite and PostgreSQL 16; PostgreSQL smoke including
 the new endpoints. Real runs: §6.
 
-## 6. Real runs on this machine
+## 6. Real runs on this machine (2026-11-07)
 
-Filled in from `docs/benchmarks/autonomy-2026-11-07.json`.
+Hardware: Intel Xeon @ 2.1 GHz, 4 cores, ~17 GB RAM, no GPU, llama.cpp 0.3.36. Evidence:
+`docs/benchmarks/autonomy-2026-11-07.json`.
+
+### 6.1 Model Hunter — live discovery (official Hugging Face API)
+
+Four searches (Swedish, small, general, coding), 15 repositories each, **60 repositories in ~10 s**, nothing downloaded.
+**12 shortlisted.** Screened out before any download:
+
+| Reason | Repositories |
+|---|---|
+| not a chat / text-generation model (speech recognition, text-to-speech, embeddings, rerankers) | 14 |
+| no single-file GGUF in a supported quantization | 12 |
+| no licence stated in the model card | 8 |
+| above the 6 GB storage budget (16–22 GB repositories) | 7 |
+| safety training removed (abliterated / uncensored) | 3 |
+
+The first run did **not** check the declared task: a search for small models shortlisted speech-recognition and
+text-to-speech GGUFs as chat models. The screening now requires the repository to declare a chat or embedding task
+(`pipeline_tag`). Most-downloaded results included 27B–35B models and an abliterated fine-tune — popularity is not a fit.
+
+### 6.2 Real acquisition through the governed path
+
+`unsloth/Qwen3-4B-Instruct-2507-GGUF` (Q4_K_M, 2.5 GB, Apache-2.0), a newer non-thinking release of the installed
+Qwen3 4B:
+
+1. Devil's Advocate: **concerns** — "the case for this model rests on popularity or public leaderboards, not on our
+   tasks"; alternative: "run it in the Model Championship against the installed models".
+2. Approval filed (`models.acquire`, APPROVAL_REQUIRED); an attempt to download before approval was refused.
+3. A second person (approver role) approved; the existing installer downloaded it in **22 s**, verified the sha256 and
+   re-checked the licence against the live Hub (`…@a06e946bb6b6`).
+
+### 6.3 Model Championships — and what they taught us
+
+**Championships #1 and #2** (sampling as in normal use: temperature 0.2, random seed): #1 = the five installed chat
+models (978 s), #2 = the same five + the newcomer (920 s). The comparison reported *"faster, smarter in 5 categories;
+2 regressions"* — but the **unchanged** models moved between the two runs:
+
+| Same model, same tasks, 15 minutes apart | #1 | #2 |
+|---|---|---|
+| SmolLM2 360M accuracy (17 tasks) | 0.588 | 0.647 |
+| SmolLM2 360M songwriting | 0.464 | 0.666 |
+| SmolLM2 360M poetry | 0.747 | 0.468 |
+| Qwen2.5 0.5B accuracy | 0.647 | 0.706 |
+| Qwen2.5 1.5B deep reasoning | 0.29 | 0.43 |
+
+So most of the "progress" was sampling luck. Two fixes followed, with tests: championships now decode **greedily**
+(temperature 0, top_k 1, fixed seed — recorded in the suite signature, so they are never compared with sampled runs),
+and the comparison **attributes**: models that ran unchanged in both championships are controls whose own movement is the
+noise floor, and only a new or changed model that leads by more than that floor counts as smarter, faster or cheaper.
+
+**Championships #3 and #4** (greedy): results in §6.4.
+
+### 6.4 Greedy championships
+
+Pending — running at the time of writing.
